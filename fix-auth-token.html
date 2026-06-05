@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix Authentication Token</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 40px; 
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .success { 
+            color: #28a745; 
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .info { 
+            color: #6c757d; 
+            margin-bottom: 30px;
+            line-height: 1.5;
+        }
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Authentication Token Fixed</h1>
+        <div class="success" id="status">✅ Clearing old authentication token...</div>
+        <div class="info">
+            Your authentication token has been updated. You need to log in again to access the dashboard with the correct permissions.
+        </div>
+        <a href="http://localhost:5173" class="btn">Go to Login Page</a>
+    </div>
+
+    <script>
+        // Clear all possible token storage locations
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('token');
+        sessionStorage.removeItem('auth_token');
+        sessionStorage.removeItem('token');
+        
+        // Clear any cookies that might contain tokens
+        document.cookie.split(";").forEach(function(c) { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+        
+        document.getElementById('status').innerHTML = '✅ Old authentication token cleared successfully!';
+        
+        // Auto-redirect after 3 seconds
+        setTimeout(() => {
+            window.location.href = 'http://localhost:5173';
+        }, 3000);
+    </script>
+</body>
+</html>

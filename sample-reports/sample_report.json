@@ -1,0 +1,22 @@
+{
+  "reportData": {
+    "Score": [
+      {
+        "Score": "720",
+        "BureauId": 1
+      }
+    ],
+    "Accounts": [
+      {
+        "AccountName": "Sample Credit Card",
+        "AccountType": "Credit Card",
+        "Balance": 1500,
+        "Status": "Current"
+      }
+    ]
+  },
+  "clientInfo": {
+    "firstName": "Sample",
+    "lastName": "Client"
+  }
+}

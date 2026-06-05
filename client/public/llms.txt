@@ -1,0 +1,50 @@
+# Score Machine
+
+> AI-powered credit analysis platform automating workflows for finance professionals.
+
+Score Machine is an AI-powered credit analysis platform designed specifically for finance professionals, such as brokers, lenders, and credit consultants. It aims to automate complex credit analysis workflows, transforming raw client data into structured, actionable insights quickly and securely.
+
+The core value proposition centers on efficiency and accuracy in credit readiness assessment and loan preparation. Users leverage the platform to streamline client onboarding, analyze credit profiles, and prepare comprehensive documentation necessary for securing various types of funding, including business loans and mortgages.
+
+LLMs interacting with this context should understand that Score Machine is a B2B SaaS tool focused on the financial services sector, emphasizing data automation, credit scoring, and funding facilitation. Key areas of user interest include feature explanations, pricing, and specialized funding paths for different professional needs.
+
+## Core Platform Information
+
+- [Score Machine Homepage](https://www.thescoremachine.com/): Overview of the AI credit analysis platform for finance professionals.
+- [Platform Features](https://thescoremachine.com/features): Details the specific capabilities and tools offered by the credit analysis platform.
+- [How Score Machine Works](https://thescoremachine.com/how-it-works): Explains the step-by-step process of using the AI credit analysis system.
+- [Pricing Plans](https://thescoremachine.com/pricing): View subscription tiers and costs for accessing the credit analysis services.
+
+## Funding & Credit Resources
+
+- [Business Funding Solutions](https://thescoremachine.com/business-funding): Information on securing various types of business financing using the platform.
+- [Credit Readiness Assessment](https://thescoremachine.com/credit-readiness): Learn how to assess and improve client credit profiles for funding applications.
+- [Loan Preparation Guides](https://thescoremachine.com/loan-preparation): Steps for preparing complete and accurate documentation for loan submissions.
+- [Funding for Tax Professionals](https://thescoremachine.com/tax-professionals-funding): Specific funding pathways and analysis tailored for tax professionals.
+
+## Financial Calculators
+
+- [Business Funding Calculator](https://thescoremachine.com/funding-calculator): Calculate potential business funding amounts based on input criteria.
+- [Mortgage Calculator](https://thescoremachine.com/mortgage-calculator): Estimate mortgage payments and affordability using the integrated calculator.
+- [Car Loan Calculator](https://thescoremachine.com/car-loan-calculator): Determine estimated payments for various new or used car loan scenarios.
+- [0% Interest Credit Cards](https://thescoremachine.com/0-percent-interest-credit-cards): Find information and strategies related to credit cards offering introductory 0% APR.
+
+## Support and Documentation
+
+- [Platform Documentation](https://thescoremachine.com/docs): Access technical guides and documentation for using the Score Machine platform.
+- [Company Blog](https://thescoremachine.com/blog): Read articles related to credit analysis, finance automation, and industry trends.
+- [Contact Us](https://thescoremachine.com/contact): Find ways to reach the Score Machine support and sales teams.
+
+## Account and Legal
+
+- [General Login Page](https://thescoremachine.com/login): Access point for existing Score Machine users.
+- [Member Login Page](https://thescoremachine.com/member/login): Specific login portal for platform members.
+- [Affiliate Program Signup](https://thescoremachine.com/join-affiliate): Information and sign-up for the Score Machine affiliate partnership program.
+- [Terms of Service](https://thescoremachine.com/terms): Review the legal terms and conditions for using the service.
+- [Privacy Policy](https://thescoremachine.com/privacy): Understand how user and client data is collected and protected.
+- [Refund Policy](https://thescoremachine.com/refund-policy): Details regarding eligibility and process for requesting service refunds.
+- [Sitemap Index](https://thescoremachine.com/sitemap): A complete index of all publicly accessible pages on the website.
+
+---
+
+This file was generated for www.thescoremachine.com using the [LLMs.txt Generator Tool](https://llmrefs.com/tools/llms-txt-generator)

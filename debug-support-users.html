@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Support Users API</title>
+</head>
+<body>
+    <h1>Support Users API Debug</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function debugSupportUsers() {
+            const results = document.getElementById('results');
+            
+            // Check localStorage for auth token
+            const authToken = localStorage.getItem('auth_token');
+            const userRole = localStorage.getItem('userRole');
+            const userId = localStorage.getItem('userId');
+            
+            let html = '<h2>Authentication Status:</h2>';
+            html += `<p><strong>Auth Token:</strong> ${authToken ? 'Present (' + authToken.substring(0, 20) + '...)' : 'Missing'}</p>`;
+            html += `<p><strong>User Role:</strong> ${userRole || 'Not set'}</p>`;
+            html += `<p><strong>User ID:</strong> ${userId || 'Not set'}</p>`;
+            
+            if (!authToken) {
+                html += '<p style="color: red;"><strong>❌ No authentication token found!</strong></p>';
+                html += '<p>You need to log in first. Go to <a href="/login">Login Page</a></p>';
+                results.innerHTML = html;
+                return;
+            }
+            
+            // Test the support users API
+            html += '<h2>Testing Support Users API:</h2>';
+            
+            try {
+                const response = await fetch('/api/super-admin/support-users', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+                
+                html += `<p><strong>Response Status:</strong> ${response.status}</p>`;
+                
+                const data = await response.json();
+                html += '<h3>Response Data:</h3>';
+                html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                if (response.ok && data.data) {
+                    html += `<p style="color: green;"><strong>✅ Found ${data.data.length} support users</strong></p>`;
+                } else {
+                    html += `<p style="color: red;"><strong>❌ API Error: ${data.error || 'Unknown error'}</strong></p>`;
+                }
+                
+            } catch (error) {
+                html += `<p style="color: red;"><strong>❌ Network Error:</strong> ${error.message}</p>`;
+            }
+            
+            results.innerHTML = html;
+        }
+        
+        // Run debug on page load
+        debugSupportUsers();
+    </script>
+</body>
+</html>

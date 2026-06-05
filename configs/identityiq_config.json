@@ -1,0 +1,143 @@
+{
+  "url": "https://member.identityiq.com/",
+  "loginUrl": "https://member.identityiq.com/",
+  "securityQuestionUrl": "https://member.identityiq.com/security-question",
+  "dashboardUrl": "https://member.identityiq.com/Dashboard.aspx",
+  "creditReportUrl": "https://member.identityiq.com/CreditReport.aspx",
+  "puppeteerConfig": {
+    "headless": "new",
+    "ignoreHTTPSErrors": false,
+    "userDataDir": "./userData",
+    "devtools": false,
+    "args": [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor"
+    ],
+    "ignoreDefaultArgs": [
+      "--disable-extensions"
+    ]
+  },
+  "puppeteerResolution": {
+    "width": 1280,
+    "height": 800
+  },
+  "puppeteerPreloadJs": [
+    "./preload.js"
+  ],
+  "puppeteerHttpHeaders": {
+    "Accept-Language": "en-US,en;q=0.9",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  },
+  "evaluations": {
+    "get_credit_data": "window.creditReportData || window.reportData || window.__CREDIT_REPORT_DATA__",
+    "get_page_data": "window.pageData || window.__PAGE_DATA__"
+  },
+  "selectors": {
+    "login_page": "form[action*='login'], .login-form, #loginForm",
+    "email_field": [
+      "input[name='email']",
+      "input[type='email']",
+      "#email",
+      "#Email",
+      "input[placeholder*='email' i]",
+      "input[id*='email' i]",
+      "input[name*='user' i]",
+      "input[id*='user' i]",
+      "input[name*='login' i]",
+      "input[id*='login' i]"
+    ],
+    "password_field": [
+      "input[name='password']",
+      "input[type='password']",
+      "#password",
+      "#Password",
+      "input[placeholder*='password' i]",
+      "input[id*='password' i]",
+      "input[name*='pass' i]",
+      "input[id*='pass' i]"
+    ],
+    "login_button": [
+      "button[type='submit']",
+      "input[type='submit']",
+      "button:contains('Sign In')",
+      "button:contains('Login')",
+      "button:contains('Log In')",
+      "a:contains('Sign In')",
+      "a:contains('Login')",
+      "a:contains('Log In')",
+      "a[href*='Customer/Login']",
+      ".login-button",
+      "#loginButton",
+      "#LoginButton"
+    ],
+    "security_question_page": [
+      "form[action*='security']",
+      ".security-question",
+      "#securityQuestionForm",
+      "input[name*='security']",
+      "input[placeholder*='last 4' i]"
+    ],
+    "ssn_field": [
+      "input[name*='ssn']",
+      "input[name*='social']",
+      "input[placeholder*='last 4' i]",
+      "input[placeholder*='SSN' i]",
+      "input[id*='ssn' i]",
+      "input[id*='social' i]",
+      "#ssnLast4",
+      "#SSNLast4"
+    ],
+    "security_submit_button": [
+      "button[type='submit']",
+      "input[type='submit']",
+      "button:contains('Continue')",
+      "button:contains('Submit')",
+      "button:contains('Verify')",
+      ".continue-button",
+      "#continueButton"
+    ],
+    "dashboard_indicators": [
+      ".dashboard",
+      "#dashboard",
+      "h1:contains('Dashboard')",
+      ".welcome-message",
+      ".account-summary"
+    ],
+    "credit_report_link": [
+      "a[href*='CreditReport']",
+      "a:contains('Credit Report')",
+      "a:contains('View Report')",
+      "a:contains('My Report')",
+      ".credit-report-link",
+      "#creditReportLink"
+    ],
+    "credit_report_container": [
+      ".credit-report",
+      "#creditReport",
+      ".report-container",
+      "#reportContainer",
+      ".credit-data",
+      "#creditData"
+    ],
+    "report_data_scripts": [
+      "script:contains('creditReportData')",
+      "script:contains('reportData')",
+      "script:contains('creditData')"
+    ]
+  },
+  "waitTimeouts": {
+    "navigation": 120000,
+    "element": 10000,
+    "security_question": 45000,
+    "report_load": 120000
+  },
+  "retryAttempts": {
+    "login": 3,
+    "security_question": 2,
+    "report_extraction": 3
+  }
+}

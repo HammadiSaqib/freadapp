@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Credit Report 403 Error</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Credit Report 403 Error</h1>
+    
+    <div class="section">
+        <h2>Authentication Status</h2>
+        <button onclick="checkAuth()">Check Authentication</button>
+        <div id="authStatus"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Test Credit Report Fetch</h2>
+        <button onclick="testCreditReportFetch()">Test Fetch Endpoint</button>
+        <div id="fetchStatus"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Test Platforms Endpoint</h2>
+        <button onclick="testPlatforms()">Test Platforms</button>
+        <div id="platformsStatus"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3002';
+        
+        function getToken() {
+            return localStorage.getItem('token');
+        }
+        
+        function makeAuthenticatedRequest(url, options = {}) {
+            const token = getToken();
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            return fetch(url, {
+                ...options,
+                headers
+            });
+        }
+        
+        async function checkAuth() {
+            const statusDiv = document.getElementById('authStatus');
+            const token = getToken();
+            
+            if (!token) {
+                statusDiv.innerHTML = '<div class="error">No token found in localStorage</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="info">Token found. Verifying...</div>';
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${API_BASE}/api/auth/verify`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.innerHTML = `
+                        <div class="success">Authentication successful</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="error">Authentication failed: ${response.status}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testCreditReportFetch() {
+            const statusDiv = document.getElementById('fetchStatus');
+            statusDiv.innerHTML = '<div class="info">Testing credit report fetch...</div>';
+            
+            try {
+                const response = await makeAuthenticatedRequest(
+                    `${API_BASE}/api/credit-reports/fetch?platform=myfreescorenow&username=test&password=test`
+                );
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.innerHTML = `
+                        <div class="success">Fetch request successful</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="error">Fetch failed: ${response.status} ${response.statusText}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testPlatforms() {
+            const statusDiv = document.getElementById('platformsStatus');
+            statusDiv.innerHTML = '<div class="info">Testing platforms endpoint...</div>';
+            
+            try {
+                const response = await makeAuthenticatedRequest(`${API_BASE}/api/credit-reports/platforms`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.innerHTML = `
+                        <div class="success">Platforms request successful</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="error">Platforms failed: ${response.status} ${response.statusText}</div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-check auth on load
+        window.onload = function() {
+            checkAuth();
+        };
+    </script>
+</body>
+</html>

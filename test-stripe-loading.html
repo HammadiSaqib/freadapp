@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Stripe Loading</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        #card-element {
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin: 15px 0;
+            background: white;
+        }
+        .payment-form {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stripe Loading Test</h1>
+        <p>This page tests if Stripe.js loads correctly and payment elements work without ERR_ABORTED errors.</p>
+        
+        <div id="status-container">
+            <div class="status info">
+                <strong>Status:</strong> Initializing...
+            </div>
+        </div>
+
+        <div class="payment-form" style="display: none;" id="payment-form">
+            <h3>Test Payment Form</h3>
+            <form id="payment-form-element">
+                <div id="card-element">
+                    <!-- Stripe Elements will create form elements here -->
+                </div>
+                <div id="card-errors" role="alert"></div>
+                <button type="submit" id="submit-button">Test Payment</button>
+            </form>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="testStripeConfig()">Test Stripe Config API</button>
+            <button onclick="reloadStripe()">Reload Stripe</button>
+        </div>
+
+        <div id="logs" style="margin-top: 20px;">
+            <h3>Logs:</h3>
+            <div id="log-content" style="background: #f8f9fa; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+
+        function log(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logContent = document.getElementById('log-content');
+            logContent.textContent += `[${timestamp}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+            console.log(message);
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusContainer = document.getElementById('status-container');
+            statusContainer.innerHTML = `<div class="status ${type}"><strong>Status:</strong> ${message}</div>`;
+        }
+
+        async function testStripeConfig() {
+            try {
+                log('Testing Stripe config API...');
+                const response = await fetch('http://localhost:3001/api/billing/stripe-config');
+                const data = await response.json();
+                
+                if (data.success && data.publishableKey) {
+                    log(`✅ Stripe config API working. Key: ${data.publishableKey.substring(0, 20)}...`);
+                    return data.publishableKey;
+                } else {
+                    log('❌ Stripe config API failed or no key found');
+                    return null;
+                }
+            } catch (error) {
+                log(`❌ Error testing Stripe config: ${error.message}`);
+                return null;
+            }
+        }
+
+        async function initializeStripe() {
+            try {
+                log('Initializing Stripe...');
+                updateStatus('Loading Stripe...', 'info');
+
+                // First test the config API
+                const publishableKey = await testStripeConfig();
+                
+                if (!publishableKey) {
+                    throw new Error('No Stripe publishable key available');
+                }
+
+                // Initialize Stripe with the key
+                stripe = Stripe(publishableKey);
+                log('✅ Stripe object created successfully');
+
+                // Create Elements instance
+                elements = stripe.elements();
+                log('✅ Stripe Elements created successfully');
+
+                // Create card element
+                cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': {
+                                color: '#aab7c4',
+                            },
+                        },
+                    },
+                });
+
+                // Mount the card element
+                cardElement.mount('#card-element');
+                log('✅ Card element mounted successfully');
+
+                // Listen for real-time validation errors from the card Element
+                cardElement.on('change', ({error}) => {
+                    const displayError = document.getElementById('card-errors');
+                    if (error) {
+                        displayError.textContent = error.message;
+                        log(`Card validation error: ${error.message}`);
+                    } else {
+                        displayError.textContent = '';
+                    }
+                });
+
+                // Show the payment form
+                document.getElementById('payment-form').style.display = 'block';
+                updateStatus('Stripe loaded successfully! Payment form is ready.', 'success');
+                log('✅ Stripe initialization complete - no ERR_ABORTED errors!');
+
+            } catch (error) {
+                log(`❌ Stripe initialization failed: ${error.message}`);
+                updateStatus(`Failed to load Stripe: ${error.message}`, 'error');
+                
+                // Check if it's the specific ERR_ABORTED error
+                if (error.message.includes('ERR_ABORTED') || error.message.includes('elements-inner-card')) {
+                    log('🔍 This appears to be the ERR_ABORTED error we\'re trying to fix');
+                }
+            }
+        }
+
+        async function reloadStripe() {
+            log('Reloading Stripe...');
+            
+            // Clear existing elements
+            if (cardElement) {
+                cardElement.unmount();
+                cardElement = null;
+            }
+            elements = null;
+            stripe = null;
+            
+            // Hide payment form
+            document.getElementById('payment-form').style.display = 'none';
+            
+            // Reinitialize
+            await initializeStripe();
+        }
+
+        // Handle form submission
+        document.getElementById('payment-form-element').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            if (!stripe || !cardElement) {
+                log('❌ Stripe not properly initialized');
+                return;
+            }
+
+            log('Testing payment method creation...');
+            
+            const {error, paymentMethod} = await stripe.createPaymentMethod({
+                type: 'card',
+                card: cardElement,
+            });
+
+            if (error) {
+                log(`❌ Payment method creation failed: ${error.message}`);
+            } else {
+                log(`✅ Payment method created successfully: ${paymentMethod.id}`);
+            }
+        });
+
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            log('Page loaded, starting Stripe initialization...');
+            initializeStripe();
+        });
+
+        // Listen for any global errors
+        window.addEventListener('error', (event) => {
+            if (event.message.includes('stripe') || event.message.includes('ERR_ABORTED')) {
+                log(`🚨 Global error detected: ${event.message}`);
+                log(`🚨 Error source: ${event.filename}:${event.lineno}`);
+            }
+        });
+    </script>
+</body>
+</html>

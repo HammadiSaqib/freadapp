@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Auth Token</title>
+</head>
+<body>
+    <h1>Debug Authentication Token</h1>
+    <div id="output"></div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        // Check what tokens are stored
+        const authToken = localStorage.getItem('auth_token');
+        const token = localStorage.getItem('token');
+        
+        output.innerHTML = `
+            <h2>LocalStorage Tokens:</h2>
+            <p><strong>auth_token:</strong> ${authToken ? authToken.substring(0, 50) + '...' : 'Not found'}</p>
+            <p><strong>token:</strong> ${token ? token.substring(0, 50) + '...' : 'Not found'}</p>
+            
+            <h2>Full Tokens (for debugging):</h2>
+            <p><strong>auth_token:</strong> ${authToken || 'Not found'}</p>
+            <p><strong>token:</strong> ${token || 'Not found'}</p>
+            
+            <h2>Actions:</h2>
+            <button onclick="clearTokens()">Clear All Tokens</button>
+            <button onclick="testBanksAPI()">Test Banks API</button>
+            
+            <div id="apiResult"></div>
+        `;
+        
+        function clearTokens() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('token');
+            location.reload();
+        }
+        
+        async function testBanksAPI() {
+            const resultDiv = document.getElementById('apiResult');
+            const authToken = localStorage.getItem('auth_token');
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '<p style="color: red;">No auth_token found in localStorage</p>';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/banks?status=active', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.text();
+                resultDiv.innerHTML = `
+                    <h3>API Test Result:</h3>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Response:</strong> ${data}</p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+        
+        // Make functions global
+        window.clearTokens = clearTokens;
+        window.testBanksAPI = testBanksAPI;
+    </script>
+</body>
+</html>

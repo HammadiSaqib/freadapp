@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { background: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #007bff; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+    </style>
+</head>
+<body>
+    <h1>API Functionality Test</h1>
+    
+    <div>
+        <h2>1. Basic Health Check</h2>
+        <button onclick="testPing()">Test /api/ping</button>
+        <div id="ping-result" class="result"></div>
+    </div>
+
+    <div>
+        <h2>2. Demo User Check</h2>
+        <button onclick="testDemoUser()">Check Demo User</button>
+        <div id="demo-result" class="result"></div>
+    </div>
+
+    <div>
+        <h2>3. Authentication Test</h2>
+        <button onclick="testLogin()">Login with Demo User</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <div>
+        <h2>4. Protected Endpoint Test</h2>
+        <button onclick="testProtected()">Test Protected Endpoint</button>
+        <div id="protected-result" class="result"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        async function testPing() {
+            const resultDiv = document.getElementById('ping-result');
+            resultDiv.innerHTML = 'Testing...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/ping');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ API is healthy!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ API error: ${data.error || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Network error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testDemoUser() {
+            const resultDiv = document.getElementById('demo-result');
+            resultDiv.innerHTML = 'Checking demo user...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/check-demo-user');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (data.user_exists) {
+                        resultDiv.innerHTML = `✅ Demo user exists!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                        resultDiv.className = 'result success';
+                    } else {
+                        resultDiv.innerHTML = `⚠️ Demo user not found<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                        resultDiv.className = 'result error';
+                    }
+                } else {
+                    resultDiv.innerHTML = `❌ Error: ${data.error || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Network error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = 'Testing login...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'demo@creditrepairpro.com',
+                        password: 'demo123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    resultDiv.innerHTML = `✅ Login successful!<br>User: ${data.user.first_name} ${data.user.last_name} (${data.user.role})<br>Token: ${data.token.substring(0, 20)}...`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ Login failed: ${data.error || 'Unknown error'}<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Network error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testProtected() {
+            const resultDiv = document.getElementById('protected-result');
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '❌ Please login first to test protected endpoints';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            resultDiv.innerHTML = 'Testing protected endpoint...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/profile', {
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ Protected endpoint works!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ Protected endpoint failed: ${data.error || 'Unknown error'}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Network error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Auto-run basic tests on page load
+        window.onload = function() {
+            setTimeout(testPing, 100);
+            setTimeout(testDemoUser, 200);
+        };
+    </script>
+</body>
+</html>

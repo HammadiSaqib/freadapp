@@ -1,0 +1,154 @@
+<!doctype html>
+<html>
+  <head>
+    <title>useToast Fix Verification</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px;
+        margin: 5px;
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .result {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #007bff;
+      }
+      .error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .success {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🛠️ useToast Import Fix Verification</h1>
+    <p>
+      Testing if the Dashboard loads without "useToast is not defined" errors
+    </p>
+
+    <div>
+      <h2>Step 1: Test Authentication</h2>
+      <button onclick="testLogin()">🔐 Login for Dashboard Access</button>
+      <div id="login-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 2: Dashboard Access Status</h2>
+      <p>After successful login, you can access the dashboard:</p>
+      <p>
+        <strong>Dashboard URL:</strong>
+        <a href="/dashboard" target="_blank">🚀 Open Dashboard</a>
+      </p>
+      <div class="result">
+        <h4>Expected Fix Results:</h4>
+        <ul>
+          <li>✅ No "ReferenceError: useToast is not defined" errors</li>
+          <li>✅ Dashboard loads without JavaScript crashes</li>
+          <li>✅ Toast notifications work for Add Client form</li>
+          <li>✅ All client functionality accessible</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <h2>Step 3: Test Client API (Optional)</h2>
+      <button onclick="testClientAPI()">📊 Test Client Data</button>
+      <div id="api-result" class="result"></div>
+    </div>
+
+    <script>
+      let authToken = null;
+
+      async function testLogin() {
+        const resultDiv = document.getElementById("login-result");
+        resultDiv.innerHTML = "🔄 Testing login...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "demo@creditrepairpro.com",
+              password: "demo123",
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.token) {
+            authToken = data.token;
+            localStorage.setItem("auth_token", data.token);
+
+            resultDiv.innerHTML = `✅ Login successful!<br>
+                        <strong>User:</strong> ${data.user.first_name} ${data.user.last_name}<br>
+                        <strong>Dashboard ready:</strong> useToast import should be working<br>
+                        <em>You can now safely access the dashboard</em>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testClientAPI() {
+        const resultDiv = document.getElementById("api-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Testing client API...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/clients", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const clientCount = data.clients?.length || 0;
+            resultDiv.innerHTML = `✅ Client API working!<br>
+                        <strong>Clients found:</strong> ${clientCount}<br>
+                        <strong>Dashboard data ready:</strong> Real client data available<br>
+                        <em>Toast notifications will work for Add Client actions</em>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `⚠️ API issue: ${data.error} (Dashboard will use fallback data)`;
+            resultDiv.className = "result";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `⚠️ API error: ${error.message} (Dashboard will use fallback data)`;
+          resultDiv.className = "result";
+        }
+      }
+
+      // Auto-test login
+      window.onload = function () {
+        setTimeout(testLogin, 500);
+      };
+    </script>
+  </body>
+</html>

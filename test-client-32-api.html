@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Client 32 API</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Client 32 Credit Report API</h1>
+        
+        <div class="section">
+            <h3>Authentication</h3>
+            <input type="email" id="email" placeholder="Email" value="demo@creditrepairpro.com">
+            <input type="password" id="password" placeholder="Password" value="demo123">
+            <button onclick="login()">Login</button>
+            <div id="auth-status"></div>
+        </div>
+
+        <div class="section">
+            <h3>API Tests</h3>
+            <button onclick="testCreditReportHistory()">Test Credit Report History</button>
+            <button onclick="testClientProfile()">Test Client Profile</button>
+            <div id="api-results"></div>
+        </div>
+
+        <div class="section">
+            <h3>Results</h3>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('auth_token');
+        
+        function updateAuthStatus() {
+            const status = document.getElementById('auth-status');
+            if (authToken) {
+                status.innerHTML = '<div class="success">✅ Authenticated</div>';
+            } else {
+                status.innerHTML = '<div class="error">❌ Not authenticated</div>';
+            }
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.token || (data.data && data.data.token)) {
+                    authToken = data.token || data.data.token;
+                    localStorage.setItem('auth_token', authToken);
+                    updateAuthStatus();
+                    logResult('Login successful', 'success');
+                } else {
+                    logResult('Login failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                logResult('Login error: ' + error.message, 'error');
+            }
+        }
+
+        async function testCreditReportHistory() {
+            if (!authToken) {
+                logResult('Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/credit-reports/history?clientId=32', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('Credit report history response:', data);
+                
+                logResult(`Credit Report History (Status: ${response.status})`, 'info');
+                logResult(JSON.stringify(data, null, 2), 'info');
+                
+                if (data.success && data.data && data.data.length > 0) {
+                    const report = data.data[0];
+                    if (report.reportData) {
+                        logResult('✅ JSON data found in report', 'success');
+                        logResult('Report Data Keys: ' + Object.keys(report.reportData).join(', '), 'info');
+                    } else {
+                        logResult('❌ No JSON data in report', 'error');
+                    }
+                }
+            } catch (error) {
+                logResult('API error: ' + error.message, 'error');
+            }
+        }
+
+        async function testClientProfile() {
+            if (!authToken) {
+                logResult('Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/clients/32', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('Client profile response:', data);
+                
+                logResult(`Client Profile (Status: ${response.status})`, 'info');
+                logResult(JSON.stringify(data, null, 2), 'info');
+            } catch (error) {
+                logResult('API error: ' + error.message, 'error');
+            }
+        }
+
+        function logResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `section ${type}`;
+            div.innerHTML = `<pre>${message}</pre>`;
+            results.appendChild(div);
+        }
+
+        // Initialize
+        updateAuthStatus();
+    </script>
+</body>
+</html>

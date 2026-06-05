@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Auth Token Test</title>
+</head>
+<body>
+    <h1>Clear Auth Token Test</h1>
+    <button onclick="clearToken()">Clear Auth Token</button>
+    <button onclick="checkToken()">Check Token</button>
+    <button onclick="goToLogin()">Go to Login</button>
+    <button onclick="goToLiveChat()">Go to Live Chat</button>
+    
+    <div id="output"></div>
+    
+    <script>
+        function clearToken() {
+            localStorage.removeItem('auth_token');
+            document.getElementById('output').innerHTML = '<p style="color: green;">Auth token cleared!</p>';
+        }
+        
+        function checkToken() {
+            const token = localStorage.getItem('auth_token');
+            const output = document.getElementById('output');
+            if (token) {
+                output.innerHTML = `<p>Token exists: ${token.substring(0, 20)}...</p>`;
+            } else {
+                output.innerHTML = '<p style="color: red;">No token found</p>';
+            }
+        }
+        
+        function goToLogin() {
+            window.location.href = '/support/login';
+        }
+        
+        function goToLiveChat() {
+            window.location.href = '/support/live-chat';
+        }
+        
+        // Check token on page load
+        window.onload = function() {
+            checkToken();
+        }
+    </script>
+</body>
+</html>

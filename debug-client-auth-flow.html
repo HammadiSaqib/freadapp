@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Client Authentication Flow</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .step {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin: 10px 0;
+            padding: 15px;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        .warning { background-color: #fff3cd; border-color: #ffeaa7; }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin: 10px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Client Authentication Flow Debugger</h1>
+        <p>This tool will test the complete client authentication flow step by step to identify where the 401 error occurs.</p>
+    </div>
+
+    <div class="container">
+        <h2>Step 1: Clear Previous State</h2>
+        <button onclick="clearState()">Clear All Storage & Cookies</button>
+        <div id="clearResult" class="step"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 2: Test Client Login</h2>
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="mrbadi1989@gmail.com" placeholder="Enter client email">
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="123456" placeholder="Enter client password">
+        </div>
+        <button onclick="testClientLogin()">Test Client Login</button>
+        <div id="loginResult" class="step"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 3: Verify Token Storage</h2>
+        <button onclick="verifyTokenStorage()">Check Token in localStorage</button>
+        <div id="tokenResult" class="step"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 4: Test Profile Endpoint</h2>
+        <button onclick="testProfileEndpoint()">Test /api/auth/profile</button>
+        <div id="profileResult" class="step"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 5: Manual Token Test</h2>
+        <div class="form-group">
+            <label for="manualToken">Manual Token (optional):</label>
+            <input type="text" id="manualToken" placeholder="Paste token here to test manually">
+        </div>
+        <button onclick="testManualToken()">Test Manual Token</button>
+        <div id="manualResult" class="step"></div>
+    </div>
+
+    <div class="container">
+        <h2>Step 6: Network Analysis</h2>
+        <button onclick="analyzeNetworkRequests()">Analyze Request Headers</button>
+        <div id="networkResult" class="step"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.className = `step ${type}`;
+            element.innerHTML = `<h3>Result:</h3><pre>${message}</pre>`;
+        }
+
+        function clearState() {
+            try {
+                // Clear localStorage
+                localStorage.clear();
+                
+                // Clear sessionStorage
+                sessionStorage.clear();
+                
+                // Clear cookies (basic attempt)
+                document.cookie.split(";").forEach(function(c) { 
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                });
+                
+                authToken = null;
+                
+                log('clearResult', '✅ All storage and cookies cleared successfully', 'success');
+            } catch (error) {
+                log('clearResult', `❌ Error clearing state: ${error.message}`, 'error');
+            }
+        }
+
+        async function testClientLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('loginResult', '❌ Please enter both email and password', 'error');
+                return;
+            }
+
+            try {
+                log('loginResult', '🔄 Testing client login...', 'info');
+                
+                const response = await fetch('/api/auth/member/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                let result = `Status: ${response.status} ${response.statusText}\n`;
+                result += `Response Headers:\n`;
+                for (let [key, value] of response.headers.entries()) {
+                    result += `  ${key}: ${value}\n`;
+                }
+                result += `\nResponse Body:\n${JSON.stringify(data, null, 2)}`;
+
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    
+                    // Store token in localStorage (simulating setAuthToken function)
+                    localStorage.setItem('auth_token', data.token);
+                    
+                    // Store user info if available
+                    if (data.user) {
+                        localStorage.setItem('userRole', data.user.role);
+                        localStorage.setItem('userId', data.user.id.toString());
+                        localStorage.setItem('userName', `${data.user.first_name} ${data.user.last_name}`);
+                    }
+                    
+                    result += `\n\n✅ Login successful! Token received: ${data.token.substring(0, 50)}...`;
+                    result += `\n✅ Token saved to localStorage`;
+                    log('loginResult', result, 'success');
+                } else {
+                    result += `\n\n❌ Login failed!`;
+                    log('loginResult', result, 'error');
+                }
+            } catch (error) {
+                log('loginResult', `❌ Network error during login: ${error.message}`, 'error');
+            }
+        }
+
+        function verifyTokenStorage() {
+            try {
+                const storedToken = localStorage.getItem('auth_token');
+                const storedRole = localStorage.getItem('userRole');
+                const storedUserId = localStorage.getItem('userId');
+                
+                let result = 'localStorage contents:\n';
+                result += `auth_token: ${storedToken ? storedToken.substring(0, 50) + '...' : 'NOT FOUND'}\n`;
+                result += `userRole: ${storedRole || 'NOT FOUND'}\n`;
+                result += `userId: ${storedUserId || 'NOT FOUND'}\n`;
+                
+                if (authToken) {
+                    result += `\nIn-memory token: ${authToken.substring(0, 50)}...\n`;
+                    
+                    if (storedToken === authToken) {
+                        result += '\n✅ Token in localStorage matches in-memory token';
+                        log('tokenResult', result, 'success');
+                    } else {
+                        result += '\n⚠️ Token mismatch between localStorage and in-memory';
+                        log('tokenResult', result, 'warning');
+                    }
+                } else if (storedToken) {
+                    authToken = storedToken;
+                    result += '\n✅ Token found in localStorage';
+                    log('tokenResult', result, 'success');
+                } else {
+                    result += '\n❌ No token found anywhere';
+                    log('tokenResult', result, 'error');
+                }
+            } catch (error) {
+                log('tokenResult', `❌ Error checking token storage: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProfileEndpoint() {
+            const token = authToken || localStorage.getItem('auth_token');
+            
+            if (!token) {
+                log('profileResult', '❌ No token available. Please login first.', 'error');
+                return;
+            }
+
+            try {
+                log('profileResult', '🔄 Testing profile endpoint...', 'info');
+                
+                const response = await fetch('/api/auth/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                let result = `Request Details:\n`;
+                result += `URL: ${response.url}\n`;
+                result += `Method: GET\n`;
+                result += `Authorization Header: Bearer ${token.substring(0, 30)}...\n\n`;
+                
+                result += `Response Details:\n`;
+                result += `Status: ${response.status} ${response.statusText}\n`;
+                result += `Response Headers:\n`;
+                for (let [key, value] of response.headers.entries()) {
+                    result += `  ${key}: ${value}\n`;
+                }
+
+                const data = await response.json();
+                result += `\nResponse Body:\n${JSON.stringify(data, null, 2)}`;
+
+                if (response.ok) {
+                    result += `\n\n✅ Profile endpoint successful!`;
+                    log('profileResult', result, 'success');
+                } else {
+                    result += `\n\n❌ Profile endpoint failed with ${response.status}`;
+                    log('profileResult', result, 'error');
+                }
+            } catch (error) {
+                log('profileResult', `❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testManualToken() {
+            const manualToken = document.getElementById('manualToken').value.trim();
+            
+            if (!manualToken) {
+                log('manualResult', '❌ Please enter a token to test', 'error');
+                return;
+            }
+
+            try {
+                log('manualResult', '🔄 Testing manual token...', 'info');
+                
+                const response = await fetch('/api/auth/profile', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${manualToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+                
+                let result = `Manual Token Test:\n`;
+                result += `Token: ${manualToken.substring(0, 50)}...\n`;
+                result += `Status: ${response.status} ${response.statusText}\n`;
+                result += `Response: ${JSON.stringify(data, null, 2)}`;
+
+                if (response.ok) {
+                    result += `\n\n✅ Manual token works!`;
+                    log('manualResult', result, 'success');
+                } else {
+                    result += `\n\n❌ Manual token failed`;
+                    log('manualResult', result, 'error');
+                }
+            } catch (error) {
+                log('manualResult', `❌ Error testing manual token: ${error.message}`, 'error');
+            }
+        }
+
+        function analyzeNetworkRequests() {
+            const token = authToken || localStorage.getItem('auth_token');
+            
+            let result = 'Network Request Analysis:\n\n';
+            
+            if (token) {
+                try {
+                    // Try to decode JWT token
+                    const parts = token.split('.');
+                    if (parts.length === 3) {
+                        const header = JSON.parse(atob(parts[0]));
+                        const payload = JSON.parse(atob(parts[1]));
+                        
+                        result += 'JWT Token Structure:\n';
+                        result += `Header: ${JSON.stringify(header, null, 2)}\n`;
+                        result += `Payload: ${JSON.stringify(payload, null, 2)}\n`;
+                        result += `Signature: ${parts[2].substring(0, 20)}...\n\n`;
+                        
+                        // Check expiration
+                        if (payload.exp) {
+                            const expDate = new Date(payload.exp * 1000);
+                            const now = new Date();
+                            result += `Token Expiration: ${expDate.toISOString()}\n`;
+                            result += `Current Time: ${now.toISOString()}\n`;
+                            result += `Token Expired: ${now > expDate ? 'YES ❌' : 'NO ✅'}\n\n`;
+                        }
+                        
+                        result += 'Request Headers that will be sent:\n';
+                        result += `Authorization: Bearer ${token.substring(0, 30)}...\n`;
+                        result += `Content-Type: application/json\n`;
+                        
+                        log('networkResult', result, payload.exp && new Date() > new Date(payload.exp * 1000) ? 'error' : 'success');
+                    } else {
+                        result += '❌ Invalid JWT format - token should have 3 parts separated by dots';
+                        log('networkResult', result, 'error');
+                    }
+                } catch (error) {
+                    result += `❌ Error analyzing token: ${error.message}`;
+                    log('networkResult', result, 'error');
+                }
+            } else {
+                result += '❌ No token available for analysis';
+                log('networkResult', result, 'error');
+            }
+        }
+
+        // Auto-run initial checks
+        window.onload = function() {
+            verifyTokenStorage();
+        };
+    </script>
+</body>
+</html>

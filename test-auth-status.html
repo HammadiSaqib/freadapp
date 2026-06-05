@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Status Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        pre { background-color: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Status Test</h1>
+    
+    <div id="tokenStatus" class="status info">Checking token...</div>
+    <div id="apiStatus" class="status info">Testing API access...</div>
+    
+    <h2>Token Details</h2>
+    <pre id="tokenDetails"></pre>
+    
+    <h2>API Response</h2>
+    <pre id="apiResponse"></pre>
+    
+    <button onclick="testAuth()">Test Authentication</button>
+    <button onclick="clearToken()">Clear Token</button>
+    
+    <script>
+        function testAuth() {
+            // Check if token exists
+            const token = localStorage.getItem('token');
+            const tokenStatus = document.getElementById('tokenStatus');
+            const tokenDetails = document.getElementById('tokenDetails');
+            
+            if (!token) {
+                tokenStatus.className = 'status error';
+                tokenStatus.textContent = 'No token found in localStorage';
+                tokenDetails.textContent = 'No token available';
+                return;
+            }
+            
+            tokenStatus.className = 'status success';
+            tokenStatus.textContent = 'Token found in localStorage';
+            
+            // Try to decode token (just for display, not validation)
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                tokenDetails.textContent = JSON.stringify(payload, null, 2);
+            } catch (e) {
+                tokenDetails.textContent = 'Invalid token format: ' + token.substring(0, 50) + '...';
+            }
+            
+            // Test API access
+            testApiAccess(token);
+        }
+        
+        async function testApiAccess(token) {
+            const apiStatus = document.getElementById('apiStatus');
+            const apiResponse = document.getElementById('apiResponse');
+            
+            try {
+                const response = await fetch('/api/calendar/admin/upcoming', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                    },
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    apiStatus.className = 'status success';
+                    apiStatus.textContent = 'API access successful';
+                } else {
+                    apiStatus.className = 'status error';
+                    apiStatus.textContent = `API access failed: ${response.status} ${response.statusText}`;
+                }
+                
+                apiResponse.textContent = JSON.stringify({
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: data
+                }, null, 2);
+                
+            } catch (error) {
+                apiStatus.className = 'status error';
+                apiStatus.textContent = 'API request failed: ' + error.message;
+                apiResponse.textContent = error.toString();
+            }
+        }
+        
+        function clearToken() {
+            localStorage.removeItem('token');
+            document.getElementById('tokenStatus').className = 'status info';
+            document.getElementById('tokenStatus').textContent = 'Token cleared';
+            document.getElementById('tokenDetails').textContent = '';
+            document.getElementById('apiResponse').textContent = '';
+        }
+        
+        // Auto-run test on page load
+        window.onload = testAuth;
+    </script>
+</body>
+</html>

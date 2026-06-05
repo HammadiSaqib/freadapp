@@ -1,0 +1,226 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Clients API Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px;
+        margin: 5px;
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .result {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #007bff;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+      .error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .success {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Clients API Test</h1>
+    <p>Testing the clients API with demo data</p>
+
+    <div>
+      <h2>Step 1: Login</h2>
+      <button onclick="testLogin()">Login with Demo User</button>
+      <div id="login-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 2: Get Clients</h2>
+      <button onclick="testGetClients()">Get All Clients</button>
+      <div id="clients-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 3: Get Client Stats</h2>
+      <button onclick="testClientStats()">Get Client Statistics</button>
+      <div id="stats-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 4: Add New Client</h2>
+      <button onclick="testAddClient()">Add Test Client</button>
+      <div id="add-result" class="result"></div>
+    </div>
+
+    <script>
+      let authToken = null;
+
+      async function testLogin() {
+        const resultDiv = document.getElementById("login-result");
+        resultDiv.innerHTML = "Testing login...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "demo@creditrepairpro.com",
+              password: "demo123",
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.token) {
+            authToken = data.token;
+            localStorage.setItem("auth_token", data.token);
+
+            resultDiv.innerHTML = `✅ Login successful!<br>User: ${data.user.first_name} ${data.user.last_name}`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testGetClients() {
+        const resultDiv = document.getElementById("clients-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "Getting clients...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/clients", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const clients = data.clients || [];
+            resultDiv.innerHTML = `✅ Found ${clients.length} clients!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to get clients: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testClientStats() {
+        const resultDiv = document.getElementById("stats-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "Getting client statistics...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/clients/stats", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Client stats retrieved!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to get stats: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testAddClient() {
+        const resultDiv = document.getElementById("add-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "Adding test client...";
+        resultDiv.className = "result";
+
+        const testClient = {
+          first_name: "Test",
+          last_name: "Client",
+          email: "test.client@example.com",
+          phone: "(555) 999-0000",
+          address: "123 Test St, Test City, TC",
+          employment_status: "employed",
+          annual_income: 50000,
+          status: "active",
+          notes: "Test client added via API",
+        };
+
+        try {
+          const response = await fetch("/api/clients", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(testClient),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Client added successfully!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to add client: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      // Auto-test login
+      window.onload = function () {
+        setTimeout(testLogin, 500);
+      };
+    </script>
+  </body>
+</html>

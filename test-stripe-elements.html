@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stripe Elements Test - ERR_ABORTED Debug</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .card-element {
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 20px 0;
+            background: white;
+        }
+        .error {
+            color: #e74c3c;
+            margin: 10px 0;
+            padding: 10px;
+            background: #fdf2f2;
+            border: 1px solid #fecaca;
+            border-radius: 4px;
+        }
+        .success {
+            color: #27ae60;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f0f9ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 4px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .retry-btn {
+            background: #28a745;
+        }
+        .retry-btn:hover {
+            background: #1e7e34;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Stripe Elements ERR_ABORTED Debug Test</h1>
+        <p>This page tests Stripe Elements loading to debug the ERR_ABORTED error.</p>
+        
+        <div class="status" id="status">
+            <strong>Status:</strong> Initializing Stripe...
+        </div>
+        
+        <div id="error-display" class="error" style="display: none;"></div>
+        <div id="success-display" class="success" style="display: none;"></div>
+        
+        <form id="payment-form">
+            <div id="card-element" class="card-element">
+                <!-- Stripe Elements will create form elements here -->
+            </div>
+            
+            <button type="button" id="retry-btn" class="retry-btn" style="display: none;">
+                Retry Loading Elements
+            </button>
+            
+            <button type="submit" id="submit-btn" disabled>
+                Test Payment Elements
+            </button>
+        </form>
+        
+        <div class="status">
+            <h3>Debug Information:</h3>
+            <div id="debug-info">
+                <p><strong>Stripe.js Version:</strong> <span id="stripe-version">Loading...</span></p>
+                <p><strong>Elements Ready:</strong> <span id="elements-ready">No</span></p>
+                <p><strong>Card Element Ready:</strong> <span id="card-ready">No</span></p>
+                <p><strong>Retry Count:</strong> <span id="retry-count">0</span></p>
+                <p><strong>Last Error:</strong> <span id="last-error">None</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use the same publishable key from the environment
+        const STRIPE_PUBLISHABLE_KEY = 'pk_test_51JIdZVJehHGbCsaCYiCquX3mKuZDrym2d3EU31L8fDxs8886NBrzsg3rYrp8bHIdl7wvARE7vxLuNfhsrY5SFbCw00tHX5coQC';
+        
+        let stripe = null;
+        let elements = null;
+        let cardElement = null;
+        let retryCount = 0;
+        const maxRetries = 3;
+
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const errorEl = document.getElementById('error-display');
+        const successEl = document.getElementById('success-display');
+        const submitBtn = document.getElementById('submit-btn');
+        const retryBtn = document.getElementById('retry-btn');
+        const form = document.getElementById('payment-form');
+
+        // Debug info elements
+        const stripeVersionEl = document.getElementById('stripe-version');
+        const elementsReadyEl = document.getElementById('elements-ready');
+        const cardReadyEl = document.getElementById('card-ready');
+        const retryCountEl = document.getElementById('retry-count');
+        const lastErrorEl = document.getElementById('last-error');
+
+        function updateStatus(message) {
+            statusEl.innerHTML = `<strong>Status:</strong> ${message}`;
+            console.log('Status:', message);
+        }
+
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            successEl.style.display = 'none';
+            lastErrorEl.textContent = message;
+            console.error('Error:', message);
+        }
+
+        function showSuccess(message) {
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            errorEl.style.display = 'none';
+            console.log('Success:', message);
+        }
+
+        function hideMessages() {
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+        }
+
+        function updateRetryCount() {
+            retryCountEl.textContent = retryCount;
+        }
+
+        async function initializeStripe() {
+            try {
+                updateStatus('Loading Stripe.js...');
+                
+                // Initialize Stripe
+                stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                
+                if (!stripe) {
+                    throw new Error('Failed to initialize Stripe');
+                }
+
+                // Get Stripe version if available
+                stripeVersionEl.textContent = 'v3 (latest)';
+                
+                updateStatus('Creating Stripe Elements...');
+                
+                // Create Elements instance
+                elements = stripe.elements();
+                elementsReadyEl.textContent = 'Yes';
+                
+                updateStatus('Creating Card Element...');
+                
+                // Create card element with enhanced options
+                cardElement = elements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#424770',
+                            '::placeholder': {
+                                color: '#aab7c4',
+                            },
+                        },
+                        invalid: {
+                            color: '#9e2146',
+                        },
+                    },
+                    hidePostalCode: false,
+                });
+
+                // Mount the card element
+                cardElement.mount('#card-element');
+                
+                // Add event listeners with detailed logging
+                cardElement.on('ready', function() {
+                    console.log('✅ Card element is ready');
+                    cardReadyEl.textContent = 'Yes';
+                    submitBtn.disabled = false;
+                    retryBtn.style.display = 'none';
+                    showSuccess('Stripe Elements loaded successfully!');
+                    updateStatus('Ready for payment testing');
+                });
+
+                cardElement.on('change', function(event) {
+                    console.log('Card element change event:', event);
+                    
+                    if (event.error) {
+                        console.error('❌ Card element error:', event.error);
+                        
+                        // Check for specific ERR_ABORTED or iframe errors
+                        if (event.error.message?.includes('ERR_ABORTED') || 
+                            event.error.message?.includes('elements-inner-card') ||
+                            event.error.message?.includes('iframe')) {
+                            
+                            const errorMsg = `ERR_ABORTED detected: ${event.error.message}`;
+                            showError(errorMsg);
+                            
+                            if (retryCount < maxRetries) {
+                                retryBtn.style.display = 'inline-block';
+                                updateStatus('Card element failed to load - retry available');
+                            } else {
+                                updateStatus('Maximum retries reached - please refresh page');
+                            }
+                        } else {
+                            showError(event.error.message);
+                        }
+                    } else {
+                        hideMessages();
+                        if (event.complete) {
+                            updateStatus('Card information is complete and valid');
+                        }
+                    }
+                });
+
+                cardElement.on('focus', function() {
+                    console.log('Card element focused');
+                    hideMessages();
+                });
+
+                cardElement.on('blur', function() {
+                    console.log('Card element blurred');
+                });
+
+                updateStatus('Waiting for card element to be ready...');
+
+            } catch (error) {
+                console.error('❌ Failed to initialize Stripe:', error);
+                showError(`Failed to initialize Stripe: ${error.message}`);
+                updateStatus('Initialization failed');
+                
+                if (retryCount < maxRetries) {
+                    retryBtn.style.display = 'inline-block';
+                }
+            }
+        }
+
+        function retryInitialization() {
+            if (retryCount >= maxRetries) {
+                showError('Maximum retries reached. Please refresh the page.');
+                return;
+            }
+
+            retryCount++;
+            updateRetryCount();
+            
+            updateStatus('Retrying Stripe initialization...');
+            retryBtn.style.display = 'none';
+            submitBtn.disabled = true;
+            
+            // Clean up existing elements
+            if (cardElement) {
+                cardElement.unmount();
+                cardElement = null;
+            }
+            
+            elements = null;
+            stripe = null;
+            
+            cardReadyEl.textContent = 'No';
+            elementsReadyEl.textContent = 'No';
+            
+            // Retry after a short delay
+            setTimeout(initializeStripe, 1000);
+        }
+
+        // Event listeners
+        retryBtn.addEventListener('click', retryInitialization);
+
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+            
+            if (!stripe || !cardElement) {
+                showError('Stripe is not properly initialized');
+                return;
+            }
+            
+            showSuccess('Stripe Elements are working correctly! (This is just a test - no actual payment will be processed)');
+            updateStatus('Test completed successfully');
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Starting Stripe Elements ERR_ABORTED debug test');
+            updateRetryCount();
+            initializeStripe();
+        });
+
+        // Monitor for network errors
+        window.addEventListener('error', function(event) {
+            console.error('Global error caught:', event.error);
+            if (event.error && event.error.message) {
+                if (event.error.message.includes('ERR_ABORTED') || 
+                    event.error.message.includes('elements-inner-card')) {
+                    showError(`Network error detected: ${event.error.message}`);
+                }
+            }
+        });
+
+        // Monitor for unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('Unhandled promise rejection:', event.reason);
+            if (event.reason && event.reason.message) {
+                if (event.reason.message.includes('ERR_ABORTED') || 
+                    event.reason.message.includes('elements-inner-card')) {
+                    showError(`Promise rejection: ${event.reason.message}`);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

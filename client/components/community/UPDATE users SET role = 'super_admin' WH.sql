@@ -1,0 +1,1 @@
+UPDATE users SET role = 'super_admin' WHERE email = 'demo@creditrepairpro.com';

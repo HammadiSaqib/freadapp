@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Auth Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #ccc;
+        }
+        .success { border-left-color: #4CAF50; background-color: #f1f8e9; }
+        .error { border-left-color: #f44336; background-color: #ffebee; }
+        .info { border-left-color: #2196F3; background-color: #e3f2fd; }
+        .warning { border-left-color: #ff9800; background-color: #fff3e0; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Dashboard Authentication Check</h1>
+        <p>This page will check the current authentication status in your dashboard.</p>
+        
+        <button onclick="checkAuthStatus()">Check Auth Status</button>
+        <button onclick="clearAuthAndReload()">Clear Auth & Reload</button>
+        <button onclick="testCalendarAPI()">Test Calendar API</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function checkAuthStatus() {
+            clearResults();
+            showResult('🔍 Checking authentication status...', 'info');
+
+            // Check localStorage for token
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showResult('❌ No authentication token found in localStorage', 'error');
+                showResult('💡 You need to log in first to access the calendar', 'warning');
+                return;
+            }
+
+            showResult(`✅ Token found: ${token.substring(0, 30)}...`, 'success');
+
+            // Try to decode the token (basic check)
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                showResult(`📋 Token payload:
+<pre>${JSON.stringify(payload, null, 2)}</pre>`, 'info');
+
+                // Check if token is expired
+                const now = Math.floor(Date.now() / 1000);
+                if (payload.exp && payload.exp < now) {
+                    showResult('⚠️ Token is expired!', 'error');
+                } else {
+                    showResult('✅ Token is valid and not expired', 'success');
+                }
+            } catch (error) {
+                showResult(`❌ Error decoding token: ${error.message}`, 'error');
+            }
+
+            // Check session storage as well
+            const sessionToken = sessionStorage.getItem('token');
+            if (sessionToken) {
+                showResult('📝 Token also found in sessionStorage', 'info');
+            }
+
+            // Check for user data
+            const userData = localStorage.getItem('user');
+            if (userData) {
+                try {
+                    const user = JSON.parse(userData);
+                    showResult(`👤 User data found:
+<pre>${JSON.stringify(user, null, 2)}</pre>`, 'info');
+                } catch (error) {
+                    showResult('❌ Invalid user data in localStorage', 'error');
+                }
+            } else {
+                showResult('⚠️ No user data found in localStorage', 'warning');
+            }
+        }
+
+        async function testCalendarAPI() {
+            clearResults();
+            showResult('🗓️ Testing calendar API endpoints...', 'info');
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                showResult('❌ No token found. Please log in first.', 'error');
+                return;
+            }
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+
+            // Test upcoming events API
+            try {
+                showResult('📅 Testing /api/calendar/admin/upcoming...', 'info');
+                const response = await fetch('/api/calendar/admin/upcoming', {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Calendar API success:
+<pre>${JSON.stringify(data, null, 2)}</pre>`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    showResult(`❌ Calendar API failed (${response.status}): ${errorText}`, 'error');
+                    
+                    if (response.status === 403) {
+                        showResult('🔐 403 Forbidden - This usually means:', 'warning');
+                        showResult('• Token is invalid or expired', 'warning');
+                        showResult('• User doesn\'t have admin permissions', 'warning');
+                        showResult('• Authentication middleware is rejecting the request', 'warning');
+                    }
+                }
+            } catch (error) {
+                showResult(`❌ Network error: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAuthAndReload() {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            sessionStorage.removeItem('token');
+            sessionStorage.removeItem('user');
+            showResult('🧹 Cleared all authentication data', 'info');
+            showResult('🔄 Please refresh the page and log in again', 'warning');
+        }
+
+        // Auto-check on page load
+        window.onload = function() {
+            checkAuthStatus();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Banks Issue</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Banks Fetching Issue</h1>
+    
+    <div class="section">
+        <h2>1. Authentication Status</h2>
+        <button onclick="checkAuth()">Check Authentication</button>
+        <div id="authResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>2. Test Banks API</h2>
+        <button onclick="testBanksAPI()">Test /api/banks</button>
+        <button onclick="testBanksStatsAPI()">Test /api/banks/stats</button>
+        <div id="apiResult"></div>
+    </div>
+    
+    <div class="section">
+        <h2>3. Network Requests</h2>
+        <button onclick="checkNetworkRequests()">Monitor Network</button>
+        <div id="networkResult"></div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            element.innerHTML += `<div class="${className}">${new Date().toLocaleTimeString()}: ${message}</div>`;
+        }
+
+        function checkAuth() {
+            const authResult = document.getElementById('authResult');
+            authResult.innerHTML = '';
+            
+            const token = localStorage.getItem('auth_token');
+            const userRole = localStorage.getItem('userRole');
+            const userId = localStorage.getItem('userId');
+            const userName = localStorage.getItem('userName');
+            
+            log('authResult', `Auth Token: ${token ? 'Present' : 'Missing'}`, token ? 'success' : 'error');
+            log('authResult', `User Role: ${userRole || 'Not set'}`, userRole ? 'success' : 'error');
+            log('authResult', `User ID: ${userId || 'Not set'}`, userId ? 'info' : 'error');
+            log('authResult', `User Name: ${userName || 'Not set'}`, userName ? 'info' : 'error');
+            
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    log('authResult', `Token Role: ${payload.role}`, 'info');
+                    log('authResult', `Token Expires: ${new Date(payload.exp * 1000)}`, 'info');
+                    log('authResult', `Token Valid: ${payload.exp * 1000 > Date.now()}`, payload.exp * 1000 > Date.now() ? 'success' : 'error');
+                    
+                    if (payload.role !== 'funding_manager' && payload.role !== 'admin') {
+                        log('authResult', `⚠️ Role "${payload.role}" may not have access to banks endpoints`, 'error');
+                    }
+                } catch (e) {
+                    log('authResult', `Error decoding token: ${e.message}`, 'error');
+                }
+            }
+        }
+
+        async function testBanksAPI() {
+            const apiResult = document.getElementById('apiResult');
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                log('apiResult', 'No auth token found - please login first', 'error');
+                return;
+            }
+            
+            try {
+                log('apiResult', 'Testing /api/banks endpoint...', 'info');
+                const response = await fetch('/api/banks', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('apiResult', `Response Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                log('apiResult', `Response Data: <pre>${JSON.stringify(data, null, 2)}</pre>`, response.ok ? 'success' : 'error');
+                
+            } catch (error) {
+                log('apiResult', `Network Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testBanksStatsAPI() {
+            const apiResult = document.getElementById('apiResult');
+            const token = localStorage.getItem('auth_token');
+            
+            if (!token) {
+                log('apiResult', 'No auth token found - please login first', 'error');
+                return;
+            }
+            
+            try {
+                log('apiResult', 'Testing /api/banks/stats endpoint...', 'info');
+                const response = await fetch('/api/banks/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                log('apiResult', `Response Status: ${response.status} ${response.statusText}`, response.ok ? 'success' : 'error');
+                
+                const data = await response.json();
+                log('apiResult', `Response Data: <pre>${JSON.stringify(data, null, 2)}</pre>`, response.ok ? 'success' : 'error');
+                
+            } catch (error) {
+                log('apiResult', `Network Error: ${error.message}`, 'error');
+            }
+        }
+
+        function checkNetworkRequests() {
+            const networkResult = document.getElementById('networkResult');
+            networkResult.innerHTML = '';
+            
+            log('networkResult', 'Open browser DevTools (F12) → Network tab to monitor requests', 'info');
+            log('networkResult', 'Look for failed requests (red status codes)', 'info');
+            log('networkResult', 'Check request headers include Authorization: Bearer [token]', 'info');
+            log('networkResult', 'Check response headers and error messages', 'info');
+        }
+
+        // Auto-check auth on page load
+        window.onload = function() {
+            checkAuth();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Cancel Subscription API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .cancel-btn {
+            background-color: #dc3545;
+        }
+        .cancel-btn:hover {
+            background-color: #c82333;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .token-display {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Test Cancel Subscription API</h1>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="hammadisaqib@gmail.com" placeholder="Enter email">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="admin123" placeholder="Enter password">
+        </div>
+        
+        <button onclick="login()">🔑 Login First</button>
+        <button onclick="getSubscription()" class="info">📋 Get Current Subscription</button>
+        <button onclick="cancelSubscription()" class="cancel-btn">❌ Cancel Subscription</button>
+        
+        <div id="result"></div>
+        <div id="token" class="token-display" style="display: none;"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+        }
+
+        function showToken(token) {
+            const tokenDiv = document.getElementById('token');
+            tokenDiv.textContent = `Current Token: ${token}`;
+            tokenDiv.style.display = 'block';
+        }
+
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                showResult('Please enter both email and password', 'error');
+                return;
+            }
+            
+            try {
+                showResult('🔄 Logging in...', 'info');
+                
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    showToken(authToken);
+                    showResult(`✅ Login successful!\nUser: ${data.user.first_name} ${data.user.last_name}\nRole: ${data.user.role}\nEmail: ${data.user.email}`, 'success');
+                } else {
+                    showResult(`❌ Login failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getSubscription() {
+            if (!authToken) {
+                showResult('❌ Please login first to get a valid token', 'error');
+                return;
+            }
+            
+            try {
+                showResult('🔄 Getting current subscription...', 'info');
+                
+                const response = await fetch('/api/billing/subscription', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    if (data.subscription) {
+                        showResult(`✅ Current Subscription:\n${JSON.stringify(data.subscription, null, 2)}`, 'success');
+                    } else {
+                        showResult('ℹ️ No active subscription found', 'info');
+                    }
+                } else {
+                    showResult(`❌ Failed to get subscription: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Error getting subscription: ${error.message}`, 'error');
+            }
+        }
+
+        async function cancelSubscription() {
+            if (!authToken) {
+                showResult('❌ Please login first to get a valid token', 'error');
+                return;
+            }
+            
+            if (!confirm('Are you sure you want to cancel the subscription?')) {
+                return;
+            }
+            
+            try {
+                showResult('🔄 Cancelling subscription...', 'info');
+                
+                const response = await fetch('/api/billing/cancel-subscription', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(`✅ Subscription cancelled successfully!\n${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    showResult(`❌ Failed to cancel subscription: ${data.error || 'Unknown error'}\nStatus: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Error cancelling subscription: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-login on page load for testing
+        window.addEventListener('load', () => {
+            // Uncomment the line below to auto-login for testing
+            // login();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analytics Test - Ambiguous Column Fix</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { background: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #007bff; max-height: 300px; overflow-y: auto; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .step { margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>Analytics Endpoints Test</h1>
+    <p>Testing the analytics endpoints that had ambiguous column name issues</p>
+    
+    <div class="step">
+        <h2>Step 1: Login</h2>
+        <button onclick="login()">Login with Demo User</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 2: Test Dashboard Analytics (has JOIN with status)</h2>
+        <button onclick="testDashboardAnalytics()">Test Dashboard Analytics</button>
+        <div id="dashboard-result" class="result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 3: Test Performance Metrics (has JOIN with status)</h2>
+        <button onclick="testPerformanceMetrics()">Test Performance Metrics</button>
+        <div id="performance-result" class="result"></div>
+    </div>
+
+    <div class="step">
+        <h2>Step 4: Test Dispute Stats (has JOIN with GROUP BY status)</h2>
+        <button onclick="testDisputeStats()">Test Dispute Stats</button>
+        <div id="dispute-stats-result" class="result"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        async function login() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = 'Logging in...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'demo@creditrepairpro.com',
+                        password: 'demo123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    resultDiv.innerHTML = `✅ Login successful! User: ${data.user.first_name} ${data.user.last_name}`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testEndpoint(url, resultElementId, endpointName) {
+            const resultDiv = document.getElementById(resultElementId);
+            
+            if (!authToken) {
+                resultDiv.innerHTML = '❌ Please login first';
+                resultDiv.className = 'result error';
+                return;
+            }
+            
+            resultDiv.innerHTML = `Testing ${endpointName}...`;
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch(url, {
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `✅ ${endpointName} works!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ ${endpointName} failed: ${data.error}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ ${endpointName} error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        async function testDashboardAnalytics() {
+            await testEndpoint('/api/analytics/dashboard', 'dashboard-result', 'Dashboard Analytics');
+        }
+
+        async function testPerformanceMetrics() {
+            await testEndpoint('/api/analytics/performance', 'performance-result', 'Performance Metrics');
+        }
+
+        async function testDisputeStats() {
+            await testEndpoint('/api/disputes/stats', 'dispute-stats-result', 'Dispute Stats');
+        }
+
+        // Auto-login on page load for convenience
+        window.onload = function() {
+            setTimeout(login, 500);
+        };
+    </script>
+</body>
+</html>

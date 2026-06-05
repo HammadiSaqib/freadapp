@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login as User 4</title>
+</head>
+<body>
+    <h1>Login as User 4 (hammadisaqib@gmail.com)</h1>
+    <button onclick="loginUser4()">Login as User 4</button>
+    <div id="result"></div>
+    
+    <script>
+        async function loginUser4() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                console.log('🔐 Logging in as user 4...');
+                
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'hammadisaqib@gmail.com',
+                        password: '12345678'
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Login response:', data);
+                
+                if (data.token && (data.success || data.message === 'Login successful')) {
+                    // Store token and user data
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    
+                    resultDiv.innerHTML = `
+                        <h3>✅ Login Successful!</h3>
+                        <p>User ID: ${data.user.id}</p>
+                        <p>Email: ${data.user.email}</p>
+                        <p>Name: ${data.user.first_name} ${data.user.last_name}</p>
+                        <p>Role: ${data.user.role}</p>
+                        <p>Token stored in localStorage</p>
+                        <br>
+                        <a href="/subscription" target="_blank">Open Subscription Page</a>
+                    `;
+                    
+                    console.log('✅ User 4 logged in successfully');
+                    console.log('Token:', data.token.substring(0, 50) + '...');
+                    console.log('User data:', data.user);
+                } else {
+                    resultDiv.innerHTML = `<h3>❌ Login Failed</h3><p>${data.message || 'Unknown error'}</p>`;
+                    console.error('❌ Login failed:', data);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<h3>❌ Error</h3><p>${error.message}</p>`;
+                console.error('❌ Login error:', error);
+            }
+        }
+        
+        // Check current auth state
+        window.onload = function() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            
+            console.log('Current auth state:');
+            console.log('Token exists:', !!token);
+            console.log('User data:', user ? JSON.parse(user) : null);
+            
+            if (token && user) {
+                const userData = JSON.parse(user);
+                document.getElementById('result').innerHTML = `
+                    <h3>Already logged in</h3>
+                    <p>User ID: ${userData.id}</p>
+                    <p>Email: ${userData.email}</p>
+                    <p>Name: ${userData.first_name} ${userData.last_name}</p>
+                    <br>
+                    <a href="/subscription" target="_blank">Open Subscription Page</a>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

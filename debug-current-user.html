@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Current User</title>
+</head>
+<body>
+    <h1>Current User Debug</h1>
+    <div id="result"></div>
+    
+    <script>
+        const token = localStorage.getItem('auth_token');
+        const resultDiv = document.getElementById('result');
+        
+        if (!token) {
+            resultDiv.innerHTML = '<p>No token found in localStorage</p>';
+        } else {
+            // Decode JWT token (client-side decode, not verification)
+            try {
+                const base64Url = token.split('.')[1];
+                const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                const decoded = JSON.parse(jsonPayload);
+                resultDiv.innerHTML = `
+                    <h2>Token Payload:</h2>
+                    <pre>${JSON.stringify(decoded, null, 2)}</pre>
+                    <h2>User Role:</h2>
+                    <p><strong>${decoded.role}</strong></p>
+                    <h2>User ID:</h2>
+                    <p><strong>${decoded.id}</strong></p>
+                    <h2>Email:</h2>
+                    <p><strong>${decoded.email}</strong></p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p>Error decoding token: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+Credit Report Results
+ Equifax
+ 610
+
+ TransUnion
+ 610
+
+ Experian
+ 611
+
+ Account Summary
+ Bureau 	 Total Accounts 	 Open Accounts 	 Closed Accounts 	 Balances
+ transunion 	 46 	 26 	 20 	 $132,242
+ experian 	 46 	 28 	 18 	 $129,281
+ equifax 	 46 	 25 	 21 	 $112,021

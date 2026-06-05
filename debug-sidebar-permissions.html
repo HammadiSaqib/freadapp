@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Sidebar Permissions</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background-color: #f8f9fa;
+        }
+        .warning {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log-output {
+            background: #000;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Sidebar Permissions</h1>
+        
+        <div class="step warning">
+            <h3>⚠️ Current Issue</h3>
+            <p>Admin user <strong>xisav87409@filipx.com</strong> (no subscription) is still seeing all sidebar items enabled instead of only Subscription and Settings pages.</p>
+        </div>
+
+        <div class="step">
+            <h3>🧪 Debug Steps</h3>
+            <ol>
+                <li><strong>Clear Browser Cache:</strong> Press Ctrl+Shift+R or Ctrl+F5 to hard refresh</li>
+                <li><strong>Clear localStorage:</strong> <button onclick="clearStorage()">Clear Storage</button></li>
+                <li><strong>Check Console Logs:</strong> Open DevTools (F12) and look for permission-related logs</li>
+                <li><strong>Test Login:</strong> <button onclick="testLogin()">Login as Admin</button></li>
+                <li><strong>Check Permissions:</strong> <button onclick="checkPermissions()">Debug Permissions</button></li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>📋 Expected Behavior</h3>
+            <ul>
+                <li>✅ <strong>Subscription</strong> page should be enabled</li>
+                <li>✅ <strong>Settings</strong> page should be enabled</li>
+                <li>❌ <strong>Dashboard</strong> should be disabled (grayed out with lock icon)</li>
+                <li>❌ <strong>Clients</strong> should be disabled</li>
+                <li>❌ <strong>Credit Reports</strong> should be disabled</li>
+                <li>❌ <strong>Analytics</strong> should be disabled</li>
+                <li>❌ All other pages should be disabled</li>
+            </ul>
+        </div>
+
+        <div class="step">
+            <h3>🔧 Debug Output</h3>
+            <div id="debug-output" class="log-output">
+                Debug logs will appear here...
+            </div>
+        </div>
+
+        <div class="step success">
+            <h3>✅ Quick Fix Instructions</h3>
+            <ol>
+                <li>Open the main application: <a href="http://localhost:3002/" target="_blank">http://localhost:3002/</a></li>
+                <li>Login with: <strong>xisav87409@filipx.com</strong></li>
+                <li>Check the sidebar - only Subscription and Settings should be clickable</li>
+                <li>If all items are still enabled, check the browser console for errors</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function log(message) {
+            const output = document.getElementById('debug-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        function clearStorage() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                log('✅ Browser storage cleared successfully');
+                log('🔄 Please refresh the main application and login again');
+            } catch (error) {
+                log('❌ Error clearing storage: ' + error.message);
+            }
+        }
+
+        function testLogin() {
+            log('🔐 Opening login page...');
+            window.open('http://localhost:3002/', '_blank');
+            log('📝 Please login with: xisav87409@filipx.com');
+            log('👀 Check the sidebar after login - only Subscription and Settings should be enabled');
+        }
+
+        async function checkPermissions() {
+            log('🔍 Checking permissions system...');
+            
+            // Check if we have auth token
+            const token = localStorage.getItem('token');
+            if (!token) {
+                log('❌ No auth token found - please login first');
+                return;
+            }
+            
+            log('✅ Auth token found');
+            
+            try {
+                // Test the subscription API endpoint
+                log('📡 Testing subscription API...');
+                const response = await fetch('http://localhost:3002/api/billing/subscription', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log('✅ Subscription API response: ' + JSON.stringify(data, null, 2));
+                } else {
+                    log('❌ Subscription API error: ' + response.status + ' ' + response.statusText);
+                }
+                
+                // Test the plans API endpoint
+                log('📡 Testing plans API...');
+                const plansResponse = await fetch('http://localhost:3002/api/super-admin/plans', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (plansResponse.ok) {
+                    const plansData = await plansResponse.json();
+                    log('✅ Plans API response: ' + JSON.stringify(plansData, null, 2));
+                } else {
+                    log('❌ Plans API error: ' + plansResponse.status + ' ' + plansResponse.statusText);
+                }
+                
+            } catch (error) {
+                log('❌ API test error: ' + error.message);
+                log('🔧 This might be why permissions are not working correctly');
+            }
+        }
+
+        // Initialize
+        log('🚀 Debug page loaded');
+        log('📍 Server running on: http://localhost:3002/');
+        log('👤 Test user: xisav87409@filipx.com (admin, no subscription)');
+        log('🎯 Expected: Only Subscription and Settings pages should be enabled');
+    </script>
+</body>
+</html>

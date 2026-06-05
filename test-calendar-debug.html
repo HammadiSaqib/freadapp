@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar API Debug</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+        button { margin: 5px; padding: 10px 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Calendar API Debug Tool</h1>
+    
+    <div>
+        <button onclick="testCalendarEvents()">Test Calendar Events API</button>
+        <button onclick="testUpcomingEvents()">Test Upcoming Events API</button>
+        <button onclick="checkAuthToken()">Check Auth Token</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+    
+    <div id="results"></div>
+
+    <script>
+        function showResult(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.innerHTML = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        function checkAuthToken() {
+            clearResults();
+            const token = localStorage.getItem('auth_token');
+            if (token) {
+                showResult(`✅ Auth token found: ${token.substring(0, 20)}...`, 'success');
+                
+                // Try to decode JWT payload
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    showResult(`🔍 Token payload: <pre>${JSON.stringify(payload, null, 2)}</pre>`, 'info');
+                } catch (e) {
+                    showResult(`⚠️ Could not decode token payload: ${e.message}`, 'warning');
+                }
+            } else {
+                showResult('❌ No auth token found in localStorage', 'error');
+            }
+        }
+
+        async function testCalendarEvents() {
+            clearResults();
+            showResult('🗓️ Testing Calendar Events API...', 'info');
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                showResult('❌ No auth token found. Please login first.', 'error');
+                return;
+            }
+
+            const currentDate = new Date();
+            const month = currentDate.getMonth() + 1;
+            const year = currentDate.getFullYear();
+            
+            try {
+                const response = await fetch(`/api/calendar/admin/events?month=${month}&year=${year}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                showResult(`📡 Request URL: /api/calendar/admin/events?month=${month}&year=${year}`, 'info');
+                showResult(`📊 Response Status: ${response.status} ${response.statusText}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Calendar Events API Success:`, 'success');
+                    showResult(`<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    
+                    // Check if events exist
+                    if (data.success && data.data && data.data.events) {
+                        showResult(`📅 Found ${data.data.events.length} events`, 'success');
+                        if (data.data.events.length > 0) {
+                            showResult(`🎯 First event: ${JSON.stringify(data.data.events[0], null, 2)}`, 'info');
+                        }
+                    } else {
+                        showResult(`⚠️ No events found in response`, 'warning');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    showResult(`❌ Calendar Events API Failed: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Network Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testUpcomingEvents() {
+            clearResults();
+            showResult('⏰ Testing Upcoming Events API...', 'info');
+            
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                showResult('❌ No auth token found. Please login first.', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/calendar/admin/upcoming', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                showResult(`📡 Request URL: /api/calendar/admin/upcoming`, 'info');
+                showResult(`📊 Response Status: ${response.status} ${response.statusText}`, 'info');
+
+                if (response.ok) {
+                    const data = await response.json();
+                    showResult(`✅ Upcoming Events API Success:`, 'success');
+                    showResult(`<pre>${JSON.stringify(data, null, 2)}</pre>`, 'info');
+                    
+                    // Check if upcoming events exist
+                    if (data.success && data.data && data.data.upcoming_events) {
+                        showResult(`📅 Found ${data.data.upcoming_events.length} upcoming events`, 'success');
+                        if (data.data.upcoming_events.length > 0) {
+                            showResult(`🎯 First upcoming event: ${JSON.stringify(data.data.upcoming_events[0], null, 2)}`, 'info');
+                        }
+                    } else {
+                        showResult(`⚠️ No upcoming events found in response`, 'warning');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    showResult(`❌ Upcoming Events API Failed: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Network Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-check auth token on page load
+        window.onload = function() {
+            checkAuthToken();
+        };
+    </script>
+</body>
+</html>

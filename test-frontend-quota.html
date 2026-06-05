@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Quota Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .result.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Client Quota Validation Test</h1>
+        <p>This page tests the client creation API to verify quota validation is working for bird09944@aminating.com</p>
+        
+        <div class="form-group">
+            <label for="email">Login Email:</label>
+            <input type="email" id="email" value="bird09944@aminating.com" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" placeholder="Enter password" required>
+        </div>
+        
+        <button onclick="testLogin()" id="loginBtn">1. Test Login</button>
+        
+        <hr style="margin: 20px 0;">
+        
+        <h3>Client Creation Test</h3>
+        <div class="form-group">
+            <label for="firstName">First Name:</label>
+            <input type="text" id="firstName" value="Test" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="lastName">Last Name:</label>
+            <input type="text" id="lastName" value="Client" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="clientEmail">Client Email:</label>
+            <input type="email" id="clientEmail" value="test.quota@example.com" required>
+        </div>
+        
+        <button onclick="testCreateClient()" id="createBtn" disabled>2. Test Create Client (Quota Check)</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+        
+        async function testLogin() {
+            const loginBtn = document.getElementById('loginBtn');
+            const resultDiv = document.getElementById('result');
+            
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+            
+            try {
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <strong>✅ Login Successful!</strong><br>
+                            User: ${data.user?.email}<br>
+                            Role: ${data.user?.role}<br>
+                            Email Verified: ${data.user?.email_verified}<br>
+                            Token: ${authToken.substring(0, 20)}...<br>
+                            <em>You can now test client creation.</em>
+                        </div>
+                    `;
+                    document.getElementById('createBtn').disabled = false;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Login Failed!</strong><br>
+                            Status: ${response.status}<br>
+                            Error: ${data.error || 'Unknown error'}<br>
+                            Message: ${data.message || 'Please check credentials'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <strong>❌ Login Error!</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '1. Test Login';
+            }
+        }
+        
+        async function testCreateClient() {
+            if (!authToken) {
+                alert('Please login first!');
+                return;
+            }
+            
+            const createBtn = document.getElementById('createBtn');
+            const resultDiv = document.getElementById('result');
+            
+            createBtn.disabled = true;
+            createBtn.textContent = 'Creating client...';
+            
+            try {
+                const firstName = document.getElementById('firstName').value;
+                const lastName = document.getElementById('lastName').value;
+                const clientEmail = document.getElementById('clientEmail').value;
+                
+                const clientData = {
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: clientEmail,
+                    status: 'active'
+                };
+                
+                console.log('Sending client data:', clientData);
+                
+                const response = await fetch('http://localhost:3001/api/clients', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(clientData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="result success">
+                            <strong>✅ Client Created Successfully!</strong><br>
+                            Client ID: ${data.data?.client?.id}<br>
+                            Name: ${firstName} ${lastName}<br>
+                            Email: ${clientEmail}<br>
+                            <em>Note: This means quota validation allowed the creation.</em>
+                        </div>
+                    `;
+                    
+                    // Update email for next test
+                    document.getElementById('clientEmail').value = `test.quota.${Date.now()}@example.com`;
+                } else if (response.status === 403 && data.error === 'Client quota exceeded') {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <strong>🚫 QUOTA VALIDATION WORKING!</strong><br>
+                            Status: ${response.status}<br>
+                            Error: ${data.error}<br>
+                            Message: ${data.message}<br>
+                            Plan Limits: <pre>${JSON.stringify(data.planLimits, null, 2)}</pre>
+                            <em>This is the expected behavior when quota is exceeded!</em>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="result error">
+                            <strong>❌ Client Creation Failed!</strong><br>
+                            Status: ${response.status}<br>
+                            Error: ${data.error || 'Unknown error'}<br>
+                            Message: ${data.message || 'Please try again'}<br>
+                            Details: <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <strong>❌ Request Error!</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            } finally {
+                createBtn.disabled = false;
+                createBtn.textContent = '2. Test Create Client (Quota Check)';
+            }
+        }
+        
+        // Auto-generate new email every 5 seconds
+        setInterval(() => {
+            if (!document.getElementById('createBtn').disabled) {
+                document.getElementById('clientEmail').value = `test.quota.${Date.now()}@example.com`;
+            }
+        }, 5000);
+    </script>
+</body>
+</html>

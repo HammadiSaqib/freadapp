@@ -1,0 +1,350 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dashboard Demo - Dynamic Client Data</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        min-height: 100vh;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 40px;
+      }
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        margin: 30px 0;
+      }
+      .feature-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 25px;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      .demo-section {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 30px;
+        border-radius: 15px;
+        margin: 20px 0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+      button {
+        padding: 12px 24px;
+        margin: 10px 5px;
+        background: linear-gradient(45deg, #00d4ff, #0099cc);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: all 0.3s ease;
+      }
+      button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      }
+      .dashboard-link {
+        display: inline-block;
+        padding: 15px 30px;
+        background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        color: white;
+        text-decoration: none;
+        border-radius: 25px;
+        font-weight: bold;
+        font-size: 18px;
+        transition: all 0.3s ease;
+      }
+      .dashboard-link:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .success {
+        background: rgba(76, 175, 80, 0.3);
+      }
+      .error {
+        background: rgba(244, 67, 54, 0.3);
+      }
+      .info {
+        background: rgba(33, 150, 243, 0.3);
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin: 20px 0;
+      }
+      .stat-card {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+      }
+      .stat-number {
+        font-size: 2em;
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+      .emoji {
+        font-size: 1.5em;
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🏆 CreditRepairPro Dashboard Demo</h1>
+        <h2>🔥 Dynamic Real Client Data Integration</h2>
+        <p>
+          Experience the power of real-time client management with database
+          integration
+        </p>
+      </div>
+
+      <div class="demo-section">
+        <h2>🎯 What's New & Improved</h2>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3>🏪 Real Database Integration</h3>
+            <p>• 8 comprehensive demo clients with complete data</p>
+            <p>• Real-time stats from SQLite database</p>
+            <p>• Proper data relationships and foreign keys</p>
+            <p>• Credit scores, addresses, employment info</p>
+          </div>
+          <div class="feature-card">
+            <h3>✨ Enhanced Add Client Form</h3>
+            <p>• Complete client information capture</p>
+            <p>• Real-time form validation</p>
+            <p>• Toast notifications for success/errors</p>
+            <p>• Automatic dashboard refresh</p>
+          </div>
+          <div class="feature-card">
+            <h3>📊 Dynamic Dashboard Stats</h3>
+            <p>• Live client counts from database</p>
+            <p>• Real dispute statistics</p>
+            <p>• Credit score improvements tracking</p>
+            <p>• Success rate calculations</p>
+          </div>
+          <div class="feature-card">
+            <h3>🛡️ Robust Error Handling</h3>
+            <p>• Graceful API failure fallbacks</p>
+            <p>• Array safety checks throughout</p>
+            <p>• User-friendly error messages</p>
+            <p>• No more JavaScript crashes</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-section">
+        <h2>🧪 Quick Demo Test</h2>
+        <button onclick="quickTest()">🚀 Run Quick Integration Test</button>
+        <div id="test-status" class="status"></div>
+      </div>
+
+      <div class="demo-section">
+        <h2>📈 Current Database Stats</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="client-count">—</div>
+            <div>Total Clients</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="active-count">—</div>
+            <div>Active Clients</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="completed-count">—</div>
+            <div>Completed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="avg-score">—</div>
+            <div>Avg Credit Score</div>
+          </div>
+        </div>
+        <button onclick="loadStats()">🔄 Refresh Stats</button>
+      </div>
+
+      <div class="demo-section">
+        <h2>🎮 Demo Clients Available</h2>
+        <div id="clients-list">
+          <p>Login to see demo clients...</p>
+        </div>
+        <button onclick="loadClients()">👥 Load Demo Clients</button>
+      </div>
+
+      <div class="demo-section" style="text-align: center">
+        <h2>🎉 Experience the Full Dashboard</h2>
+        <p>
+          Click below to access the complete dashboard with real client data
+        </p>
+        <a href="/dashboard" target="_blank" class="dashboard-link">
+          🚀 Open Live Dashboard
+        </a>
+        <p style="margin-top: 20px; opacity: 0.8; font-size: 14px">
+          Login with: <strong>demo@creditrepairpro.com</strong> /
+          <strong>demo123</strong>
+        </p>
+      </div>
+    </div>
+
+    <script>
+      let authToken = localStorage.getItem("auth_token");
+
+      async function login() {
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "demo@creditrepairpro.com",
+              password: "demo123",
+            }),
+          });
+
+          const data = await response.json();
+          if (response.ok && data.token) {
+            authToken = data.token;
+            localStorage.setItem("auth_token", authToken);
+            return true;
+          }
+        } catch (error) {
+          console.error("Login failed:", error);
+        }
+        return false;
+      }
+
+      async function quickTest() {
+        const statusDiv = document.getElementById("test-status");
+        statusDiv.innerHTML = "🔄 Running integration test...";
+        statusDiv.className = "status info";
+
+        if (!authToken) {
+          const loginSuccess = await login();
+          if (!loginSuccess) {
+            statusDiv.innerHTML = "❌ Login failed";
+            statusDiv.className = "status error";
+            return;
+          }
+        }
+
+        try {
+          const [clientsResponse, statsResponse] = await Promise.all([
+            fetch("/api/clients", {
+              headers: { Authorization: `Bearer ${authToken}` },
+            }),
+            fetch("/api/clients/stats", {
+              headers: { Authorization: `Bearer ${authToken}` },
+            }),
+          ]);
+
+          const clientsData = await clientsResponse.json();
+          const statsData = await statsResponse.json();
+
+          if (clientsResponse.ok && statsResponse.ok) {
+            const clientCount = clientsData.clients?.length || 0;
+            statusDiv.innerHTML = `✅ Integration test passed!<br>
+                        <span class="emoji">📊</span>Found ${clientCount} clients in database<br>
+                        <span class="emoji">📈</span>API endpoints responding correctly<br>
+                        <span class="emoji">🎯</span>Ready for dashboard use`;
+            statusDiv.className = "status success";
+
+            // Auto-load stats
+            loadStats();
+          } else {
+            statusDiv.innerHTML = "⚠️ API responses but may have issues";
+            statusDiv.className = "status info";
+          }
+        } catch (error) {
+          statusDiv.innerHTML = `❌ Test failed: ${error.message}`;
+          statusDiv.className = "status error";
+        }
+      }
+
+      async function loadStats() {
+        if (!authToken) {
+          await login();
+        }
+
+        try {
+          const response = await fetch("/api/clients/stats", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const data = await response.json();
+
+          if (response.ok) {
+            document.getElementById("client-count").textContent =
+              data.total_clients || 0;
+            document.getElementById("active-count").textContent =
+              data.active_clients || 0;
+            document.getElementById("completed-count").textContent =
+              data.completed_clients || 0;
+            document.getElementById("avg-score").textContent = Math.round(
+              data.avg_credit_score || 0,
+            );
+          }
+        } catch (error) {
+          console.error("Failed to load stats:", error);
+        }
+      }
+
+      async function loadClients() {
+        if (!authToken) {
+          await login();
+        }
+
+        const clientsList = document.getElementById("clients-list");
+        clientsList.innerHTML = "🔄 Loading clients...";
+
+        try {
+          const response = await fetch("/api/clients", {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const data = await response.json();
+
+          if (response.ok && data.clients) {
+            const clientsHtml = data.clients
+              .map(
+                (client) =>
+                  `<div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                            <strong>${client.first_name} ${client.last_name}</strong> 
+                            <span style="color: #4CAF50;">(${client.status})</span><br>
+                            <small>📧 ${client.email} | 📞 ${client.phone}</small><br>
+                            <small>💳 Score: ${client.credit_score || "N/A"} | 💼 ${client.employment_status || "N/A"}</small>
+                        </div>`,
+              )
+              .join("");
+
+            clientsList.innerHTML = clientsHtml;
+          } else {
+            clientsList.innerHTML = "❌ Failed to load clients";
+          }
+        } catch (error) {
+          clientsList.innerHTML = `❌ Error: ${error.message}`;
+        }
+      }
+
+      // Auto-run quick test on load
+      window.onload = function () {
+        setTimeout(quickTest, 1000);
+      };
+    </script>
+  </body>
+</html>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dashboard Error Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { padding: 10px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer; }
+        .result { background: #f8f9fa; padding: 10px; margin: 10px 0; border-left: 4px solid #007bff; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard Error Fix Test</h1>
+    <p>Testing if the Dashboard loads without "Cannot read properties of undefined" errors</p>
+    
+    <div>
+        <h2>Step 1: Test Login</h2>
+        <button onclick="testLogin()">Login with Demo User</button>
+        <div id="login-result" class="result"></div>
+    </div>
+
+    <div>
+        <h2>Step 2: Check Dashboard Access</h2>
+        <p>After successful login, you should be able to access the dashboard at <a href="/dashboard" target="_blank">/dashboard</a></p>
+        <p>The dashboard should show stats without any JavaScript errors.</p>
+    </div>
+
+    <div>
+        <h2>Expected Fix</h2>
+        <ul>
+            <li>✅ No "Cannot read properties of undefined (reading 'toLocaleString')" errors</li>
+            <li>✅ Stats display properly with fallback values if API fails</li>
+            <li>✅ All numerical stats have null safety checks</li>
+        </ul>
+    </div>
+
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            resultDiv.innerHTML = 'Testing login...';
+            resultDiv.className = 'result';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'demo@creditrepairpro.com',
+                        password: 'demo123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    // Store token for potential dashboard access
+                    localStorage.setItem('auth_token', data.token);
+                    
+                    resultDiv.innerHTML = `✅ Login successful!<br>
+                        User: ${data.user.first_name} ${data.user.last_name}<br>
+                        You can now try accessing the <a href="/dashboard" target="_blank">dashboard</a>`;
+                    resultDiv.className = 'result success';
+                } else {
+                    resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+                    resultDiv.className = 'result error';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+                resultDiv.className = 'result error';
+            }
+        }
+
+        // Auto-test login
+        window.onload = function() {
+            setTimeout(testLogin, 500);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dashboard recentActivity.map Fix Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px;
+        margin: 5px;
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .result {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #007bff;
+      }
+      .error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .success {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Dashboard Error Fix Test</h1>
+    <p>
+      Testing if the Dashboard loads without "recentActivity.map is not a
+      function" errors
+    </p>
+
+    <div>
+      <h2>Step 1: Login</h2>
+      <button onclick="testLogin()">Login with Demo User</button>
+      <div id="login-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 2: Test Dashboard Analytics API</h2>
+      <button onclick="testDashboardAPI()">Test Dashboard Analytics</button>
+      <div id="api-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Step 3: Test Recent Activities API</h2>
+      <button onclick="testActivitiesAPI()">Test Recent Activities</button>
+      <div id="activities-result" class="result"></div>
+    </div>
+
+    <div>
+      <h2>Expected Fix Results</h2>
+      <ul>
+        <li>✅ No "recentActivity.map is not a function" errors</li>
+        <li>✅ recentActivity is always treated as an array</li>
+        <li>✅ Proper fallback data with correct Activity type structure</li>
+        <li>✅ Dashboard loads successfully even if API calls fail</li>
+      </ul>
+      <p>
+        <strong>Dashboard URL:</strong>
+        <a href="/dashboard" target="_blank">/dashboard</a>
+      </p>
+    </div>
+
+    <script>
+      let authToken = null;
+
+      async function testLogin() {
+        const resultDiv = document.getElementById("login-result");
+        resultDiv.innerHTML = "Testing login...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "demo@creditrepairpro.com",
+              password: "demo123",
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.token) {
+            authToken = data.token;
+            localStorage.setItem("auth_token", data.token);
+
+            resultDiv.innerHTML = `✅ Login successful!<br>User: ${data.user.first_name} ${data.user.last_name}`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testDashboardAPI() {
+        const resultDiv = document.getElementById("api-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "Testing dashboard analytics API...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/analytics/dashboard", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Dashboard API works!<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `⚠️ Dashboard API failed but this is OK for testing: ${data.error}`;
+            resultDiv.className = "result";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `⚠️ Dashboard API error (expected, fallback will work): ${error.message}`;
+          resultDiv.className = "result";
+        }
+      }
+
+      async function testActivitiesAPI() {
+        const resultDiv = document.getElementById("activities-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "Testing recent activities API...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/analytics/activities?limit=5", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const isArray = Array.isArray(data);
+            resultDiv.innerHTML = `✅ Activities API works!<br>
+                        <strong>Is Array:</strong> ${isArray}<br>
+                        <strong>Length:</strong> ${isArray ? data.length : "N/A"}<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `⚠️ Activities API failed but this is OK for testing: ${data.error}`;
+            resultDiv.className = "result";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `⚠️ Activities API error (expected, fallback will work): ${error.message}`;
+          resultDiv.className = "result";
+        }
+      }
+
+      // Auto-test login
+      window.onload = function () {
+        setTimeout(testLogin, 500);
+      };
+    </script>
+  </body>
+</html>

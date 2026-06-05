@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Browser Token</title>
+</head>
+<body>
+    <h1>Browser Token Check</h1>
+    <div id="result"></div>
+    
+    <script>
+        const token = localStorage.getItem('auth_token');
+        const resultDiv = document.getElementById('result');
+        
+        if (token) {
+            resultDiv.innerHTML = `
+                <h2>Token found in localStorage:</h2>
+                <p><strong>Token:</strong> ${token.substring(0, 50)}...</p>
+                <p><strong>Full length:</strong> ${token.length} characters</p>
+                
+                <h3>Decoded Token (without verification):</h3>
+                <pre id="decoded"></pre>
+            `;
+            
+            try {
+                // Decode JWT without verification (just to see the payload)
+                const parts = token.split('.');
+                if (parts.length === 3) {
+                    const payload = JSON.parse(atob(parts[1]));
+                    document.getElementById('decoded').textContent = JSON.stringify(payload, null, 2);
+                }
+            } catch (e) {
+                document.getElementById('decoded').textContent = 'Error decoding token: ' + e.message;
+            }
+        } else {
+            resultDiv.innerHTML = '<p>No auth_token found in localStorage</p>';
+        }
+    </script>
+</body>
+</html>

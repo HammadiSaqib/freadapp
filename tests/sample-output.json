@@ -1,0 +1,114 @@
+{
+  "clientInfo": {
+    "clientId": "unknown",
+    "username": "tester@example.com",
+    "timestamp": "2026-02-28T00:00:06.423Z"
+  },
+  "reportData": {
+    "CreditReport": [
+      {
+        "DateReport": "2025-03-08",
+        "ReportProvider": "MyFreeScoreNow"
+      }
+    ],
+    "Name": [
+      {
+        "BureauId": 1,
+        "FirstName": "MARTIKA",
+        "Middle": "R",
+        "LastName": "DABNEY",
+        "NameType": "Primary"
+      },
+      {
+        "BureauId": 2,
+        "FirstName": "MARTIKA",
+        "Middle": "R",
+        "LastName": "DABNEY",
+        "NameType": "Primary"
+      },
+      {
+        "BureauId": 3,
+        "FirstName": "MARTIKA",
+        "Middle": "R",
+        "LastName": "DABNEY",
+        "NameType": "Primary"
+      }
+    ],
+    "Address": [
+      {
+        "BureauId": 1,
+        "StreetAddress": "100 MAIN ST",
+        "City": "DALLAS",
+        "State": "TX",
+        "Zip": "75001",
+        "AddressType": "Current"
+      },
+      {
+        "BureauId": 1,
+        "StreetAddress": "50 OLD RD",
+        "City": "PLANO",
+        "State": "TX",
+        "Zip": "75024",
+        "AddressType": "Previous"
+      },
+      {
+        "BureauId": 2,
+        "StreetAddress": "100 MAIN ST",
+        "City": "DALLAS",
+        "State": "TX",
+        "Zip": "75001",
+        "AddressType": "Current"
+      },
+      {
+        "BureauId": 3,
+        "StreetAddress": "100 MAIN ST",
+        "City": "DALLAS",
+        "State": "TX",
+        "Zip": "75001",
+        "AddressType": "Current"
+      }
+    ],
+    "DOB": [
+      { "BureauId": 1, "DOB": "1990-01-01" },
+      { "BureauId": 2, "DOB": "1990-01-01" },
+      { "BureauId": 3, "DOB": "1990-01-01" }
+    ],
+    "Score": [
+      { "BureauId": 1, "Score": "711", "ScoreType": "VantageScore3", "DateScore": "2025-03-08" },
+      { "BureauId": 2, "Score": "702", "ScoreType": "VantageScore3", "DateScore": "2025-03-08" },
+      { "BureauId": 3, "Score": "695", "ScoreType": "VantageScore3", "DateScore": "2025-03-08" }
+    ],
+    "Employer": [],
+    "Inquiries": [],
+    "PublicRecords": [],
+    "Accounts": [
+      {
+        "BureauId": 1,
+        "AccountTypeDescription": "Revolving Account",
+        "HighBalance": "500",
+        "DateReported": "2025-03-08",
+        "DateOpened": "2021-01-01",
+        "AccountNumber": "****1234",
+        "DateAccountStatus": "2025-03-08",
+        "CurrentBalance": "100",
+        "CreditorName": "AMEX",
+        "AccountCondition": "Open",
+        "AccountDesignator": "",
+        "DisputeFlag": "Account not disputed",
+        "Industry": "",
+        "AccountStatus": "Open",
+        "PaymentStatus": "Current",
+        "AmountPastDue": "0",
+        "AccountType": "REVOLVING",
+        "CreditType": "Revolving Account",
+        "PaymentFrequency": "Monthly (every month)",
+        "TermType": "Provided",
+        "WorstPayStatus": "Current",
+        "PayStatusHistoryStartDate": "2025-01-01",
+        "PayStatusHistory": "C???????????????????????",
+        "Remark": "OK",
+        "CreditLimit": "1000"
+      }
+    ]
+  }
+}

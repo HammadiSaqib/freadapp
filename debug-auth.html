@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Authentication</title>
+</head>
+<body>
+    <h1>Authentication Debug Tool</h1>
+    <div id="results"></div>
+    
+    <script>
+        function debugAuth() {
+            const results = document.getElementById('results');
+            
+            // Check localStorage for auth token
+            const authToken = localStorage.getItem('auth_token');
+            const userRole = localStorage.getItem('userRole');
+            const userId = localStorage.getItem('userId');
+            const userName = localStorage.getItem('userName');
+            
+            let html = '<h2>Current Authentication State:</h2>';
+            html += `<p><strong>Auth Token:</strong> ${authToken ? 'Present (' + authToken.length + ' chars)' : 'Missing'}</p>`;
+            html += `<p><strong>User Role:</strong> ${userRole || 'Not set'}</p>`;
+            html += `<p><strong>User ID:</strong> ${userId || 'Not set'}</p>`;
+            html += `<p><strong>User Name:</strong> ${userName || 'Not set'}</p>`;
+            
+            if (authToken) {
+                // Try to decode JWT (basic decode, not verification)
+                try {
+                    const parts = authToken.split('.');
+                    if (parts.length === 3) {
+                        const payload = JSON.parse(atob(parts[1]));
+                        html += '<h3>Token Payload:</h3>';
+                        html += '<pre>' + JSON.stringify(payload, null, 2) + '</pre>';
+                        
+                        // Check if token is expired
+                        if (payload.exp) {
+                            const now = Math.floor(Date.now() / 1000);
+                            const isExpired = payload.exp < now;
+                            html += `<p><strong>Token Status:</strong> ${isExpired ? 'EXPIRED' : 'Valid'}</p>`;
+                            if (isExpired) {
+                                html += `<p style="color: red;">Token expired ${Math.floor((now - payload.exp) / 60)} minutes ago</p>`;
+                            } else {
+                                html += `<p style="color: green;">Token expires in ${Math.floor((payload.exp - now) / 60)} minutes</p>`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    html += '<p style="color: red;">Error decoding token: ' + e.message + '</p>';
+                }
+            }
+            
+            html += '<h3>Actions:</h3>';
+            html += '<button onclick="clearAuth()">Clear All Auth Data</button> ';
+            html += '<button onclick="testAPI()">Test API Call</button>';
+            
+            results.innerHTML = html;
+        }
+        
+        function clearAuth() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('userId');
+            localStorage.removeItem('userName');
+            alert('Authentication data cleared!');
+            debugAuth();
+        }
+        
+        async function testAPI() {
+            const authToken = localStorage.getItem('auth_token');
+            if (!authToken) {
+                alert('No auth token found!');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/affiliate/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                console.log('API Response:', { status: response.status, data });
+                
+                if (response.ok) {
+                    alert('API call successful! Check console for details.');
+                } else {
+                    alert(`API call failed: ${response.status} - ${data.error || data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                alert('API call failed: ' + error.message);
+            }
+        }
+        
+        // Run debug on page load
+        debugAuth();
+    </script>
+</body>
+</html>

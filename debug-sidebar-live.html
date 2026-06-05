@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Live Sidebar Permissions Debug</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .debug-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        .warning {
+            border-left-color: #ff9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        .code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin: 2px;
+        }
+        .enabled { background: #4CAF50; }
+        .disabled { background: #f44336; }
+        .results {
+            max-height: 400px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Live Sidebar Permissions Debug</h1>
+        <p>This tool will help debug why sidebar pages are still enabled when they should be disabled.</p>
+        
+        <div class="debug-section">
+            <h2>🎯 Current Issue</h2>
+            <p><strong>Problem:</strong> Admin user without subscription still sees all pages enabled</p>
+            <p><strong>Expected:</strong> Only "Subscription" and "Settings" should be enabled</p>
+            <p><strong>Admin User:</strong> xisav87409@filipx.com (no active subscription)</p>
+        </div>
+
+        <div class="debug-section">
+            <h2>🔧 Debug Actions</h2>
+            <button class="button" onclick="checkPermissions()">Check usePagePermissions</button>
+            <button class="button" onclick="checkSidebarState()">Check Sidebar State</button>
+            <button class="button" onclick="checkConsoleErrors()">Check Console Errors</button>
+            <button class="button" onclick="clearStorageAndReload()">Clear Storage & Reload</button>
+        </div>
+
+        <div class="debug-section">
+            <h2>📊 Debug Results</h2>
+            <div id="results" class="results">
+                Click debug buttons above to see results...
+            </div>
+        </div>
+
+        <div class="debug-section warning">
+            <h2>⚠️ Instructions</h2>
+            <ol>
+                <li>Make sure you're logged in as <strong>xisav87409@filipx.com</strong></li>
+                <li>Open browser DevTools (F12)</li>
+                <li>Click the debug buttons above</li>
+                <li>Check both this page results and browser console</li>
+                <li>Look for any errors or unexpected values</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'warning' ? 'warning' : '';
+            results.innerHTML += `<div class="${className}">[${timestamp}] ${message}</div>`;
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function checkPermissions() {
+            log('🔍 Checking usePagePermissions hook...', 'info');
+            
+            // Try to access React DevTools or window objects
+            if (window.React) {
+                log('✅ React found in window', 'info');
+            } else {
+                log('❌ React not found in window', 'warning');
+            }
+
+            // Check if we can access any permission-related data
+            const script = `
+                // Try to find permission data in localStorage
+                const authData = localStorage.getItem('auth_token');
+                const userData = localStorage.getItem('user_data');
+                
+                console.log('🔍 Auth token exists:', !!authData);
+                console.log('🔍 User data exists:', !!userData);
+                
+                if (userData) {
+                    try {
+                        const parsed = JSON.parse(userData);
+                        console.log('👤 User role:', parsed.role);
+                        console.log('📧 User email:', parsed.email);
+                    } catch (e) {
+                        console.log('❌ Error parsing user data:', e);
+                    }
+                }
+                
+                // Check if usePagePermissions is working
+                if (window.__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+                    console.log('🔧 React DevTools available');
+                }
+            `;
+            
+            eval(script);
+            log('📝 Check browser console for detailed permission info', 'info');
+        }
+
+        function checkSidebarState() {
+            log('🔍 Checking sidebar DOM state...', 'info');
+            
+            // Look for sidebar elements
+            const sidebarElements = document.querySelectorAll('[class*="sidebar"], [class*="nav"], a[href*="/"]');
+            log(`📊 Found ${sidebarElements.length} potential sidebar elements`, 'info');
+            
+            // Check for disabled states
+            const disabledElements = document.querySelectorAll('[disabled], .disabled, [class*="disabled"]');
+            log(`🚫 Found ${disabledElements.length} disabled elements`, 'info');
+            
+            // Check for specific navigation links
+            const navLinks = [
+                '/dashboard', '/clients', '/reports', '/ai-coach', 
+                '/school', '/analytics', '/affiliate', '/compliance', 
+                '/automation', '/support', '/subscription', '/settings'
+            ];
+            
+            navLinks.forEach(link => {
+                const element = document.querySelector(`a[href="${link}"]`);
+                if (element) {
+                    const isDisabled = element.hasAttribute('disabled') || 
+                                     element.classList.contains('disabled') ||
+                                     element.style.pointerEvents === 'none';
+                    const status = isDisabled ? 'disabled' : 'enabled';
+                    log(`${link}: <span class="status ${status}">${status.toUpperCase()}</span>`, 'info');
+                }
+            });
+        }
+
+        function checkConsoleErrors() {
+            log('🔍 Checking for console errors...', 'info');
+            
+            // Override console methods to capture errors
+            const originalError = console.error;
+            const originalWarn = console.warn;
+            
+            let errorCount = 0;
+            let warnCount = 0;
+            
+            console.error = function(...args) {
+                errorCount++;
+                log(`❌ Console Error: ${args.join(' ')}`, 'error');
+                originalError.apply(console, args);
+            };
+            
+            console.warn = function(...args) {
+                warnCount++;
+                log(`⚠️ Console Warning: ${args.join(' ')}`, 'warning');
+                originalWarn.apply(console, args);
+            };
+            
+            setTimeout(() => {
+                log(`📊 Captured ${errorCount} errors and ${warnCount} warnings`, 'info');
+                console.error = originalError;
+                console.warn = originalWarn;
+            }, 5000);
+            
+            log('👂 Listening for console errors for 5 seconds...', 'info');
+        }
+
+        function clearStorageAndReload() {
+            log('🧹 Clearing browser storage...', 'info');
+            
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                log('✅ Storage cleared successfully', 'info');
+                
+                setTimeout(() => {
+                    log('🔄 Reloading page...', 'info');
+                    window.location.reload();
+                }, 2000);
+            } catch (error) {
+                log(`❌ Error clearing storage: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-start basic checks
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                log('🚀 Auto-starting debug checks...', 'info');
+                checkPermissions();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

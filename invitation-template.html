@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You're Invited!</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .invitation-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            max-width: 600px;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .invitation-header {
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            padding: 60px 40px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .invitation-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.1)"/></svg>') repeat;
+            animation: float 20s infinite linear;
+        }
+
+        @keyframes float {
+            0% { transform: translateX(0) translateY(0); }
+            100% { transform: translateX(-100px) translateY(-100px); }
+        }
+
+        .invitation-title {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .invitation-subtitle {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+
+        .invitation-body {
+            padding: 50px 40px;
+            text-align: center;
+        }
+
+        .event-details {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 30px 0;
+            border-left: 5px solid #ff6b6b;
+        }
+
+        .event-title {
+            font-size: 1.8rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 15px 0;
+            font-size: 1.1rem;
+            color: #555;
+        }
+
+        .detail-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            fill: #ff6b6b;
+        }
+
+        .invitation-message {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #666;
+            margin: 30px 0;
+            font-style: italic;
+        }
+
+        .cta-section {
+            margin: 40px 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff6b6b, #feca57);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 107, 107, 0.4);
+        }
+
+        .invitation-footer {
+            background: #2c3e50;
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .footer-text {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            line-height: 1.6;
+        }
+
+        .decorative-border {
+            height: 5px;
+            background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
+        }
+
+        .rsvp-info {
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 2px dashed #ff6b6b;
+        }
+
+        .rsvp-text {
+            color: #ff6b6b;
+            font-weight: bold;
+            font-size: 1rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .invitation-header {
+                padding: 40px 20px 30px;
+            }
+
+            .invitation-title {
+                font-size: 2rem;
+            }
+
+            .invitation-body {
+                padding: 30px 20px;
+            }
+
+            .event-details {
+                padding: 20px;
+            }
+
+            .detail-item {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .detail-icon {
+                margin-right: 0;
+                margin-bottom: 5px;
+            }
+
+            .invitation-footer {
+                padding: 20px;
+            }
+        }
+
+        /* Animation for entrance */
+        .invitation-container {
+            animation: slideIn 0.8s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invitation-container">
+        <div class="decorative-border"></div>
+        
+        <div class="invitation-header">
+            <h1 class="invitation-title">You're Invited!</h1>
+            <p class="invitation-subtitle">Join us for a special celebration</p>
+        </div>
+
+        <div class="invitation-body">
+            <div class="event-details">
+                <h2 class="event-title">Credit Repair Success Workshop</h2>
+                
+                <div class="detail-item">
+                    <svg class="detail-icon" viewBox="0 0 24 24">
+                        <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+                    </svg>
+                    <span><strong>Date:</strong> Saturday, March 15th, 2024</span>
+                </div>
+
+                <div class="detail-item">
+                    <svg class="detail-icon" viewBox="0 0 24 24">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+                        <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    <span><strong>Time:</strong> 2:00 PM - 5:00 PM EST</span>
+                </div>
+
+                <div class="detail-item">
+                    <svg class="detail-icon" viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    <span><strong>Location:</strong> Virtual Event (Zoom Link Provided)</span>
+                </div>
+            </div>
+
+            <p class="invitation-message">
+                "We're excited to invite you to our exclusive Credit Repair Success Workshop! 
+                Join industry experts as they share proven strategies to improve your credit score 
+                and achieve financial freedom. This interactive session will provide you with 
+                actionable insights and personalized guidance."
+            </p>
+
+            <div class="rsvp-info">
+                <p class="rsvp-text">
+                    🎯 Limited Seats Available • 📚 Free Resources Included • 🏆 Expert Guidance
+                </p>
+            </div>
+
+            <div class="cta-section">
+                <a href="#" class="cta-button" onclick="handleRSVP()">
+                    Accept Invitation
+                </a>
+            </div>
+        </div>
+
+        <div class="invitation-footer">
+            <p class="footer-text">
+                Can't make it? No worries! We'll send you the recording and resources.<br>
+                Questions? Contact us at <strong>support@creditrepair.com</strong><br>
+                <em>We look forward to seeing you there!</em>
+            </p>
+        </div>
+
+        <div class="decorative-border"></div>
+    </div>
+
+    <script>
+        function handleRSVP() {
+            // Add your RSVP logic here
+            alert('Thank you for your interest! RSVP functionality can be integrated with your backend.');
+            
+            // Example: Redirect to RSVP form or send API request
+            // window.location.href = '/rsvp-form';
+            
+            // Example: Send RSVP data to backend
+            // fetch('/api/rsvp', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ eventId: 'workshop-2024', response: 'accepted' })
+            // });
+        }
+
+        // Add some interactive effects
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add hover effect to detail items
+            const detailItems = document.querySelectorAll('.detail-item');
+            detailItems.forEach(item => {
+                item.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateX(10px)';
+                    this.style.transition = 'transform 0.3s ease';
+                });
+                
+                item.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateX(0)';
+                });
+            });
+
+            // Add sparkle effect on button hover
+            const ctaButton = document.querySelector('.cta-button');
+            ctaButton.addEventListener('mouseenter', function() {
+                this.style.background = 'linear-gradient(135deg, #feca57, #ff6b6b)';
+            });
+            
+            ctaButton.addEventListener('mouseleave', function() {
+                this.style.background = 'linear-gradient(135deg, #ff6b6b, #feca57)';
+            });
+        });
+    </script>
+</body>
+</html>

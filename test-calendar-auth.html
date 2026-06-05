@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .success {
+            color: #28a745;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .info {
+            color: #0c5460;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .status {
+            font-weight: bold;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗓️ Calendar Authentication Test</h1>
+        <p>This page will test login with demo credentials and then test the calendar API endpoints.</p>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" value="demo@creditrepairpro.com">
+        </div>
+        
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" value="demo123">
+        </div>
+        
+        <button onclick="testLogin()">🔐 Login</button>
+        <button onclick="testCalendarAPIs()" id="testCalendarBtn" disabled>📅 Test Calendar APIs</button>
+        <button onclick="clearResults()">🧹 Clear Results</button>
+    </div>
+
+    <div class="container">
+        <h2>📊 Test Results</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let authToken = null;
+
+        function showResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testLogin() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            showResult('🔄 Attempting login...', 'info');
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', authToken);
+                    
+                    showResult(`✅ Login successful!
+User: ${data.user.first_name} ${data.user.last_name}
+Role: ${data.user.role}
+Email: ${data.user.email}
+Token: ${authToken.substring(0, 20)}...`, 'success');
+                    
+                    document.getElementById('testCalendarBtn').disabled = false;
+                } else {
+                    showResult(`❌ Login failed: ${data.error || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testCalendarAPIs() {
+            if (!authToken) {
+                showResult('❌ No auth token available. Please login first.', 'error');
+                return;
+            }
+
+            showResult('🔄 Testing calendar API endpoints...', 'info');
+
+            const headers = {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Test 1: Get upcoming events
+            try {
+                showResult('📅 Testing /api/calendar/admin/upcoming...', 'info');
+                const upcomingResponse = await fetch('/api/calendar/admin/upcoming', {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (upcomingResponse.ok) {
+                    const upcomingData = await upcomingResponse.json();
+                    showResult(`✅ Upcoming events API success:
+<pre>${JSON.stringify(upcomingData, null, 2)}</pre>`, 'success');
+                } else {
+                    const errorData = await upcomingResponse.text();
+                    showResult(`❌ Upcoming events API failed (${upcomingResponse.status}): ${errorData}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Upcoming events API error: ${error.message}`, 'error');
+            }
+
+            // Test 2: Get calendar events for current month
+            try {
+                const now = new Date();
+                const month = now.getMonth() + 1;
+                const year = now.getFullYear();
+                
+                showResult(`📅 Testing /api/calendar/admin/events?month=${month}&year=${year}...`, 'info');
+                const eventsResponse = await fetch(`/api/calendar/admin/events?month=${month}&year=${year}`, {
+                    method: 'GET',
+                    headers: headers
+                });
+
+                if (eventsResponse.ok) {
+                    const eventsData = await eventsResponse.json();
+                    showResult(`✅ Calendar events API success:
+<pre>${JSON.stringify(eventsData, null, 2)}</pre>`, 'success');
+                } else {
+                    const errorData = await eventsResponse.text();
+                    showResult(`❌ Calendar events API failed (${eventsResponse.status}): ${errorData}`, 'error');
+                }
+            } catch (error) {
+                showResult(`❌ Calendar events API error: ${error.message}`, 'error');
+            }
+
+            // Test 3: Test mark reminder completed (with proper parameters)
+            try {
+                showResult('📝 Testing mark reminder completed API...', 'info');
+                const markResponse = await fetch('/api/calendar/admin/mark-completed', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ 
+                        client_id: 999, // Test with non-existent client ID
+                        reminder_date: '2025-01-15' // Test with a valid date format
+                    })
+                });
+
+                if (markResponse.ok) {
+                    const markData = await markResponse.json();
+                    showResult(`✅ Mark completed API success:
+<pre>${JSON.stringify(markData, null, 2)}</pre>`, 'success');
+                } else {
+                    const errorData = await markResponse.text();
+                    if (markResponse.status === 404) {
+                        showResult(`✅ Mark completed API accessible (404 expected for non-existent client)`, 'success');
+                    } else {
+                        showResult(`❌ Mark completed API failed (${markResponse.status}): ${errorData}`, 'error');
+                    }
+                }
+            } catch (error) {
+                showResult(`❌ Mark completed API error: ${error.message}`, 'error');
+            }
+
+            showResult('🎉 Calendar API testing completed!', 'success');
+        }
+
+        // Check if there's already a token in localStorage
+        window.onload = function() {
+            const existingToken = localStorage.getItem('token');
+            if (existingToken) {
+                authToken = existingToken;
+                document.getElementById('testCalendarBtn').disabled = false;
+                showResult(`ℹ️ Found existing token in localStorage: ${existingToken.substring(0, 20)}...`, 'info');
+            }
+        };
+    </script>
+</body>
+</html>

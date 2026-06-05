@@ -1,0 +1,477 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@layer base {
+  /**
+   * Tailwind CSS theme
+   * tailwind.config.ts expects the following color variables to be expressed as HSL values.
+   * A different format will require also updating the theme in tailwind.config.ts.
+  */
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 16% 22%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 16% 22%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 212 84% 4%;
+
+    --primary: 197 71% 52%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 173 58% 39%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 210 40% 98%;
+    --muted-foreground: 220 14% 41%;
+
+    --accent: 173 58% 39%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 96%;
+    --ring: 197 71% 52%;
+
+    --radius: 0.75rem;
+
+    /* Custom blue and sea green colors - better contrast */
+    --ocean-blue: 199 89% 48%;
+    --deep-blue: 220 40% 30%;
+    --sea-green: 172 47% 45%;
+    --light-sea-green: 173 58% 85%;
+    --cyan-blue: 187 85% 53%;
+    --teal-green: 158 64% 52%;
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(197 71% 52%) 0%,
+      hsl(173 58% 39%) 100%
+    );
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(187 85% 53%) 0%,
+      hsl(158 64% 52%) 100%
+    );
+    --gradient-soft: linear-gradient(
+      135deg,
+      hsl(197 71% 96%) 0%,
+      hsl(173 58% 96%) 100%
+    );
+    --gradient-dark: linear-gradient(
+      135deg,
+      hsl(197 71% 35%) 0%,
+      hsl(173 58% 25%) 100%
+    );
+    --gradient-light: linear-gradient(
+      135deg,
+      hsl(220 13% 97%) 0%,
+      hsl(220 13% 98%) 100%
+    );
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Professional dark theme - Rich navy and slate tones */
+    --background: 222 47% 11%;
+    --foreground: 213 31% 91%;
+
+    --card: 222 47% 15%;
+    --card-foreground: 213 31% 91%;
+
+    --popover: 222 47% 15%;
+    --popover-foreground: 213 31% 91%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 220 26% 14%;
+
+    --secondary: 172 47% 45%;
+    --secondary-foreground: 220 9% 96%;
+
+    --muted: 215 25% 27%;
+    --muted-foreground: 217 10% 64%;
+
+    --accent: 172 47% 45%;
+    --accent-foreground: 220 9% 96%;
+
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 220 9% 96%;
+
+    --border: 215 25% 27%;
+    --input: 215 25% 27%;
+    --ring: 199 89% 48%;
+
+    /* Professional dark theme custom colors */
+    --ocean-blue: 199 89% 48%;
+    --deep-blue: 217 91% 60%;
+    --sea-green: 142 76% 36%;
+    --light-sea-green: 160 84% 39%;
+    --cyan-blue: 190 80% 50%;
+    --teal-green: 165 60% 48%;
+
+    /* Professional gradients for dark theme - navy/slate only */
+    --gradient-primary: linear-gradient(
+      135deg,
+      hsl(199 89% 48%) 0%,
+      hsl(142 76% 36%) 100%
+    );
+    --gradient-secondary: linear-gradient(
+      135deg,
+      hsl(190 80% 50%) 0%,
+      hsl(165 60% 48%) 100%
+    );
+    --gradient-soft: linear-gradient(
+      135deg,
+      hsl(215 25% 30%) 0%,
+      hsl(215 25% 32%) 100%
+    );
+    --gradient-dark: linear-gradient(
+      135deg,
+      hsl(222 47% 18%) 0%,
+      hsl(222 47% 20%) 100%
+    );
+    --gradient-light: linear-gradient(
+      135deg,
+      hsl(215 25% 35%) 0%,
+      hsl(215 25% 37%) 100%
+    );
+
+    /* Professional sidebar colors */
+    --sidebar-background: 220 30% 12%;
+    --sidebar-foreground: 220 9% 96%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 220 30% 12%;
+    --sidebar-accent: 220 22% 18%;
+    --sidebar-accent-foreground: 220 9% 96%;
+    --sidebar-border: 220 22% 18%;
+    --sidebar-ring: 199 89% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .gradient-soft {
+    background: var(--gradient-soft);
+  }
+
+  .gradient-dark {
+    background: var(--gradient-dark);
+  }
+
+  .gradient-light {
+    background: var(--gradient-light);
+  }
+
+  .gradient-text-primary {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .gradient-text-secondary {
+    background: var(--gradient-secondary);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Blob animation for login pages */
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+
+  @keyframes elite-affiliate-scroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .animate-elite-affiliate-scroll {
+    animation: elite-affiliate-scroll 24s linear infinite;
+  }
+
+  .elite-affiliate-glass {
+    background-color: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .elite-affiliate-glass-card {
+    background-color: rgba(255, 255, 255, 0.86);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 1);
+  }
+
+  .elite-affiliate-bg-dots {
+    background-image: radial-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+
+  .elite-affiliate-preserve-3d {
+    transform-style: preserve-3d;
+  }
+
+  /* Elite Dashboard Custom Theme Utilities */
+  .elite-theme {
+    @apply bg-[radial-gradient(circle_at_top_left,_rgba(0,212,255,0.08),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(112,0,255,0.08),_transparent_30%),linear-gradient(135deg,_#fafcff_0%,_#ffffff_48%,_#f0f7ff_100%)] dark:bg-[radial-gradient(circle_at_top_left,_rgba(0,212,255,0.14),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(112,0,255,0.18),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0b1120_48%,_#111827_100%)] text-slate-900 dark:text-slate-100;
+  }
+  .elite-page-shell {
+    @apply min-h-screen -mx-4 -mt-4 p-4 sm:p-6 lg:p-8 font-sans overflow-x-hidden relative bg-[#fafcff] dark:bg-[radial-gradient(circle_at_top_left,_rgba(0,212,255,0.14),_transparent_26%),radial-gradient(circle_at_bottom_right,_rgba(112,0,255,0.18),_transparent_32%),linear-gradient(135deg,_#020617_0%,_#0b1120_48%,_#111827_100%)];
+  }
+  .elite-page-glow-primary {
+    @apply absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#00d4ff] rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[120px] opacity-10 dark:opacity-15 pointer-events-none animate-pulse;
+  }
+  .elite-page-glow-secondary {
+    @apply absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-[#ff00ff] rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-[150px] opacity-10 dark:opacity-15 pointer-events-none animate-pulse;
+  }
+  .elite-navbar {
+    @apply bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border-b border-white dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.2)];
+  }
+  .elite-neon-line-thick {
+    @apply h-1 bg-gradient-to-r from-[#00d4ff] via-[#7000ff] to-[#ff00ff];
+  }
+  .elite-gradient-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff];
+  }
+  .elite-navbar-search {
+    @apply border border-slate-100 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 shadow-inner focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500;
+  }
+  .elite-navbar-btn {
+    @apply text-slate-600 dark:text-slate-400 hover:text-[#7000ff] dark:hover:text-[#a855f7] hover:bg-purple-50 dark:hover:bg-purple-900/30 transition-colors;
+  }
+  .elite-navbar-add-btn {
+    @apply bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 font-bold border-0 shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] transition-all;
+  }
+  .elite-sidebar {
+    @apply bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-r border-white dark:border-slate-800 shadow-[8px_0_30px_rgb(0,0,0,0.04)] dark:shadow-[8px_0_30px_rgba(0,0,0,0.2)];
+  }
+  .elite-sidebar-item {
+    @apply text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-all font-semibold rounded-xl;
+  }
+  .elite-sidebar-item-active {
+    @apply bg-gradient-to-r from-blue-50 dark:from-blue-900/30 to-purple-50 dark:to-purple-900/30 text-[#7000ff] dark:text-[#a855f7] font-bold border border-[#7000ff]/10 dark:border-[#a855f7]/20 shadow-sm rounded-xl relative overflow-hidden;
+  }
+  .elite-sidebar-item-active::before {
+    content: '';
+    @apply absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#00d4ff] to-[#7000ff];
+  }
+  .elite-sidebar-badge {
+    @apply bg-gradient-to-r from-[#ff0055] to-[#ff00ff] text-white font-bold border-0 shadow-[0_0_10px_rgba(255,0,85,0.3)];
+  }
+  .elite-sidebar-logo-text {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white to-[#7000ff] font-black;
+  }
+
+  /* Elite Nested Wrapper - Aggressive overrides for old components */
+  .elite-nested-wrapper .bg-card,
+  .elite-nested-wrapper [class*="bg-gradient-to-br"],
+  .elite-nested-wrapper [class*="bg-white/90"] {
+    @apply bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none rounded-3xl !important;
+  }
+
+  .elite-nested-wrapper [class~="bg-white"],
+  .elite-nested-wrapper [class~="bg-white/80"] {
+    @apply dark:bg-slate-900 !important;
+  }
+
+  .elite-nested-wrapper [class~="bg-slate-50"],
+  .elite-nested-wrapper [class~="bg-slate-50/30"],
+  .elite-nested-wrapper [class~="bg-slate-50/50"],
+  .elite-nested-wrapper [class~="bg-slate-50/80"] {
+    @apply dark:bg-slate-800/60 !important;
+  }
+
+  .elite-nested-wrapper [class~="border-white"],
+  .elite-nested-wrapper [class~="border-slate-50"],
+  .elite-nested-wrapper [class~="border-slate-100"],
+  .elite-nested-wrapper [class~="border-slate-200"] {
+    @apply dark:border-slate-800 !important;
+  }
+
+  .elite-nested-wrapper [class~="text-slate-800"] {
+    @apply dark:text-slate-100 !important;
+  }
+
+  .elite-nested-wrapper [class~="text-slate-700"] {
+    @apply dark:text-slate-200 !important;
+  }
+
+  .elite-nested-wrapper [class~="text-slate-600"] {
+    @apply dark:text-slate-300 !important;
+  }
+
+  .elite-nested-wrapper [class~="text-slate-500"] {
+    @apply dark:text-slate-400 !important;
+  }
+
+  .elite-nested-wrapper [class~="text-slate-400"] {
+    @apply dark:text-slate-500 !important;
+  }
+  
+  .elite-nested-wrapper .dark\:from-slate-800,
+  .elite-nested-wrapper .dark\:to-slate-700,
+  .elite-nested-wrapper .dark\:bg-slate-800\/90 {
+    /* Removed white background override to support dark mode natively */
+  }
+
+  .elite-nested-wrapper [class*="gradient-text-"] {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] !important;
+  }
+
+  .elite-nested-wrapper button.gradient-primary,
+  .elite-nested-wrapper button[data-state="active"][class~="data-[state=active]:gradient-primary"] {
+    @apply bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 font-black border-0 shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] rounded-xl uppercase tracking-wider transition-all !important;
+  }
+
+  .elite-nested-wrapper button:not(.gradient-primary):not([class~="data-[state=active]:gradient-primary"]) {
+    @apply rounded-xl font-bold uppercase tracking-wider !important;
+  }
+
+  .elite-nested-wrapper .border-border {
+    @apply border-slate-100 dark:border-slate-800 !important;
+  }
+
+  .elite-nested-wrapper [role="progressbar"] > div {
+    @apply bg-gradient-to-r from-[#00d4ff] to-[#7000ff] !important;
+  }
+
+  .elite-nested-wrapper .rounded-lg,
+  .elite-nested-wrapper .rounded-md {
+    @apply rounded-2xl !important;
+  }
+}
+
+  /* PDF export helpers */
+  .pdf-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .pdf-section {
+    margin-bottom: 2rem;
+  }
+
+  .pdf-break-before {
+    /* removed forced page break to reduce empty space */
+  }
+
+  .pdf-exporting {
+    background: #f8fafc;
+  }
+
+  .analysis-pdf-root.pdf-export-active {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .analysis-pdf-root.pdf-export-active .pdf-section {
+    margin-bottom: 24px;
+    box-shadow: none;
+  }
+
+  /* Prevent SVG icon clipping in PDF export */
+  .analysis-pdf-root.pdf-export-active svg {
+    overflow: visible !important;
+    flex-shrink: 0;
+  }
+
+  .analysis-pdf-root.pdf-export-active .pdf-icon-wrap {
+    overflow: visible !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pdf-table-wrapper {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Hide scrollbars for horizontal scroll containers */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }

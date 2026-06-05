@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard Invitation - Funding System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .invitation-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            max-width: 650px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .logo-section {
+            position: relative;
+            z-index: 1;
+        }
+
+        .company-logo {
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .header-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .invitation-message {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .greeting {
+            font-size: 1.3rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .message-text {
+            color: #555;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .admin-details {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #495057;
+            display: flex;
+            align-items: center;
+        }
+
+        .detail-value {
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .icon {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+            fill: #667eea;
+        }
+
+        .permissions-section {
+            background: #e8f4fd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+
+        .permissions-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .permissions-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .permission-item {
+            display: flex;
+            align-items: center;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .permission-item::before {
+            content: '✓';
+            color: #28a745;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .cta-section {
+            text-align: center;
+            margin: 35px 0;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 35px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .security-notice {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 25px 0;
+            font-size: 0.9rem;
+            color: #856404;
+        }
+
+        .security-notice-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 25px 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .footer-text {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .contact-info {
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        .contact-info a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .expiry-notice {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            padding: 12px;
+            margin: 20px 0;
+            color: #721c24;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .content {
+                padding: 25px 20px;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .detail-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+
+            .permissions-list {
+                grid-template-columns: 1fr;
+            }
+
+            .header-title {
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Animation */
+        .invitation-container {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invitation-container">
+        <div class="header">
+            <div class="logo-section">
+                <div class="company-logo">CR</div>
+                <h1 class="header-title">Admin Dashboard Invitation</h1>
+                <p class="header-subtitle">Funding Management System</p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="invitation-message">
+                <h2 class="greeting">Welcome to the Team!</h2>
+                <p class="message-text">
+                    You have been invited to join our Funding Management System as an administrator. 
+                    This invitation grants you access to manage clients, monitor disputes, and oversee 
+                    the funding process.
+                </p>
+            </div>
+
+            <div class="admin-details">
+                <div class="detail-row">
+                    <span class="detail-label">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                        Role:
+                    </span>
+                    <span class="detail-value">Funding Administrator</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                        </svg>
+                        Email:
+                    </span>
+                    <span class="detail-value">admin@example.com</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        Access Level:
+                    </span>
+                    <span class="detail-value">Full Administrative Access</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">
+                        <svg class="icon" viewBox="0 0 24 24">
+                            <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+                            <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                        </svg>
+                        Invited By:
+                    </span>
+                    <span class="detail-value">System Administrator</span>
+                </div>
+            </div>
+
+            <div class="permissions-section">
+                <h3 class="permissions-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/>
+                    </svg>
+                    Your Administrative Permissions
+                </h3>
+                <div class="permissions-list">
+                    <div class="permission-item">Manage Client Accounts</div>
+                    <div class="permission-item">View Credit Reports</div>
+                    <div class="permission-item">Process Dispute Letters</div>
+                    <div class="permission-item">Generate Analytics Reports</div>
+                    <div class="permission-item">Manage User Subscriptions</div>
+                    <div class="permission-item">Access Billing Information</div>
+                    <div class="permission-item">Configure System Settings</div>
+                    <div class="permission-item">Monitor System Activity</div>
+                </div>
+            </div>
+
+            <div class="security-notice">
+                <div class="security-notice-title">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+                    </svg>
+                    Security Notice
+                </div>
+                This invitation contains sensitive access credentials. Please keep this information secure and do not share it with unauthorized personnel.
+            </div>
+
+            <div class="expiry-notice">
+                ⏰ This invitation expires in 7 days. Please accept it promptly to maintain access.
+            </div>
+
+            <div class="cta-section">
+                <a href="#" class="cta-button" onclick="handleAcceptInvitation()">
+                    Accept Invitation & Set Password
+                </a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p class="footer-text">
+                By accepting this invitation, you agree to our Terms of Service and Privacy Policy.
+            </p>
+            <div class="contact-info">
+                Need help? Contact us at <a href="mailto:support@creditrepair.com">support@creditrepair.com</a><br>
+                Or call our support line: <strong>(555) 123-4567</strong>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function handleAcceptInvitation() {
+            // This would typically redirect to a secure registration/password setup page
+            const token = new URLSearchParams(window.location.search).get('token') || 'demo-token';
+            
+            // Example implementation
+            alert('Redirecting to secure password setup...');
+            
+            // In a real implementation, you would:
+            // 1. Validate the invitation token
+            // 2. Redirect to password setup page
+            // 3. Create the admin account
+            // 4. Send confirmation email
+            
+            // Example redirect:
+            // window.location.href = `/admin/setup-password?token=${token}`;
+            
+            // Example API call:
+            // fetch('/api/admin/accept-invitation', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ 
+            //         token: token,
+            //         email: 'admin@example.com'
+            //     })
+            // }).then(response => {
+            //     if (response.ok) {
+            //         window.location.href = '/admin/dashboard';
+            //     }
+            // });
+        }
+
+        // Add some interactive effects
+        document.addEventListener('DOMContentLoaded', function() {
+            // Highlight permission items on hover
+            const permissionItems = document.querySelectorAll('.permission-item');
+            permissionItems.forEach(item => {
+                item.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = 'rgba(102, 126, 234, 0.1)';
+                    this.style.padding = '5px 10px';
+                    this.style.borderRadius = '4px';
+                    this.style.transition = 'all 0.2s ease';
+                });
+                
+                item.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = 'transparent';
+                    this.style.padding = '0';
+                });
+            });
+
+            // Add pulse effect to CTA button
+            const ctaButton = document.querySelector('.cta-button');
+            setInterval(() => {
+                ctaButton.style.boxShadow = '0 6px 25px rgba(102, 126, 234, 0.5)';
+                setTimeout(() => {
+                    ctaButton.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)';
+                }, 1000);
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

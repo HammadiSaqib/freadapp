@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Super Admin API</title>
+</head>
+<body>
+    <h1>Super Admin API Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        async function testSuperAdminLogin() {
+            try {
+                console.log('Testing super admin login...');
+                
+                // First, try to login as super admin
+                const loginResponse = await fetch('http://localhost:3002/api/auth/super-admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'test@example.com',
+                        password: 'password123'
+                    })
+                });
+                
+                const loginData = await loginResponse.json();
+                console.log('Login response:', loginData);
+                
+                if (loginData.success && loginData.data?.token) {
+                    const token = loginData.data.token;
+                    console.log('Login successful, token:', token);
+                    
+                    // Now try to fetch admins
+                    const adminsResponse = await fetch('http://localhost:3002/api/super-admin/admins', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    const adminsData = await adminsResponse.json();
+                    console.log('Admins response:', adminsData);
+                    
+                    document.getElementById('results').innerHTML = `
+                        <h2>Login Result:</h2>
+                        <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                        <h2>Admins Result:</h2>
+                        <pre>${JSON.stringify(adminsData, null, 2)}</pre>
+                    `;
+                } else {
+                    console.error('Login failed:', loginData);
+                    document.getElementById('results').innerHTML = `
+                        <h2>Login Failed:</h2>
+                        <pre>${JSON.stringify(loginData, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('results').innerHTML = `
+                    <h2>Error:</h2>
+                    <pre>${error.message}</pre>
+                `;
+            }
+        }
+        
+        // Run test when page loads
+        window.onload = testSuperAdminLogin;
+    </script>
+</body>
+</html>

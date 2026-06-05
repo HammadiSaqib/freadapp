@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Token and Re-login</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            border-left: 4px solid;
+        }
+        .error { 
+            background: #fee; 
+            border-color: #f00; 
+            color: #c00; 
+        }
+        .success { 
+            background: #efe; 
+            border-color: #0a0; 
+            color: #060; 
+        }
+        .warning { 
+            background: #ffa; 
+            border-color: #fa0; 
+            color: #a60; 
+        }
+        .info { 
+            background: #eef; 
+            border-color: #00a; 
+            color: #006; 
+        }
+        button {
+            background: #007cba;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #005a87;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix JWT Token Issue</h1>
+        <div id="status"></div>
+
+        <div class="form-group">
+            <button onclick="clearTokens()">1. Clear All Tokens</button>
+            <button onclick="checkCurrentState()">2. Check Current State</button>
+        </div>
+
+        <h3>Fresh Login</h3>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" value="funding_manager" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="funding123" required>
+            </div>
+            <button type="submit">3. Login as Funding Manager</button>
+        </form>
+
+        <div class="form-group">
+            <button onclick="testEndpoints()">4. Test Protected Endpoints</button>
+            <button onclick="goToFundingRequests()">5. Go to Funding Requests</button>
+        </div>
+    </div>
+
+    <script>
+        function addStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            statusDiv.appendChild(div);
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+        }
+
+        function clearTokens() {
+            // Clear all possible token keys
+            const keysToRemove = ['auth_token', 'token', 'userRole', 'userId', 'userName'];
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                sessionStorage.removeItem(key);
+            });
+            
+            addStatus('✅ All tokens and user data cleared from localStorage and sessionStorage', 'success');
+            checkCurrentState();
+        }
+
+        function checkCurrentState() {
+            const authToken = localStorage.getItem('auth_token');
+            const oldToken = localStorage.getItem('token');
+            const userRole = localStorage.getItem('userRole');
+            
+            if (!authToken && !oldToken) {
+                addStatus('✅ No tokens found in storage - ready for fresh login', 'success');
+            } else {
+                addStatus(`⚠️ Found tokens: auth_token=${authToken ? 'present' : 'none'}, token=${oldToken ? 'present' : 'none'}, userRole=${userRole || 'none'}`, 'warning');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            addStatus('🔄 Attempting login...', 'info');
+            
+            try {
+                const response = await fetch('/api/auth/funding-manager-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Store the token
+                    localStorage.setItem('auth_token', data.token);
+                    localStorage.setItem('userRole', data.user.role);
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('userName', data.user.username);
+                    
+                    addStatus('✅ Login successful! Token stored.', 'success');
+                    addStatus(`User: ${data.user.username} (${data.user.role})`, 'info');
+                    
+                    // Validate the token format
+                    const tokenParts = data.token.split('.');
+                    if (tokenParts.length === 3) {
+                        addStatus('✅ JWT token format is valid (3 parts)', 'success');
+                        
+                        try {
+                            const payload = JSON.parse(atob(tokenParts[1]));
+                            addStatus(`Token payload: <pre>${JSON.stringify(payload, null, 2)}</pre>`, 'info');
+                        } catch (e) {
+                            addStatus('⚠️ Could not decode token payload', 'warning');
+                        }
+                    } else {
+                        addStatus(`❌ Invalid JWT format: ${tokenParts.length} parts (should be 3)`, 'error');
+                    }
+                } else {
+                    const errorData = await response.text();
+                    addStatus(`❌ Login failed: ${response.status} - ${errorData}`, 'error');
+                }
+            } catch (error) {
+                addStatus(`❌ Login error: ${error.message}`, 'error');
+            }
+        });
+
+        async function testEndpoints() {
+            const token = localStorage.getItem('auth_token');
+            if (!token) {
+                addStatus('❌ No token found. Please login first.', 'error');
+                return;
+            }
+
+            addStatus('🔄 Testing protected endpoints...', 'info');
+
+            // Test profile endpoint
+            try {
+                const profileResponse = await fetch('/api/auth/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (profileResponse.ok) {
+                    const profileData = await profileResponse.json();
+                    addStatus('✅ Profile endpoint working', 'success');
+                } else {
+                    addStatus(`❌ Profile endpoint failed: ${profileResponse.status}`, 'error');
+                }
+            } catch (error) {
+                addStatus(`❌ Profile endpoint error: ${error.message}`, 'error');
+            }
+
+            // Test funding requests endpoint
+            try {
+                const fundingResponse = await fetch('/api/funding-requests', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (fundingResponse.ok) {
+                    const fundingData = await fundingResponse.json();
+                    addStatus(`✅ Funding requests endpoint working (${fundingData.requests?.length || 0} requests)`, 'success');
+                } else {
+                    const errorText = await fundingResponse.text();
+                    addStatus(`❌ Funding requests endpoint failed: ${fundingResponse.status} - ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addStatus(`❌ Funding requests endpoint error: ${error.message}`, 'error');
+            }
+
+            // Test funding stats endpoint
+            try {
+                const statsResponse = await fetch('/api/funding-requests/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (statsResponse.ok) {
+                    const statsData = await statsResponse.json();
+                    addStatus('✅ Funding stats endpoint working', 'success');
+                } else {
+                    const errorText = await statsResponse.text();
+                    addStatus(`❌ Funding stats endpoint failed: ${statsResponse.status} - ${errorText}`, 'error');
+                }
+            } catch (error) {
+                addStatus(`❌ Funding stats endpoint error: ${error.message}`, 'error');
+            }
+        }
+
+        function goToFundingRequests() {
+            addStatus('🔄 Redirecting to funding requests page...', 'info');
+            window.location.href = '/funding-manager/funding-requests';
+        }
+
+        // Check current state on page load
+        checkCurrentState();
+    </script>
+</body>
+</html>

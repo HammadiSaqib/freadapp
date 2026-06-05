@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Current Token</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .token-info { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .error { color: red; }
+        .success { color: green; }
+        .warning { color: orange; }
+        pre { background: #f0f0f0; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Debug Current Token</h1>
+    <div id="results"></div>
+
+    <script>
+        function debugToken() {
+            const results = document.getElementById('results');
+            results.innerHTML = '';
+
+            // Check for auth_token
+            const authToken = localStorage.getItem('auth_token');
+            const tokenDiv = document.createElement('div');
+            tokenDiv.className = 'token-info';
+            
+            if (!authToken) {
+                tokenDiv.innerHTML = '<h3 class="error">❌ No auth_token found in localStorage</h3>';
+                results.appendChild(tokenDiv);
+                return;
+            }
+
+            tokenDiv.innerHTML = `
+                <h3 class="success">✅ auth_token found</h3>
+                <p><strong>Token length:</strong> ${authToken.length} characters</p>
+                <p><strong>Token preview:</strong> ${authToken.substring(0, 50)}...</p>
+            `;
+            results.appendChild(tokenDiv);
+
+            // Validate JWT format
+            const jwtDiv = document.createElement('div');
+            jwtDiv.className = 'token-info';
+            
+            const parts = authToken.split('.');
+            if (parts.length !== 3) {
+                jwtDiv.innerHTML = `
+                    <h3 class="error">❌ Invalid JWT format</h3>
+                    <p>JWT should have 3 parts separated by dots, found: ${parts.length}</p>
+                    <p>Parts: ${JSON.stringify(parts.map(p => p.substring(0, 20) + '...'))}</p>
+                `;
+            } else {
+                jwtDiv.innerHTML = '<h3 class="success">✅ JWT format appears correct (3 parts)</h3>';
+                
+                // Try to decode header and payload
+                try {
+                    const header = JSON.parse(atob(parts[0]));
+                    const payload = JSON.parse(atob(parts[1]));
+                    
+                    jwtDiv.innerHTML += `
+                        <h4>JWT Header:</h4>
+                        <pre>${JSON.stringify(header, null, 2)}</pre>
+                        <h4>JWT Payload:</h4>
+                        <pre>${JSON.stringify(payload, null, 2)}</pre>
+                    `;
+                    
+                    // Check expiration
+                    if (payload.exp) {
+                        const expDate = new Date(payload.exp * 1000);
+                        const now = new Date();
+                        if (expDate < now) {
+                            jwtDiv.innerHTML += '<p class="error">❌ Token is expired</p>';
+                        } else {
+                            jwtDiv.innerHTML += `<p class="success">✅ Token expires: ${expDate.toLocaleString()}</p>`;
+                        }
+                    }
+                } catch (e) {
+                    jwtDiv.innerHTML += `<p class="error">❌ Failed to decode JWT: ${e.message}</p>`;
+                }
+            }
+            results.appendChild(jwtDiv);
+
+            // Check other auth-related items
+            const otherDiv = document.createElement('div');
+            otherDiv.className = 'token-info';
+            otherDiv.innerHTML = `
+                <h3>Other localStorage items:</h3>
+                <p><strong>userRole:</strong> ${localStorage.getItem('userRole') || 'Not set'}</p>
+                <p><strong>userId:</strong> ${localStorage.getItem('userId') || 'Not set'}</p>
+                <p><strong>userName:</strong> ${localStorage.getItem('userName') || 'Not set'}</p>
+                <p><strong>token (old key):</strong> ${localStorage.getItem('token') ? 'Present' : 'Not present'}</p>
+            `;
+            results.appendChild(otherDiv);
+
+            // Test API call
+            testApiCall(authToken);
+        }
+
+        async function testApiCall(token) {
+            const apiDiv = document.createElement('div');
+            apiDiv.className = 'token-info';
+            apiDiv.innerHTML = '<h3>Testing API call...</h3>';
+            document.getElementById('results').appendChild(apiDiv);
+
+            try {
+                const response = await fetch('/api/auth/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    apiDiv.innerHTML += `
+                        <p class="success">✅ API call successful</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    const errorText = await response.text();
+                    apiDiv.innerHTML += `
+                        <p class="error">❌ API call failed: ${response.status}</p>
+                        <pre>${errorText}</pre>
+                    `;
+                }
+            } catch (error) {
+                apiDiv.innerHTML += `<p class="error">❌ API call error: ${error.message}</p>`;
+            }
+        }
+
+        // Run debug on page load
+        debugToken();
+    </script>
+</body>
+</html>

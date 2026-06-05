@@ -1,0 +1,381 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Dashboard Client Data Flow Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+      }
+      button {
+        padding: 10px;
+        margin: 5px;
+        background: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      .result {
+        background: #f8f9fa;
+        padding: 10px;
+        margin: 10px 0;
+        border-left: 4px solid #007bff;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      .error {
+        border-left-color: #dc3545;
+        background: #f8d7da;
+      }
+      .success {
+        border-left-color: #28a745;
+        background: #d4edda;
+      }
+      .info {
+        border-left-color: #17a2b8;
+        background: #d1ecf1;
+      }
+      .step {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🏪 Dashboard Client Data Flow Test</h1>
+    <p>Testing complete client data integration with the dashboard</p>
+
+    <div class="step">
+      <h2>Step 1: Authentication</h2>
+      <button onclick="testLogin()">🔐 Login with Demo User</button>
+      <div id="login-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>Step 2: Dashboard Analytics (Client Stats)</h2>
+      <button onclick="testDashboardAnalytics()">
+        📊 Get Dashboard Analytics
+      </button>
+      <div id="analytics-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>Step 3: Get All Clients</h2>
+      <button onclick="testGetClients()">👥 Get All Clients</button>
+      <div id="clients-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>Step 4: Get Client Statistics</h2>
+      <button onclick="testClientStats()">📈 Get Client Stats</button>
+      <div id="stats-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>Step 5: Add New Client</h2>
+      <button onclick="testAddNewClient()">➕ Add Test Client</button>
+      <div id="add-client-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>Step 6: Verify Updated Stats</h2>
+      <button onclick="testUpdatedStats()">🔄 Check Updated Stats</button>
+      <div id="updated-stats-result" class="result"></div>
+    </div>
+
+    <div class="step">
+      <h2>🎯 Dashboard Access</h2>
+      <p>
+        After successful login, you can access the dashboard with real data:
+      </p>
+      <p>
+        <strong>Dashboard URL:</strong>
+        <a href="/dashboard" target="_blank">🚀 Open Dashboard</a>
+      </p>
+      <div class="info">
+        <h4>Expected Dashboard Features:</h4>
+        <ul>
+          <li>✅ Real client count in stats cards</li>
+          <li>✅ Client list with demo data (8 clients)</li>
+          <li>✅ Functional "Add Client" button</li>
+          <li>✅ Toast notifications for actions</li>
+          <li>✅ Real-time data updates</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      let authToken = null;
+      let clientCount = 0;
+
+      async function testLogin() {
+        const resultDiv = document.getElementById("login-result");
+        resultDiv.innerHTML = "🔄 Testing login...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: "demo@creditrepairpro.com",
+              password: "demo123",
+            }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.token) {
+            authToken = data.token;
+            localStorage.setItem("auth_token", data.token);
+
+            resultDiv.innerHTML = `✅ Login successful!<br>
+                        <strong>User:</strong> ${data.user.first_name} ${data.user.last_name}<br>
+                        <strong>Role:</strong> ${data.user.role}<br>
+                        <strong>Token:</strong> ${data.token.substring(0, 20)}...`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Login failed: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Login error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testDashboardAnalytics() {
+        const resultDiv = document.getElementById("analytics-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Getting dashboard analytics...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/analytics/dashboard", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Dashboard analytics retrieved!<br>
+                        <strong>Total Clients:</strong> ${data.totalClients || "N/A"}<br>
+                        <strong>Active Disputes:</strong> ${data.activeDisputes || "N/A"}<br>
+                        <strong>Success Rate:</strong> ${data.successRate || "N/A"}%<br>
+                        <details><summary>📋 Full Response</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `⚠️ Dashboard API failed (fallback will work): ${data.error}`;
+            resultDiv.className = "result info";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `⚠️ Dashboard API error (fallback will work): ${error.message}`;
+          resultDiv.className = "result info";
+        }
+      }
+
+      async function testGetClients() {
+        const resultDiv = document.getElementById("clients-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Getting all clients...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/clients", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const clients = data.clients || [];
+            clientCount = clients.length;
+
+            resultDiv.innerHTML = `✅ Found ${clients.length} clients!<br>
+                        <strong>Client Names:</strong><br>
+                        ${clients.map((c) => `• ${c.first_name} ${c.last_name} (${c.status})`).join("<br>")}
+                        <details><summary>📋 Full Client Data</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to get clients: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testClientStats() {
+        const resultDiv = document.getElementById("stats-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Getting client statistics...";
+        resultDiv.className = "result";
+
+        try {
+          const response = await fetch("/api/clients/stats", {
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Client stats retrieved!<br>
+                        <strong>Total:</strong> ${data.total_clients}<br>
+                        <strong>Active:</strong> ${data.active_clients}<br>
+                        <strong>Completed:</strong> ${data.completed_clients}<br>
+                        <strong>On Hold:</strong> ${data.on_hold_clients}<br>
+                        <strong>Avg Credit Score:</strong> ${Math.round(data.avg_credit_score || 0)}<br>
+                        <details><summary>📋 Full Stats</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to get stats: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testAddNewClient() {
+        const resultDiv = document.getElementById("add-client-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Adding test client...";
+        resultDiv.className = "result";
+
+        const testClient = {
+          first_name: "Test",
+          last_name: "User",
+          email: `test.user.${Date.now()}@example.com`,
+          phone: "(555) 999-8888",
+          address: "123 Test Avenue, Test City, TC 12345",
+          employment_status: "employed",
+          annual_income: 60000,
+          status: "active",
+          notes: "Test client added via API test",
+        };
+
+        try {
+          const response = await fetch("/api/clients", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(testClient),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `✅ Client added successfully!<br>
+                        <strong>New Client:</strong> ${data.first_name} ${data.last_name}<br>
+                        <strong>ID:</strong> ${data.id}<br>
+                        <strong>Status:</strong> ${data.status}<br>
+                        <details><summary>📋 Full Client Data</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to add client: ${data.error}`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      async function testUpdatedStats() {
+        const resultDiv = document.getElementById("updated-stats-result");
+
+        if (!authToken) {
+          resultDiv.innerHTML = "❌ Please login first";
+          resultDiv.className = "result error";
+          return;
+        }
+
+        resultDiv.innerHTML = "🔄 Checking updated statistics...";
+        resultDiv.className = "result";
+
+        try {
+          const [clientsResponse, statsResponse] = await Promise.all([
+            fetch("/api/clients", {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+              },
+            }),
+            fetch("/api/clients/stats", {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+                "Content-Type": "application/json",
+              },
+            }),
+          ]);
+
+          const clientsData = await clientsResponse.json();
+          const statsData = await statsResponse.json();
+
+          if (clientsResponse.ok && statsResponse.ok) {
+            const newClientCount = clientsData.clients?.length || 0;
+            const countIncrease = newClientCount - clientCount;
+
+            resultDiv.innerHTML = `✅ Updated stats retrieved!<br>
+                        <strong>Previous Client Count:</strong> ${clientCount}<br>
+                        <strong>Current Client Count:</strong> ${newClientCount}<br>
+                        <strong>Increase:</strong> +${countIncrease}<br>
+                        <strong>Total from Stats API:</strong> ${statsData.total_clients}<br>
+                        ${countIncrease > 0 ? "🎉 Client successfully added to database!" : ""}`;
+            resultDiv.className = "result success";
+          } else {
+            resultDiv.innerHTML = `❌ Failed to get updated stats`;
+            resultDiv.className = "result error";
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `❌ Error: ${error.message}`;
+          resultDiv.className = "result error";
+        }
+      }
+
+      // Auto-test login
+      window.onload = function () {
+        setTimeout(testLogin, 500);
+      };
+    </script>
+  </body>
+</html>
