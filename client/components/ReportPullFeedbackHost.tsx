@@ -135,7 +135,7 @@ export default function ReportPullFeedbackHost() {
                 </DialogHeader>
                 <div className="mt-6 inline-flex flex-col items-center gap-2 rounded-2xl border border-cyan-300/20 bg-white/5 px-5 py-4 text-center backdrop-blur">
                   <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-cyan-100/80">
-                    Estimated Maximum Time
+                    Estimated Time
                   </p>
                   <p className="text-2xl font-black tracking-tight text-cyan-200">
                     {formatCountdown(countdownSeconds)}

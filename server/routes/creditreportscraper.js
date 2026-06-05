@@ -1510,24 +1510,50 @@ const toDDMMYYYY = (s) => {
         const raw = reportData?.rawCreditData || reportData;
         const bureauFromType = (t) => {
           const s = String(t || '').toLowerCase();
-          if (s.includes('exp')) return 1;
-          if (s.includes('eqf')) return 2;
-          if (s.includes('tuc')) return 3;
+          if (s.includes('tuc')) return 1;
+          if (s.includes('exp')) return 2;
+          if (s.includes('eqf')) return 3;
           return null;
         };
         const bureauFromStr = (b) => {
           const s = String(b || '').toLowerCase();
-          if (s.includes('exper')) return 1;
-          if (s.includes('equif')) return 2;
-          if (s.includes('trans')) return 3;
+          if (s.includes('trans')) return 1;
+          if (s.includes('exper')) return 2;
+          if (s.includes('equif')) return 3;
           return null;
         };
         const bureauFromCode = (c) => {
           const s = String(c || '').toLowerCase();
-          if (s.includes('exp')) return 1;
-          if (s.includes('eqf')) return 2;
-          if (s.includes('tuc')) return 3;
+          if (s.includes('tuc')) return 1;
+          if (s.includes('exp')) return 2;
+          if (s.includes('eqf')) return 3;
           return null;
+        };
+        const bureauFromScoreName = (name) => {
+          const s = String(name || '').toLowerCase();
+          if (s.includes('trans')) return 1;
+          if (s.includes('exper')) return 2;
+          if (s.includes('equif')) return 3;
+          return null;
+        };
+        const resolveItemBureauId = (item, fallback = null) => {
+          const candidates = [
+            item?.['@bureau'],
+            item?.bureau,
+            item?.Source?.Bureau?.['@abbreviation'],
+            item?.Source?.Bureau?.['@description'],
+            item?.Source?.Bureau?.['@symbol'],
+            item?.Bureau?.['@abbreviation'],
+            item?.Bureau?.['@description'],
+            item?.Bureau?.['@symbol']
+          ];
+          for (const candidate of candidates) {
+            const fromStr = bureauFromStr(candidate);
+            if (fromStr) return fromStr;
+            const fromCode = bureauFromCode(candidate);
+            if (fromCode) return fromCode;
+          }
+          return fallback;
         };
         const normalizeStr = (v, def = '') => {
           if (v === null || v === undefined) return def;
@@ -1579,39 +1605,39 @@ const toDDMMYYYY = (s) => {
             if (!v) continue;
             if (k === 'Tradeline' && Array.isArray(v)) {
               for (const a of v) {
-                const bi = a?.['@bureau'] ? bureauFromStr(a['@bureau']) : nextBureau;
+                const bi = resolveItemBureauId(a, nextBureau);
                 accountsIQ.push({ a, bi });
               }
             } else if (k === 'Inquiry' && Array.isArray(v)) {
               for (const inq of v) {
-                const bi = nextBureau;
+                const bi = resolveItemBureauId(inq, nextBureau);
                 inquiriesIQ.push({ inq, bi });
               }
             } else if (k === 'Inquiry' && typeof v === 'object' && !Array.isArray(v)) {
-              const bi = nextBureau;
+              const bi = resolveItemBureauId(v, nextBureau);
               inquiriesIQ.push({ inq: v, bi });
             } else if (k === 'BorrowerAddress' && Array.isArray(v)) {
               for (const addr of v) {
-                const bi = bureauFromStr(addr?.Source?.Bureau?.['@abbreviation']) || bureauFromCode(addr?.Source?.Bureau?.['@symbol']) || nextBureau;
+                const bi = resolveItemBureauId(addr, nextBureau);
                 addressesIQ.push({ addr, bi });
               }
             } else if (k === 'BorrowerName' && Array.isArray(v)) {
               for (const n of v) {
-                const bi = bureauFromStr(n?.Source?.Bureau?.['@abbreviation']) || bureauFromCode(n?.Source?.Bureau?.['@symbol']) || nextBureau;
+                const bi = resolveItemBureauId(n, nextBureau);
                 namesIQ.push({ n, bi });
               }
             } else if (k === 'Birth' && Array.isArray(v)) {
               for (const b of v) {
-                const bi = bureauFromStr(b?.Source?.Bureau?.['@abbreviation']) || bureauFromCode(b?.Source?.Bureau?.['@symbol']) || nextBureau;
+                const bi = resolveItemBureauId(b, nextBureau);
                 birthsIQ.push({ b, bi });
               }
             } else if (k === 'Employer' && Array.isArray(v)) {
               for (const emp of v) {
-                const bi = nextBureau;
+                const bi = resolveItemBureauId(emp, nextBureau);
                 employersIQ.push({ emp, bi });
               }
             } else if (k === 'CreditScoreType' && typeof v === 'object') {
-              const bi = nextBureau;
+              const bi = resolveItemBureauId(v, nextBureau);
               scoresIQ.push({ s: v, bi });
             }
             if (typeof v === 'object') q.push({ node: v, bureau: nextBureau });
@@ -1727,6 +1753,19 @@ const toDDMMYYYY = (s) => {
             ScoreType: normalizeStr(s?.['@scoreName'] || s?.['@model'] || ''),
             DateScore: baseDateScore
           });
+        }
+        if (Array.isArray(raw?.scores)) {
+          for (const item of raw.scores) {
+            const id = bureauFromScoreName(item?.name || item?.bureau);
+            const scoreValue = normalizeStr(item?.score ?? item?.Score ?? '', '');
+            if (!id || scoreValue === '') continue;
+            bureauScoresMap.set(id, {
+              BureauId: id,
+              Score: scoreValue,
+              ScoreType: normalizeStr(item?.scoreType || item?.type || item?.model || 'VantageScore3', 'VantageScore3'),
+              DateScore: (parseDate(item?.date || item?.DateScore || baseDateScore) || '')?.slice(0,10) || baseDateScore
+            });
+          }
         }
         const scoresArrayFull = [1,2,3].map(id => (bureauScoresMap.get(id) || { BureauId: id, Score: null, ScoreType: '', DateScore: baseDateScore }));
         const creditorsMap = new Map();
@@ -1880,7 +1919,14 @@ const toDDMMYYYY = (s) => {
           try {
             reportData.reportData = converted.reportData;
             reportData.Score = converted.reportData?.Scores;
-            reportData.ReportDate = (parseDate(reportData?.clientInfo?.timestamp) || '')?.slice(0,10) || null;
+            reportData.ReportDate = (
+              parseDate(
+                reportData?.reportDate ||
+                reportData?.clientInfo?.timestamp ||
+                converted.reportData?.Scores?.find?.((score) => score?.DateScore)?.DateScore ||
+                reportData?.rawCreditData?.scores?.find?.((score) => score?.date)?.date
+              ) || ''
+            )?.slice(0,10) || null;
           } catch {}
         } catch {}
       }
@@ -1907,15 +1953,9 @@ const toDDMMYYYY = (s) => {
         scores.forEach(score => {
           const scoreValue = parseInt(score.Score);
           if (!isNaN(scoreValue)) {
-            if (platform && String(platform).toLowerCase() === String(PLATFORMS.IDENTITYIQ).toLowerCase()) {
-              if (score.BureauId === 1) experianScore = scoreValue;
-              if (score.BureauId === 2) equifaxScore = scoreValue;
-              if (score.BureauId === 3) transunionScore = scoreValue;
-            } else {
-              if (score.BureauId === 1) transunionScore = scoreValue;
-              if (score.BureauId === 2) experianScore = scoreValue;
-              if (score.BureauId === 3) equifaxScore = scoreValue;
-            }
+            if (score.BureauId === 1) transunionScore = scoreValue;
+            if (score.BureauId === 2) experianScore = scoreValue;
+            if (score.BureauId === 3) equifaxScore = scoreValue;
           }
         });
 
@@ -1929,15 +1969,9 @@ const toDDMMYYYY = (s) => {
         scores.forEach(score => {
           const scoreValue = parseInt(score.Score);
           if (!isNaN(scoreValue)) {
-            if (platform && String(platform).toLowerCase() === String(PLATFORMS.IDENTITYIQ).toLowerCase()) {
-              if (score.BureauId === 1) experianScore = scoreValue;
-              if (score.BureauId === 2) equifaxScore = scoreValue;
-              if (score.BureauId === 3) transunionScore = scoreValue;
-            } else {
-              if (score.BureauId === 1) transunionScore = scoreValue;
-              if (score.BureauId === 2) experianScore = scoreValue;
-              if (score.BureauId === 3) equifaxScore = scoreValue;
-            }
+            if (score.BureauId === 1) transunionScore = scoreValue;
+            if (score.BureauId === 2) experianScore = scoreValue;
+            if (score.BureauId === 3) equifaxScore = scoreValue;
           }
         });
         const validScores = [experianScore, equifaxScore, transunionScore].filter(score => score !== null);
@@ -1949,8 +1983,12 @@ const toDDMMYYYY = (s) => {
       // Extract report date if available
       if (reportData && reportData.reportData && reportData.reportData.ReportDate) {
         reportDate = reportData.reportData.ReportDate;
+      } else if (reportData && reportData.ReportDate) {
+        reportDate = reportData.ReportDate;
       } else if (reportData && reportData.CreditReport && Array.isArray(reportData.CreditReport) && reportData.CreditReport[0]?.DateReport) {
         reportDate = reportData.CreditReport[0].DateReport;
+      } else if (reportData && reportData.Score && Array.isArray(reportData.Score)) {
+        reportDate = reportData.Score.find(score => score?.DateScore)?.DateScore || null;
       }
 
       // Create notes with additional report information

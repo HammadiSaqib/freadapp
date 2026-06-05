@@ -230,6 +230,17 @@ function hasMatchingIdentityForMerge(existingClient: any, clientData: z.infer<ty
   return true;
 }
 
+function hasConflictingPlatform(existingClient: any, clientData: z.infer<typeof clientSchema>) {
+  const existingPlatform = normalizeComparableValue(existingClient?.platform);
+  const incomingPlatform = normalizeComparableValue(clientData.platform);
+
+  if (!existingPlatform || !incomingPlatform) {
+    return false;
+  }
+
+  return existingPlatform !== incomingPlatform;
+}
+
 async function findExistingClientForAdminByEmail(adminId: number, email?: string | null) {
   const normalizedEmail = normalizeComparableValue(email);
   if (!adminId || !normalizedEmail) {
@@ -694,7 +705,7 @@ export async function createClient(req: AuthRequest, res: Response) {
     }
 
     const emailMatchedClient = await findExistingClientForAdminByEmail(baseUserId, clientData.email);
-    if (emailMatchedClient?.id) {
+    if (emailMatchedClient?.id && !hasConflictingPlatform(emailMatchedClient, clientData)) {
       if (!hasMatchingIdentityForMerge(emailMatchedClient, clientData)) {
         return res.status(409).json({
           success: false,

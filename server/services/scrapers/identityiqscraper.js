@@ -105,6 +105,25 @@ function extractJsonLike(text) {
   return null;
 }
 
+function isIdentityIQScoreOnlyPayload(payload) {
+  return !!(
+    payload &&
+    typeof payload === 'object' &&
+    !Array.isArray(payload) &&
+    Array.isArray(payload.scores) &&
+    payload.scores.length > 0 &&
+    payload.scores.every((item) => item && typeof item === 'object' && ('score' in item || 'name' in item || 'date' in item))
+  );
+}
+
+function isIdentityIQFullReportPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return false;
+  if (payload.BundleComponents || payload.TrueLinkCreditReportType || payload.CreditReport || payload.Borrower) return true;
+  if (payload.Tradeline || payload.Inquiry || payload.PublicRecord || payload.CreditScoreType) return true;
+  if (Array.isArray(payload.BundleComponent) || Array.isArray(payload.Tradelines) || Array.isArray(payload.Inquiries)) return true;
+  return false;
+}
+
 // parse scores from sections text fallback
 function parseScoresFromSections(sectionsObj) {
   // sectionsObj: { "Credit Score": "..." , ... }
@@ -184,11 +203,23 @@ async function fetchIdentityIQReport(username, password, options = {}) {
 
     // response capture
     let rawCreditData = null;
+    let rawCreditDataCapturedAt = 0;
+    let scoreOnlyCreditData = null;
     const capturedResponses = [];
     let reportScreenshotPath = null;
     let reportTextPath = null;
     let reportSectionsPath = null;
     let htmlDownloadPath = null;
+    const reportWaitTimeout = Math.max(15000, config.waitTimeouts?.report_load || 20000);
+    const postClickNavigationTimeout = Math.min(config.waitTimeouts?.navigation || 45000, 45000);
+    const waitForCapturedReport = async (timeoutMs = reportWaitTimeout) => {
+      if (rawCreditData) return true;
+      const start = Date.now();
+      while (!rawCreditData && Date.now() - start < timeoutMs) {
+        await sleep(200);
+      }
+      return !!rawCreditData;
+    };
     page.on('response', async (resp) => {
       try {
         const url = resp.url();
@@ -198,10 +229,15 @@ async function fetchIdentityIQReport(username, password, options = {}) {
           // try to parse as JSON, else keep text for debug
           const text = await resp.text().catch(() => '');
           const parsed = extractJsonLike(text);
-          if (parsed && Object.keys(parsed || {}).length) {
+          if (parsed && isIdentityIQFullReportPayload(parsed)) {
             rawCreditData = parsed;
-            capturedResponses.push({ url, status: resp.status(), size: (text||'').length });
-            console.log('[IdentityIQ] Captured JSON-like response from', url);
+            rawCreditDataCapturedAt = Date.now();
+            capturedResponses.push({ url, status: resp.status(), size: (text||'').length, kind: 'full-report' });
+            console.log('[IdentityIQ] Captured full report JSON-like response from', url);
+          } else if (parsed && isIdentityIQScoreOnlyPayload(parsed)) {
+            scoreOnlyCreditData = parsed;
+            capturedResponses.push({ url, status: resp.status(), size: (text||'').length, kind: 'score-only' });
+            console.log('[IdentityIQ] Captured score-only JSON response from', url);
           } else {
             capturedResponses.push({ url, status: resp.status(), length: (text||'').length });
           }
@@ -443,11 +479,10 @@ async function fetchIdentityIQReport(username, password, options = {}) {
     let navigated = false;
     try {
       await page.waitForSelector('a[href="/CreditReport.aspx"], a[href*="CreditReport.aspx"]', { timeout: 8000 });
-      await Promise.all([
-        page.waitForNavigation({ waitUntil: 'networkidle0', timeout: Math.max(120000, config.waitTimeouts?.navigation || 120000) }),
-        page.click('a[href="/CreditReport.aspx"], a[href*="CreditReport.aspx"]')
-      ]);
-      navigated = /CreditReport\.aspx/i.test(page.url());
+      const navigationPromise = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: postClickNavigationTimeout }).catch(() => null);
+      await page.click('a[href="/CreditReport.aspx"], a[href*="CreditReport.aspx"]');
+      await Promise.race([navigationPromise, waitForCapturedReport()]);
+      navigated = /CreditReport\.aspx/i.test(page.url()) || !!rawCreditData;
       reportClicked.success = true;
     } catch {}
     if (!navigated) {
@@ -468,20 +503,25 @@ async function fetchIdentityIQReport(username, password, options = {}) {
         });
       } catch {}
       if (reportClicked.success) {
-        try { await page.waitForNavigation({ waitUntil: 'networkidle0', timeout: Math.max(120000, config.waitTimeouts?.navigation || 120000) }); } catch {}
-        navigated = /CreditReport\.aspx/i.test(page.url());
+        try {
+          await Promise.race([
+            page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: postClickNavigationTimeout }).catch(() => null),
+            waitForCapturedReport()
+          ]);
+        } catch {}
+        navigated = /CreditReport\.aspx/i.test(page.url()) || !!rawCreditData;
       }
     }
     if (!navigated) {
       console.log('[IdentityIQ] Fallback: navigating directly to CreditReport.aspx');
       try {
-        await page.goto('https://member.identityiq.com/CreditReport.aspx', { waitUntil: 'networkidle0', timeout: Math.max(120000, config.waitTimeouts?.navigation || 120000) });
-        navigated = /CreditReport\.aspx/i.test(page.url());
+        await page.goto('https://member.identityiq.com/CreditReport.aspx', { waitUntil: 'domcontentloaded', timeout: Math.max(120000, config.waitTimeouts?.navigation || 120000) });
+        navigated = /CreditReport\.aspx/i.test(page.url()) || !!rawCreditData;
       } catch (e) {
         console.warn('[IdentityIQ] Direct navigation to CreditReport.aspx failed:', e?.message || e);
       }
     }
-    await sleep(8000);
+    await sleep(rawCreditData ? 1500 : 8000);
     if (saveHtml) {
       try {
         const ts = new Date().toISOString().replace(/[:.]/g,'-');
@@ -492,14 +532,19 @@ async function fetchIdentityIQReport(username, password, options = {}) {
     }
 
     // wait for report XHRs (best-effort)
-    try {
-      await page.waitForResponse((r) => {
-        const u = (r.url() || '').toLowerCase();
-        return (/dsply/.test(u) || /csid/.test(u) || /creditreport/.test(u) || /getreport/.test(u) || /report|scrape|trueLink|credit/i.test(u)) && r.status() === 200;
-      }, { timeout: Math.max(15000, config.waitTimeouts?.report_load || 20000) }).catch(()=>null);
-    } catch (e) {}
+    if (!rawCreditData) {
+      try {
+        await page.waitForResponse((r) => {
+          const u = (r.url() || '').toLowerCase();
+          return (/dsply/.test(u) || /csid/.test(u) || /creditreport/.test(u) || /getreport/.test(u) || /report|scrape|trueLink|credit/i.test(u)) && r.status() === 200;
+        }, { timeout: reportWaitTimeout }).catch(()=>null);
+      } catch (e) {}
+    } else {
+      const captureAgeMs = rawCreditDataCapturedAt ? Date.now() - rawCreditDataCapturedAt : 0;
+      console.log('[IdentityIQ] Report payload already captured; skipping post-navigation response wait.', { captureAgeMs });
+    }
 
-    await sleep(1200);
+    await sleep(rawCreditData ? 300 : 1200);
 
     // choose frame that contains visible report text and poll longer if needed
     let reportCtx = page;
@@ -518,7 +563,7 @@ async function fetchIdentityIQReport(username, password, options = {}) {
       try {
         await reportCtx.waitForFunction(() => {
           try { return /Credit Report Date|Personal Information|Account History|Summary|Inquiries/i.test(document.body.innerText || ''); } catch { return false; }
-        }, { timeout: 20000 });
+        }, { timeout: rawCreditData ? 5000 : 20000 });
       } catch {}
     } catch (e) {}
 
@@ -623,6 +668,10 @@ async function fetchIdentityIQReport(username, password, options = {}) {
     }
 
     // If still no rawCreditData, we already saved reportSectionsPath -> use sections as fallback for payload
+    if (!rawCreditData && scoreOnlyCreditData) {
+      rawCreditData = scoreOnlyCreditData;
+    }
+
     let reportStructured = {};
     if (rawCreditData) {
       try {
@@ -655,6 +704,17 @@ async function fetchIdentityIQReport(username, password, options = {}) {
         equifax = rc?.Scores?.Equifax?.Score || rc?.Equifax?.score || rc?.equifaxScore || rc?.scores?.equifax || null;
         transunion = rc?.Scores?.TransUnion?.Score || rc?.TransUnion?.score || rc?.transunionScore || rc?.scores?.transunion || null;
         reportDate = rc?.reportDate || rc?.ReportDate || null;
+        if ((!experian && !equifax && !transunion) && Array.isArray(rc?.scores)) {
+          for (const item of rc.scores) {
+            const bureauName = String(item?.name || item?.bureau || '').toLowerCase();
+            const scoreValue = item?.score ?? item?.Score ?? null;
+            if (scoreValue === null || scoreValue === undefined || scoreValue === '') continue;
+            if (bureauName.includes('trans')) transunion = String(scoreValue);
+            if (bureauName.includes('exper')) experian = String(scoreValue);
+            if (bureauName.includes('equif')) equifax = String(scoreValue);
+            if (!reportDate && item?.date) reportDate = item.date;
+          }
+        }
       } catch (e) {}
     }
     if ((!experian && !equifax && !transunion) && reportStructured && Object.keys(reportStructured).length) {
