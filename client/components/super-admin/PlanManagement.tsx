@@ -42,6 +42,7 @@ interface SubscriptionPlan {
   features: string[];
   page_permissions?: string[]; // New field for page access control
   assigned_courses?: number[]; // New field for course assignments
+  trial_price_id?: string;
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
@@ -84,6 +85,7 @@ interface PlanFormData {
   features: string[];
   page_permissions: string[]; // New field for page access control
   assigned_courses: number[]; // New field for course assignments
+  trial_price_id?: string;
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
@@ -105,6 +107,7 @@ const initialFormData: PlanFormData = {
   features: [],
   page_permissions: [], // Initialize empty page permissions
   assigned_courses: [], // Initialize empty course assignments
+  trial_price_id: '',
   stripe_monthly_price_id: '',
   stripe_yearly_price_id: '',
   stripe_product_id: '',
@@ -252,6 +255,7 @@ export default function PlanManagement() {
       features: [...plan.features],
       page_permissions: plan.page_permissions || [],
       assigned_courses: plan.assigned_courses || [],
+      trial_price_id: plan.trial_price_id || '',
       stripe_monthly_price_id: plan.stripe_monthly_price_id || '',
       stripe_yearly_price_id: plan.stripe_yearly_price_id || '',
       stripe_product_id: plan.stripe_product_id || '',
@@ -628,6 +632,15 @@ export default function PlanManagement() {
                       />
                     </div>
                     <div>
+                      <Label htmlFor="trial_price_id">Trial Price ID</Label>
+                      <Input
+                        id="trial_price_id"
+                        placeholder="price_..."
+                        value={formData.trial_price_id || ''}
+                        onChange={(e) => setFormData(prev => ({ ...prev, trial_price_id: e.target.value }))}
+                      />
+                    </div>
+                    <div>
                       <Label htmlFor="stripe_monthly_price_id">Monthly Price ID</Label>
                       <Input
                         id="stripe_monthly_price_id"
@@ -647,7 +660,7 @@ export default function PlanManagement() {
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Leave blank if not applicable. Monthly/Yearly are used based on selected cycle at checkout.
+                    Leave blank if not applicable. Trial Price ID is used for monthly checkout when present; otherwise checkout uses the normal monthly or yearly price ID.
                   </p>
                 </div>
 

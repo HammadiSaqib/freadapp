@@ -5,6 +5,44 @@ import { SecurityLogger } from '../utils/securityLogger.js';
 const router = express.Router();
 const securityLogger = new SecurityLogger();
 
+const resolveAffiliateRef = async (candidate: unknown): Promise<number | null> => {
+  const raw = String(candidate || '').trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = parseInt(raw, 10);
+  if (!Number.isNaN(parsed)) {
+    const numericRows: any[] = await executeQuery(
+      `SELECT id FROM affiliates WHERE id = ? AND status = 'active' LIMIT 1`,
+      [parsed]
+    );
+    if (numericRows && numericRows.length > 0) {
+      return Number(numericRows[0].id);
+    }
+  }
+
+  const rows: any[] = await executeQuery(
+    `SELECT id
+     FROM affiliates
+     WHERE status = 'active' AND (
+       referral_slug = ?
+       OR email = ?
+       OR LOWER(CONCAT(first_name, last_name)) = LOWER(?)
+       OR LOWER(REPLACE(CONCAT(first_name, ' ', last_name), ' ', '')) = LOWER(?)
+     )
+     ORDER BY id ASC
+     LIMIT 1`,
+    [raw, raw, raw, raw]
+  );
+
+  if (rows && rows.length > 0) {
+    return Number(rows[0].id);
+  }
+
+  return null;
+};
+
 const hasAffiliateColumn = async (columnName: string) => {
   const rows: any[] = await executeQuery(
     `SELECT COUNT(*) as cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'affiliates' AND COLUMN_NAME = ?`,
@@ -30,10 +68,7 @@ const ensureEliteLandingPageColumn = async () => {
 router.get('/pricing', async (req, res) => {
   try {
     const { ref } = req.query; // Affiliate referral ID
-    const refAffiliateId = (() => {
-      const parsed = parseInt(String(ref || ''), 10);
-      return Number.isNaN(parsed) ? null : parsed;
-    })();
+    const refAffiliateId = await resolveAffiliateRef(ref);
 
     if (refAffiliateId) {
       securityLogger.logSecurityEvent('affiliate_referral_visit', {

@@ -652,7 +652,7 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
 
     // Fetch plan to get Stripe Price IDs
     const planRows = await executeQuery<any[]>(
-      'SELECT id, name, price, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions FROM subscription_plans WHERE id = ? AND is_active = TRUE',
+      'SELECT id, name, price, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions FROM subscription_plans WHERE id = ? AND is_active = TRUE',
       [planId]
     );
     if (!Array.isArray(planRows) || planRows.length === 0) {
@@ -675,7 +675,12 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       }
     } catch {}
 
-    let priceId = billingCycle === 'yearly' ? plan.stripe_yearly_price_id : plan.stripe_monthly_price_id;
+    const useTrialPrice = billingCycle === 'monthly' && !!plan.trial_price_id;
+    let priceId = useTrialPrice
+      ? plan.trial_price_id
+      : billingCycle === 'yearly'
+        ? plan.stripe_yearly_price_id
+        : plan.stripe_monthly_price_id;
     const interval = billingCycle === 'yearly' ? 'year' : 'month';
     let pendingAmount = 0;
     let stripePriceValid = false;
@@ -691,6 +696,9 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       }
     } catch {}
     if (!stripePriceValid) {
+      if (useTrialPrice) {
+        return res.status(400).json({ error: 'Trial price is not configured correctly for this plan' });
+      }
       const planPriceNum = Number(plan.price);
       if (!Number.isFinite(planPriceNum) || planPriceNum <= 0) {
         return res.status(400).json({ error: 'Plan price not configured' });
@@ -1963,6 +1971,56 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       console.error('Webhook signature verification failed:', err);
       return res.status(400).send('Webhook signature verification failed');
     }
+
+    const syncSubscriptionFromStripe = async (stripeSub: Stripe.Subscription) => {
+      const customerId = String(stripeSub.customer);
+      const userRows = await executeQuery<any[]>(
+        'SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1',
+        [customerId]
+      );
+      let userId: number | undefined = undefined;
+      if (Array.isArray(userRows) && userRows.length > 0) {
+        userId = userRows[0].id;
+      } else {
+        const affRows = await executeQuery<any[]>(
+          'SELECT id FROM affiliates WHERE stripe_customer_id = ? LIMIT 1',
+          [customerId]
+        );
+        if (Array.isArray(affRows) && affRows.length > 0) {
+          userId = affRows[0].id;
+        }
+      }
+
+      const statusMap: any = {
+        active: 'active',
+        trialing: 'active',
+        canceled: 'canceled',
+        past_due: 'past_due',
+        unpaid: 'unpaid',
+        incomplete: 'incomplete',
+        incomplete_expired: 'incomplete'
+      };
+      const normalizedStatus = statusMap[stripeSub.status] || 'active';
+      const periodStart = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null;
+      const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
+
+      if (userId) {
+        await executeQuery(
+          `UPDATE subscriptions 
+           SET status = ?, current_period_start = ?, current_period_end = ?, cancel_at_period_end = ?, updated_at = CURRENT_TIMESTAMP 
+           WHERE user_id = ?`,
+          [
+            normalizedStatus,
+            periodStart ? new Date(periodStart) : null,
+            periodEnd ? new Date(periodEnd) : null,
+            !!stripeSub.cancel_at_period_end,
+            userId
+          ]
+        );
+      }
+
+      return { userId, customerId, normalizedStatus };
+    };
     
     // Handle the event
     switch (event.type) {
@@ -2284,6 +2342,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
             const statusMap: any = {
               active: 'active',
+              trialing: 'active',
               canceled: 'canceled',
               past_due: 'past_due',
               unpaid: 'unpaid',
@@ -2576,59 +2635,64 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     }
       
       // Ongoing subscription status updates
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const stripeSub = event.data.object as Stripe.Subscription;
         try {
-          const customerId = String(stripeSub.customer);
-          // Try to resolve user by customer ID
-          const userRows = await executeQuery<any[]>(
-            'SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1',
-            [customerId]
-          );
-          let userId: number | undefined = undefined;
-          if (Array.isArray(userRows) && userRows.length > 0) {
-            userId = userRows[0].id;
-          } else {
-            const affRows = await executeQuery<any[]>(
-              'SELECT id FROM affiliates WHERE stripe_customer_id = ? LIMIT 1',
-              [customerId]
-            );
-            if (Array.isArray(affRows) && affRows.length > 0) {
-              userId = affRows[0].id;
-            }
-          }
-
-          const statusMap: any = {
-            active: 'active',
-            canceled: 'canceled',
-            past_due: 'past_due',
-            unpaid: 'unpaid',
-            incomplete: 'incomplete',
-            incomplete_expired: 'incomplete'
-          };
-          const normalizedStatus = statusMap[stripeSub.status] || 'active';
-          const periodStart = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null;
-          const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
-
+          const { userId, customerId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub);
           if (userId) {
-            await executeQuery(
-              `UPDATE subscriptions 
-               SET status = ?, current_period_start = ?, current_period_end = ?, cancel_at_period_end = ?, updated_at = CURRENT_TIMESTAMP 
-               WHERE user_id = ?`,
-              [
-                normalizedStatus,
-                periodStart ? new Date(periodStart) : null,
-                periodEnd ? new Date(periodEnd) : null,
-                !!stripeSub.cancel_at_period_end,
-                userId
-              ]
-            );
-            console.log('🔁 Subscription updated via webhook:', { userId, status: normalizedStatus });
+            console.log('🔁 Subscription synced via webhook:', { eventType: event.type, userId, status: normalizedStatus });
           } else {
-            console.log('ℹ️ No matching user found for subscription update (customerId:', customerId, ')');
+            console.log('ℹ️ No matching user found for subscription sync (customerId:', customerId, ')');
           }
         } catch (updErr) {
-          console.error('⚠️ Error processing customer.subscription.updated:', updErr);
+          console.error(`⚠️ Error processing ${event.type}:`, updErr);
+        }
+        break;
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice;
+        try {
+          const paymentIntentId = invoice.payment_intent ? String(invoice.payment_intent) : '';
+          if (paymentIntentId) {
+            await executeQuery(
+              'UPDATE billing_transactions SET status = ?, updated_at = NOW() WHERE stripe_payment_intent_id = ?',
+              ['succeeded', paymentIntentId]
+            );
+          }
+          if (invoice.subscription) {
+            const stripeSub = await stripe.subscriptions.retrieve(String(invoice.subscription));
+            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub);
+            if (userId) {
+              console.log('💸 Invoice paid synced subscription:', { userId, status: normalizedStatus, invoiceId: invoice.id });
+            }
+          }
+        } catch (invoicePaidErr) {
+          console.error('⚠️ Error processing invoice.paid:', invoicePaidErr);
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        try {
+          const paymentIntentId = invoice.payment_intent ? String(invoice.payment_intent) : '';
+          if (paymentIntentId) {
+            await executeQuery(
+              'UPDATE billing_transactions SET status = ?, updated_at = NOW() WHERE stripe_payment_intent_id = ?',
+              ['failed', paymentIntentId]
+            );
+          }
+          if (invoice.subscription) {
+            const stripeSub = await stripe.subscriptions.retrieve(String(invoice.subscription));
+            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub);
+            if (userId) {
+              console.log('⚠️ Invoice payment failed synced subscription:', { userId, status: normalizedStatus, invoiceId: invoice.id });
+            }
+          }
+        } catch (invoiceFailedErr) {
+          console.error('⚠️ Error processing invoice.payment_failed:', invoiceFailedErr);
         }
         break;
       }

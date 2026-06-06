@@ -352,6 +352,7 @@ const createPlanSchema = z.object({
   restricted_to_current_subscribers: z.boolean().optional(),
   allowed_affiliate_ids: z.array(z.number()).optional(),
   assigned_courses: z.array(z.number()).optional(),
+  trial_price_id: z.string().optional(),
   stripe_monthly_price_id: z.string().optional(),
   stripe_yearly_price_id: z.string().optional(),
   stripe_product_id: z.string().optional(),
@@ -1265,8 +1266,8 @@ router.post('/plans', authenticateToken, requireSuperAdmin, async (req: Request,
     })();
 
     const result = await db.executeQuery(
-      `INSERT INTO subscription_plans (name, description, price, billing_cycle, features, page_permissions, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, max_users, max_clients, max_disputes, is_active, sort_order, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO subscription_plans (name, description, price, billing_cycle, features, page_permissions, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, max_users, max_clients, max_disputes, is_active, sort_order, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         planData.name,
         planData.description || null,
@@ -1274,6 +1275,7 @@ router.post('/plans', authenticateToken, requireSuperAdmin, async (req: Request,
         planData.billing_cycle,
         JSON.stringify(planData.features || []),
         JSON.stringify(permObj),
+        planData.trial_price_id || null,
         planData.stripe_monthly_price_id || null,
         planData.stripe_yearly_price_id || null,
         planData.stripe_product_id || null,
@@ -1412,7 +1414,11 @@ router.put('/plans/:id', authenticateToken, requireSuperAdmin, async (req: Reque
           updateValues.push(JSON.stringify(value));
         } else if (key !== 'page_permissions') {
           updateFields.push(`${key} = ?`);
-          updateValues.push(value);
+          if (['trial_price_id', 'stripe_monthly_price_id', 'stripe_yearly_price_id', 'stripe_product_id'].includes(key)) {
+            updateValues.push(value || null);
+          } else {
+            updateValues.push(value);
+          }
         }
       }
     });

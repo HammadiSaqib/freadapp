@@ -161,10 +161,29 @@ const ReferralLandingPage: React.FC = () => {
   }, { scope: ctaRef });
 
   useEffect(() => {
+    const fetchPricingPlans = async (refCandidate?: string | number) => {
+      try {
+        const refQuery = refCandidate ? `?ref=${encodeURIComponent(String(refCandidate))}` : '';
+        const response = await fetch(`/api/pricing/plans${refQuery}`);
+        const result = await response.json();
+
+        if (result.success) {
+          setPlans(result.data);
+        } else {
+          console.error('Failed to load pricing plans:', result.error);
+        }
+      } catch (err) {
+        console.error('Error fetching pricing plans:', err);
+      } finally {
+        setPlansLoading(false);
+      }
+    };
+
     const fetchAffiliateData = async () => {
       if (!affiliateId) {
         setError('Invalid referral link');
         setLoading(false);
+        await fetchPricingPlans();
         return;
       }
 
@@ -182,36 +201,21 @@ const ReferralLandingPage: React.FC = () => {
             '| data.elite_landing_page =', data.elite_landing_page,
             '| computed eliteAllowed =', eliteAllowed);
           setAffiliate({ ...data, eliteLandingPage: eliteAllowed });
+          await fetchPricingPlans(data.id || affiliateId);
         } else {
           setError(result.error || 'Affiliate not found');
+          await fetchPricingPlans();
         }
       } catch (err) {
         console.error('Error fetching affiliate data:', err);
         setError('Failed to load referral information');
+        await fetchPricingPlans();
       } finally {
         setLoading(false);
       }
     };
 
-    const fetchPricingPlans = async () => {
-      try {
-        const response = await fetch('/api/pricing/plans');
-        const result = await response.json();
-
-        if (result.success) {
-          setPlans(result.data);
-        } else {
-          console.error('Failed to load pricing plans:', result.error);
-        }
-      } catch (err) {
-        console.error('Error fetching pricing plans:', err);
-      } finally {
-        setPlansLoading(false);
-      }
-    };
-
     fetchAffiliateData();
-    fetchPricingPlans();
   }, [affiliateId]);
 
   useEffect(() => {

@@ -11,6 +11,7 @@ export interface SubscriptionPlan {
   billing_cycle: 'monthly' | 'yearly' | 'lifetime';
   features: string; // JSON string of features array
   page_permissions?: string; // JSON string of page permissions array
+  trial_price_id?: string;
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
@@ -123,6 +124,7 @@ export async function createSuperAdminTables(): Promise<void> {
       billing_cycle ENUM('monthly', 'yearly', 'lifetime') NOT NULL DEFAULT 'monthly',
       features JSON NOT NULL,
       page_permissions JSON DEFAULT NULL,
+      trial_price_id VARCHAR(255) DEFAULT NULL,
       stripe_monthly_price_id VARCHAR(255) DEFAULT NULL,
       stripe_yearly_price_id VARCHAR(255) DEFAULT NULL,
       stripe_product_id VARCHAR(255) DEFAULT NULL,
@@ -374,10 +376,13 @@ export async function createSuperAdminTables(): Promise<void> {
         `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
          WHERE TABLE_SCHEMA = DATABASE() 
            AND TABLE_NAME = 'subscription_plans' 
-           AND COLUMN_NAME IN ('stripe_monthly_price_id','stripe_yearly_price_id','stripe_product_id')`
+           AND COLUMN_NAME IN ('trial_price_id','stripe_monthly_price_id','stripe_yearly_price_id','stripe_product_id')`
       );
       const existing = new Set((cols as any[]).map((c: any) => c.COLUMN_NAME));
       const alters: string[] = [];
+      if (!existing.has('trial_price_id')) {
+        alters.push('ADD COLUMN trial_price_id VARCHAR(255) DEFAULT NULL');
+      }
       if (!existing.has('stripe_monthly_price_id')) {
         alters.push('ADD COLUMN stripe_monthly_price_id VARCHAR(255) DEFAULT NULL');
       }
