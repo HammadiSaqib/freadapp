@@ -9,10 +9,18 @@ import { buildAliasUrl } from "@/lib/hostRouting";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
+import {
+  BASIC_ADMIN_CLIENT_CHANGED_EVENT,
+  getRememberedBasicAdminClientId,
+  hasReadyReportPullCredentials,
+  rememberBasicAdminClientId,
+  saveAndPullClientReport,
+} from "@/lib/basicAdminReportPull";
 import {
   ArrowLeft,
   CreditCard,
@@ -28,6 +36,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Sparkles,
   BarChart3,
   Target,
@@ -38,19 +47,59 @@ import {
   DollarSign,
   Crown,
   Menu,
+  Loader2,
   X
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 
 interface SidebarProps {
   className?: string;
   onAddClient?: () => void;
 }
 
+interface BasicAdminSidebarItem {
+  name: string;
+  href: string;
+  pageKey: string;
+  tab: string;
+  lawEngineAuto?: boolean;
+}
+
+interface BasicAdminSidebarSection {
+  key: "clients" | "workArea";
+  name: string;
+  icon: typeof Users | typeof FileText;
+  badge: string | null;
+  pageKey: string;
+  items: BasicAdminSidebarItem[];
+}
+
+const normalizeSidebarBooleanParam = (value: string | null) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+};
+
+const buildSidebarTabHref = (
+  pathname: string,
+  tab: string,
+  options?: { lawEngineAuto?: boolean },
+) => {
+  const params = new URLSearchParams();
+  params.set("tab", tab);
+
+  if (options?.lawEngineAuto) {
+    params.set("lawEngineAuto", "true");
+  }
+
+  return `${pathname}?${params.toString()}`;
+};
+
 export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const [collapsed, setCollapsed] = useState(false);
   // Mobile drawer state
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -58,11 +107,42 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const [clientCount, setClientCount] = useState<number>(0);
   const [reportCount, setReportCount] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [basicAdminClientRefreshNonce, setBasicAdminClientRefreshNonce] = useState(0);
+  const [basicAdminPrimaryClient, setBasicAdminPrimaryClient] = useState<{
+    id: string;
+    name: string;
+    platform?: string | null;
+    platform_email?: string | null;
+    platform_password?: string | null;
+    ssn_last_four?: string | null;
+  } | null>(null);
+  const [basicAdminExpandedSections, setBasicAdminExpandedSections] = useState({
+    clients: true,
+    workArea: true,
+  });
+  const [basicAdminRepullLoading, setBasicAdminRepullLoading] = useState(false);
   const subscriptionStatus = useSubscriptionStatus();
   const { userProfile } = useAuthContext();
   const { hasPermission, isLoading: pagePermissionsLoading } = usePagePermissions();
   const portalReturnContext = getPortalReturnContext();
   const { isEliteActive } = useScoreMachineEliteStatus();
+  const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
+  const currentSidebarSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const basicAdminRouteClientId = useMemo(() => {
+    const queryClientId = String(currentSidebarSearchParams.get('clientId') || '').trim();
+    if (queryClientId) {
+      return queryClientId;
+    }
+
+    const match = location.pathname.match(/^\/(?:clients|credit-report)\/([^/?#]+)/i);
+    return match?.[1] ? decodeURIComponent(match[1]) : null;
+  }, [currentSidebarSearchParams, location.pathname]);
+
+  useEffect(() => {
+    if (isBasicAdminPortalUser && basicAdminRouteClientId) {
+      rememberBasicAdminClientId(basicAdminRouteClientId);
+    }
+  }, [basicAdminRouteClientId, isBasicAdminPortalUser]);
 
   const openAffiliatePortal = (pathname: string = "/dashboard") => {
     const normalizedPath = pathname.startsWith("/") ? pathname : `/${pathname}`;
@@ -190,6 +270,190 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const isActive = (href: string) => location.pathname === href;
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
+  const basicAdminClientItems = useMemo<BasicAdminSidebarItem[]>(() => {
+    if (!basicAdminPrimaryClient?.id) {
+      return [];
+    }
+
+    const clientPath = `/clients/${basicAdminPrimaryClient.id}`;
+
+    return [
+      {
+        name: 'Profile & Documents',
+        href: buildSidebarTabHref(clientPath, 'info'),
+        pageKey: 'clients',
+        tab: 'info',
+      },
+      {
+        name: 'Credit Reports',
+        href: buildSidebarTabHref(clientPath, 'history'),
+        pageKey: 'clients',
+        tab: 'history',
+      },
+      {
+        name: 'Score History',
+        href: buildSidebarTabHref(clientPath, 'scores'),
+        pageKey: 'clients',
+        tab: 'scores',
+      },
+      {
+        name: 'Generated Letters',
+        href: buildSidebarTabHref(clientPath, 'letters'),
+        pageKey: 'clients',
+        tab: 'letters',
+      },
+      {
+        name: 'Equifax Settlement',
+        href: buildSidebarTabHref(clientPath, 'equifax'),
+        pageKey: 'clients',
+        tab: 'equifax',
+      },
+      {
+        name: 'Raw Data',
+        href: buildSidebarTabHref(clientPath, 'json'),
+        pageKey: 'clients',
+        tab: 'json',
+      },
+    ];
+  }, [basicAdminPrimaryClient?.id]);
+
+  const basicAdminWorkAreaItems = useMemo<BasicAdminSidebarItem[]>(() => {
+    if (!basicAdminPrimaryClient?.id) {
+      return [];
+    }
+
+    const creditReportPath = `/credit-report/${basicAdminPrimaryClient.id}`;
+
+    return [
+      {
+        name: 'Overview Dashboard',
+        href: buildSidebarTabHref(creditReportPath, 'overview'),
+        pageKey: 'credit-report',
+        tab: 'overview',
+      },
+      {
+        name: 'Personal Identity',
+        href: buildSidebarTabHref(creditReportPath, 'personal'),
+        pageKey: 'credit-report',
+        tab: 'personal',
+      },
+      {
+        name: 'Inquiries Credit Pulls',
+        href: buildSidebarTabHref(creditReportPath, 'inquiries'),
+        pageKey: 'credit-report',
+        tab: 'inquiries',
+      },
+      {
+        name: 'Public Records',
+        href: buildSidebarTabHref(creditReportPath, 'public'),
+        pageKey: 'credit-report',
+        tab: 'public',
+      },
+      {
+        name: 'Legal Accounts Credit Lines',
+        href: buildSidebarTabHref(creditReportPath, 'accounts'),
+        pageKey: 'credit-report',
+        tab: 'accounts',
+      },
+      {
+        name: 'Analysis Insights',
+        href: buildSidebarTabHref(creditReportPath, 'analysis'),
+        pageKey: 'credit-report',
+        tab: 'analysis',
+      },
+      {
+        name: 'Progress Report',
+        href: buildSidebarTabHref(creditReportPath, 'progress'),
+        pageKey: 'credit-report',
+        tab: 'progress',
+      },
+      {
+        name: 'Underwriting Assessment',
+        href: buildSidebarTabHref(creditReportPath, 'underwriting'),
+        pageKey: 'credit-report',
+        tab: 'underwriting',
+      },
+      {
+        name: 'Credit War Map Strategy',
+        href: buildSidebarTabHref(creditReportPath, 'creditWarMap'),
+        pageKey: 'credit-report',
+        tab: 'creditWarMap',
+      },
+      {
+        name: 'Automated Credit Analysis',
+        href: buildSidebarTabHref(creditReportPath, 'overview', { lawEngineAuto: true }),
+        pageKey: 'credit-report',
+        tab: 'overview',
+        lawEngineAuto: true,
+      },
+      {
+        name: 'Credit Repair Negative Items',
+        href: buildSidebarTabHref(creditReportPath, 'creditRepair'),
+        pageKey: 'credit-report',
+        tab: 'creditRepair',
+      },
+      {
+        name: 'Debt Consolidation Solutions',
+        href: buildSidebarTabHref(creditReportPath, 'debtConsolidation'),
+        pageKey: 'credit-report',
+        tab: 'debtConsolidation',
+      },
+      {
+        name: 'Funding Audit Options',
+        href: buildSidebarTabHref(creditReportPath, 'funding'),
+        pageKey: 'credit-report',
+        tab: 'funding',
+      },
+      {
+        name: 'Funding Apply',
+        href: buildSidebarTabHref(creditReportPath, 'fundingApplications'),
+        pageKey: 'credit-report',
+        tab: 'fundingApplications',
+      },
+    ];
+  }, [basicAdminPrimaryClient?.id]);
+
+  const basicAdminSections = useMemo<BasicAdminSidebarSection[]>(() => {
+    return [
+      {
+        key: 'clients',
+        name: 'Profile',
+        icon: Users,
+        badge: clientCount > 0 ? String(Math.min(clientCount, 1)) : null,
+        pageKey: 'clients',
+        items: basicAdminClientItems,
+      },
+      {
+        key: 'workArea',
+        name: 'Work Area',
+        icon: FileText,
+        badge: reportCount > 0 ? reportCount.toString() : null,
+        pageKey: 'credit-report',
+        items: basicAdminWorkAreaItems,
+      },
+    ];
+  }, [basicAdminClientItems, basicAdminWorkAreaItems, clientCount, isEliteActive, reportCount]);
+
+  const filteredBasicAdminSections = useMemo(() => {
+    return basicAdminSections
+      .map((section) => {
+        const matchesSection = !normalizedQuery || section.name.toLowerCase().includes(normalizedQuery);
+        const filteredItems = matchesSection || !normalizedQuery
+          ? section.items
+          : section.items.filter((item) => item.name.toLowerCase().includes(normalizedQuery));
+
+        if (!matchesSection && filteredItems.length === 0) {
+          return null;
+        }
+
+        return {
+          ...section,
+          items: filteredItems,
+        };
+      })
+      .filter((section): section is BasicAdminSidebarSection => Boolean(section));
+  }, [basicAdminSections, normalizedQuery]);
+
   // Detect small screens and keep it in sync with resize
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -219,23 +483,94 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
     if (isSmallScreen) setIsMobileOpen(false);
   }, [location.pathname, isSmallScreen]);
 
+  useEffect(() => {
+    if (isBasicAdminPortalUser) {
+      setCollapsed(false);
+    }
+  }, [isBasicAdminPortalUser]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleBasicAdminClientChanged = () => {
+      setBasicAdminClientRefreshNonce((current) => current + 1);
+    };
+
+    window.addEventListener(BASIC_ADMIN_CLIENT_CHANGED_EVENT, handleBasicAdminClientChanged);
+    return () => {
+      window.removeEventListener(BASIC_ADMIN_CLIENT_CHANGED_EVENT, handleBasicAdminClientChanged);
+    };
+  }, []);
+
   // Fetch client count
   useEffect(() => {
     const fetchClientCount = async () => {
       try {
         const response = await clientsApi.getClients({ limit: 1 });
-        if (response.data && response.data.pagination) {
-          setClientCount(response.data.pagination.total);
+        const payload = response.data;
+        const clients = Array.isArray(payload?.clients)
+          ? payload.clients
+          : Array.isArray(payload?.data)
+            ? payload.data
+            : Array.isArray(payload)
+              ? payload
+              : [];
+        const totalClients = Number(payload?.pagination?.total);
+
+        setClientCount(Number.isFinite(totalClients) ? totalClients : clients.length);
+
+        const preferredClientId = isBasicAdminPortalUser
+          ? basicAdminRouteClientId || getRememberedBasicAdminClientId()
+          : null;
+
+        let primaryClient = clients[0];
+
+        if (preferredClientId) {
+          try {
+            const preferredClientResponse = await clientsApi.getClient(preferredClientId);
+            if (preferredClientResponse?.data?.id !== undefined && preferredClientResponse?.data?.id !== null) {
+              primaryClient = preferredClientResponse.data;
+            }
+          } catch (preferredClientError) {
+            console.warn("Error fetching preferred basic admin client:", preferredClientError);
+          }
+        }
+
+        if (primaryClient?.id !== undefined && primaryClient?.id !== null) {
+          const primaryClientName = [primaryClient.first_name, primaryClient.last_name]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || String(primaryClient.name || 'Client');
+
+          if (isBasicAdminPortalUser) {
+            rememberBasicAdminClientId(primaryClient.id);
+          }
+
+          setBasicAdminPrimaryClient({
+            id: String(primaryClient.id),
+            name: primaryClientName,
+            platform: primaryClient.platform,
+            platform_email: primaryClient.platform_email,
+            platform_password: primaryClient.platform_password,
+            ssn_last_four: primaryClient.ssn_last_four,
+          });
+        } else {
+          setBasicAdminPrimaryClient(null);
         }
       } catch (error) {
         console.error("Error fetching client count:", error);
+        setBasicAdminPrimaryClient(null);
       }
     };
 
     if (userProfile) {
       fetchClientCount();
+    } else {
+      setBasicAdminPrimaryClient(null);
     }
-  }, [userProfile]);
+  }, [basicAdminClientRefreshNonce, basicAdminRouteClientId, isBasicAdminPortalUser, userProfile]);
 
   // Fetch report count for Work Area badge
   useEffect(() => {
@@ -339,6 +674,26 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
     },
   ];
 
+  const basicAdminMobileNavItems = useMemo(() => {
+    if (!isBasicAdminPortalUser) {
+      return mobileNavItems;
+    }
+
+    return [
+      mobileNavItems[0],
+      {
+        name: 'Report',
+        href: basicAdminPrimaryClient?.id
+          ? buildSidebarTabHref(`/credit-report/${basicAdminPrimaryClient.id}`, 'overview')
+          : location.pathname,
+        icon: FileText,
+        key: 'credit-report',
+        disabled: !basicAdminPrimaryClient?.id || !hasPermission('credit-report'),
+      },
+      mobileNavItems[4],
+    ];
+  }, [basicAdminPrimaryClient?.id, hasPermission, isBasicAdminPortalUser, location.pathname, mobileNavItems]);
+
   const handleLogout = async () => {
     try {
       // Clear all auth-related localStorage items
@@ -394,6 +749,162 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
     disabled?: boolean;
     onClick?: () => void;
   }>;
+
+  const basicAdminHiddenPageKeys = ['employees', 'feature-requests', 'ai-coach'];
+
+  const basicAdminStandaloneNavigation = isBasicAdminPortalUser
+    ? filteredNavigation.filter((item) => (
+      item.pageKey !== 'clients'
+      && item.pageKey !== 'reports'
+      && !basicAdminHiddenPageKeys.includes(item.pageKey)
+    ))
+    : filteredNavigation;
+
+  const toggleBasicAdminSection = (sectionKey: BasicAdminSidebarSection['key']) => {
+    setBasicAdminExpandedSections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey],
+    }));
+  };
+
+  const isBasicAdminSidebarItemActive = (item: BasicAdminSidebarItem) => {
+    const [pathname] = item.href.split('?');
+
+    if (location.pathname !== pathname) {
+      return false;
+    }
+
+    const currentTab = String(currentSidebarSearchParams.get('tab') || '').trim();
+    const currentLawEngineAuto = normalizeSidebarBooleanParam(currentSidebarSearchParams.get('lawEngineAuto'));
+
+    return currentTab === item.tab && currentLawEngineAuto === Boolean(item.lawEngineAuto);
+  };
+
+  const isBasicAdminSectionActive = (section: BasicAdminSidebarSection) => {
+    return section.items.some((item) => isBasicAdminSidebarItemActive(item));
+  };
+
+  const renderNavigationLink = (item: typeof filteredNavigation[number]) => {
+    const Icon = item.icon;
+    const active = isActive(item.href);
+    const disabled = item.disabled;
+
+    const content = (
+      <>
+        <Icon
+          className={`h-5 w-5 ${
+            disabled
+              ? "text-slate-400 dark:text-slate-600"
+              : active
+              ? (isEliteActive ? "text-[#7000ff]" : "text-white")
+              : (isEliteActive ? "text-slate-500 group-hover:text-[#7000ff]" : "text-slate-600 dark:text-slate-400 group-hover:text-ocean-blue")
+          }`}
+        />
+        {!collapsed && (
+          <div className="flex items-center justify-between flex-1">
+            <span className={`font-medium ${
+              disabled ? "text-slate-400 dark:text-slate-600" : ""
+            }`}>{item.name}</span>
+            <div className="flex items-center space-x-2">
+              {item.badge && (
+                <Badge
+                  variant={active ? "secondary" : "outline"}
+                  className={`text-xs ${
+                    disabled
+                      ? "bg-slate-100 text-slate-400 border-slate-200"
+                      : active
+                      ? (isEliteActive ? "elite-sidebar-badge" : "bg-white/20 text-white border-white/30")
+                      : item.name === 'Subscription' && item.badge === 'Payment Required'
+                      ? "bg-yellow-100 text-yellow-800 border-yellow-200"
+                      : (isEliteActive ? "border-[#7000ff]/20 text-[#7000ff]" : "border-ocean-blue/20 text-ocean-blue")
+                  }`}
+                >
+                  {item.badge}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+      </>
+    );
+
+    if (disabled) {
+      return (
+        <div
+          key={item.name}
+          className={`flex items-center py-2.5 rounded-lg transition-all duration-200 cursor-not-allowed opacity-40 hover:opacity-60 relative group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'}`}
+          title="Upgrade your subscription to access this feature"
+        >
+          {content}
+          <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="bg-slate-200 dark:bg-slate-700 rounded-full p-1">
+              <Shield className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <Link
+        key={item.name}
+        to={item.href}
+        className={`flex items-center py-2.5 transition-all duration-200 group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'} ${
+          active
+            ? (isEliteActive ? "elite-sidebar-item-active" : "gradient-primary text-white shadow-lg rounded-lg")
+            : (isEliteActive ? "elite-sidebar-item" : "rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gradient-soft hover:text-foreground")
+        }`}
+      >
+        {content}
+      </Link>
+    );
+  };
+
+  const handleBasicAdminRepull = async () => {
+    if (!basicAdminPrimaryClient?.id) {
+      return;
+    }
+
+    const profileHref = buildSidebarTabHref(`/clients/${basicAdminPrimaryClient.id}`, 'info');
+    rememberBasicAdminClientId(basicAdminPrimaryClient.id);
+
+    if (!hasReadyReportPullCredentials(basicAdminPrimaryClient)) {
+      navigate(`${profileHref}&reportPullPrompt=true`);
+      return;
+    }
+
+    try {
+      setBasicAdminRepullLoading(true);
+
+      await saveAndPullClientReport({
+        clientId: basicAdminPrimaryClient.id,
+        platform: String(basicAdminPrimaryClient.platform || ''),
+        platformEmail: String(basicAdminPrimaryClient.platform_email || ''),
+        platformPassword: String(basicAdminPrimaryClient.platform_password || ''),
+        ssnLast4: basicAdminPrimaryClient.ssn_last_four,
+      });
+
+      toast({
+        title: "Report Scraping Started",
+        description: "Credit report scraping has been initiated successfully.",
+      });
+
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      console.error("Error re-pulling basic admin report:", error);
+      toast({
+        title: "Scraping Failed",
+        description:
+          (error as any)?.response?.data?.message
+          || (error instanceof Error ? error.message : "Failed to start credit report scraping. Please try again."),
+        variant: "destructive",
+      });
+    } finally {
+      setBasicAdminRepullLoading(false);
+    }
+  };
 
   return (
     <>
@@ -481,82 +992,86 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
       {/* Navigation */}
       <nav className="p-4 space-y-2">
-        {filteredNavigation.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          const disabled = item.disabled;
+        {isBasicAdminPortalUser ? (
+          <>
+            {basicAdminStandaloneNavigation
+              .filter((item) => item.pageKey === 'dashboard')
+              .map((item) => renderNavigationLink(item))}
 
-          const content = (
-            <>
-              <Icon
-                className={`h-5 w-5 ${
-                  disabled
-                    ? "text-slate-400 dark:text-slate-600"
-                    : active
-                    ? (isEliteActive ? "text-[#7000ff]" : "text-white")
-                    : (isEliteActive ? "text-slate-500 group-hover:text-[#7000ff]" : "text-slate-600 dark:text-slate-400 group-hover:text-ocean-blue")
-                }`}
-              />
-              {!collapsed && (
-                <div className="flex items-center justify-between flex-1">
-                  <span className={`font-medium ${
-                    disabled ? "text-slate-400 dark:text-slate-600" : ""
-                  }`}>{item.name}</span>
-                  <div className="flex items-center space-x-2">
-                    {item.badge && (
-                      <Badge
-                        variant={active ? "secondary" : "outline"}
-                        className={`text-xs ${
-                          disabled
-                            ? "bg-slate-100 text-slate-400 border-slate-200"
-                            : active
-                            ? (isEliteActive ? "elite-sidebar-badge" : "bg-white/20 text-white border-white/30")
-                            : item.name === 'Subscription' && item.badge === 'Payment Required'
-                            ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                            : (isEliteActive ? "border-[#7000ff]/20 text-[#7000ff]" : "border-ocean-blue/20 text-ocean-blue")
-                        }`}
-                      >
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </div>
+            {!collapsed && filteredBasicAdminSections.map((section) => {
+              const Icon = section.icon;
+              const hasSectionAccess = hasPermission(section.pageKey);
+              const isExpanded = basicAdminExpandedSections[section.key];
+              const isSectionActive = isBasicAdminSectionActive(section);
+              const hasPrimaryClient = section.items.length > 0;
+
+              return (
+                <div key={section.key} className="space-y-1 rounded-xl border border-border/40 bg-white/60 p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                  <button
+                    type="button"
+                    onClick={() => hasSectionAccess && hasPrimaryClient && toggleBasicAdminSection(section.key)}
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition-all duration-200 ${
+                      hasSectionAccess && hasPrimaryClient
+                        ? isSectionActive
+                          ? 'bg-gradient-soft text-foreground'
+                          : 'text-slate-700 hover:bg-gradient-soft dark:text-slate-300'
+                        : 'cursor-not-allowed opacity-50 text-slate-400'
+                    }`}
+                    aria-expanded={isExpanded}
+                    disabled={!hasSectionAccess || !hasPrimaryClient}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className="h-5 w-5 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium">{section.name}</div>
+                        {!hasPrimaryClient && (
+                          <div className="text-xs text-muted-foreground">No client assigned yet</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {section.badge && (
+                        <Badge variant="outline" className="text-xs">
+                          {section.badge}
+                        </Badge>
+                      )}
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
+                  </button>
+
+                  {isExpanded && hasSectionAccess && hasPrimaryClient && (
+                    <div className="space-y-1 pl-3 pt-1">
+                      {section.items.map((item) => {
+                        const itemActive = isBasicAdminSidebarItemActive(item);
+
+                        return (
+                          <Link
+                            key={item.name}
+                            to={item.href}
+                            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
+                              itemActive
+                                ? 'gradient-primary text-white shadow-md'
+                                : 'text-slate-600 hover:bg-gradient-soft hover:text-foreground dark:text-slate-400'
+                            }`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${itemActive ? 'bg-white' : 'bg-slate-400 dark:bg-slate-500'}`} />
+                            <span className="truncate">{item.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          );
+              );
+            })}
 
-          if (disabled) {
-            return (
-              <div
-                key={item.name}
-                className={`flex items-center py-2.5 rounded-lg transition-all duration-200 cursor-not-allowed opacity-40 hover:opacity-60 relative group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'}`}
-                title="Upgrade your subscription to access this feature"
-              >
-                {content}
-                {/* Subtle lock icon overlay */}
-                <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="bg-slate-200 dark:bg-slate-700 rounded-full p-1">
-                    <Shield className="h-3 w-3 text-slate-500 dark:text-slate-400" />
-                  </div>
-                </div>
-              </div>
-            );
-          }
-
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={`flex items-center py-2.5 transition-all duration-200 group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'} ${
-                active
-                  ? (isEliteActive ? "elite-sidebar-item-active" : "gradient-primary text-white shadow-lg rounded-lg")
-                  : (isEliteActive ? "elite-sidebar-item" : "rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gradient-soft hover:text-foreground")
-              }`}
-            >
-              {content}
-            </Link>
-          );
-        })}
+            {basicAdminStandaloneNavigation
+              .filter((item) => item.pageKey !== 'dashboard')
+              .map((item) => renderNavigationLink(item))}
+          </>
+        ) : (
+          filteredNavigation.map((item) => renderNavigationLink(item))
+        )}
 
         {/* Quick Actions */}
         {!collapsed && (
@@ -565,28 +1080,49 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
               Quick Actions
             </h4>
             <div className="space-y-2">
-              <Button
-                onClick={hasPermission('clients') ? (onAddClient || (() => navigate("/clients"))) : undefined}
-                variant="outline"
-                size="sm"
-                disabled={!hasPermission('clients')}
-                className={`w-full justify-start relative group ${
-                  !hasPermission('clients')
-                    ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
-                    : isEliteActive ? "bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 border-0 font-bold shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] hover:opacity-90" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
-                }`}
-                title={!hasPermission('clients') ? "Upgrade your subscription to access this feature" : ""}
-              >
-                <Target className="h-4 w-4 mr-2" />
-                {isEliteActive ? "Add to CRM" : "Add Client"}
-                {!hasPermission('clients') && (
-                  <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <div className="bg-slate-200 dark:bg-slate-700 rounded-full p-1">
-                      <Shield className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+              {isBasicAdminPortalUser ? (
+                <Button
+                  onClick={basicAdminPrimaryClient?.id ? handleBasicAdminRepull : undefined}
+                  variant="outline"
+                  size="sm"
+                  disabled={!basicAdminPrimaryClient?.id || !hasPermission('credit-report') || basicAdminRepullLoading}
+                  className={`w-full justify-start relative group ${
+                    !basicAdminPrimaryClient?.id || !hasPermission('credit-report') || basicAdminRepullLoading
+                      ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
+                      : isEliteActive ? "bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 border-0 font-bold shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] hover:opacity-90" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
+                  }`}
+                >
+                  {basicAdminRepullLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Target className="h-4 w-4 mr-2" />
+                  )}
+                  {basicAdminRepullLoading ? 'Re Pulling Your Report...' : 'Re Pull Your Report'}
+                </Button>
+              ) : (
+                <Button
+                  onClick={hasPermission('clients') ? (onAddClient || (() => navigate("/clients"))) : undefined}
+                  variant="outline"
+                  size="sm"
+                  disabled={!hasPermission('clients')}
+                  className={`w-full justify-start relative group ${
+                    !hasPermission('clients')
+                      ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
+                      : isEliteActive ? "bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 border-0 font-bold shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] hover:opacity-90" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
+                  }`}
+                  title={!hasPermission('clients') ? "Upgrade your subscription to access this feature" : ""}
+                >
+                  <Target className="h-4 w-4 mr-2" />
+                  {isEliteActive ? "Add to CRM" : "Add Client"}
+                  {!hasPermission('clients') && (
+                    <div className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <div className="bg-slate-200 dark:bg-slate-700 rounded-full p-1">
+                        <Shield className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+                      </div>
                     </div>
-                  </div>
-                )}
-              </Button>
+                  )}
+                </Button>
+              )}
               <Button
                 onClick={() => navigate("/invoices")}
                 variant="outline"
@@ -732,6 +1268,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 {(() => {
                   if (userProfile?.role === 'super_admin') return 'Super Admin Account';
                   if (userProfile?.role === 'admin') {
+                    if (isBasicAdminPortalUser) return 'Basic Access';
                     return isEliteActive ? 'Elite Access' : (subscriptionStatus.hasActiveSubscription ? 'Partner Program' : 'Affiliate Program');
                   }
                   if (userProfile?.role === 'manager') return 'Manager Account';
@@ -759,7 +1296,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
           >
             <div className="mx-auto max-w-[850px] px-2 overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
               <ul className="flex items-stretch flex-nowrap gap-1">
-                {[...filteredNavigation, ...mobileNavExtras].map((item) => {
+                {[...basicAdminMobileNavItems, ...mobileNavExtras].map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   const disabled = item.disabled;

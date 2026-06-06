@@ -127,10 +127,13 @@ import FundingProjectionsCalculator from '../utils/fundingProjections.js';
 import GapAnalyzer from '../utils/gapAnalyzer.js';
 import PersonalCardsDisplay from '../components/PersonalCardsDisplay';
 import BusinessCardsDisplay from '../components/BusinessCardsDisplay';
+import BasicAdminReportPullPrompt from "@/components/BasicAdminReportPullPrompt";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import { api } from "@/lib/api";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
+import { normalizeBasicAdminBooleanParam, rememberBasicAdminClientId } from "@/lib/basicAdminReportPull";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
 
 interface DebtConsolidationViewProps {
@@ -2495,12 +2498,37 @@ const negativeItemBureauOrder = ['Experian', 'Equifax', 'TransUnion'];
 export default function CreditReport() {
   const { userProfile, isLoading: authLoading, refreshProfile } = useAuthContext();
   const { isEliteActive, isEliteStatusLoading } = useScoreMachineEliteStatus();
+  const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
   const [affiliateCreditRepairLink, setAffiliateCreditRepairLink] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
+  const allowedCreditReportTabs = [
+    'overview',
+    'personal',
+    'inquiries',
+    'public',
+    'accounts',
+    'analysis',
+    'progress',
+    'underwriting',
+    'creditWarMap',
+    'creditRepair',
+    'debtConsolidation',
+    'funding',
+    'fundingApplications',
+  ] as const;
+  const getRequestedCreditReportTab = () => {
+    const tab = String(searchParams.get('tab') || '').trim();
+    return allowedCreditReportTabs.includes(tab as typeof allowedCreditReportTabs[number]) ? tab : 'overview';
+  };
+  const getRequestedLawEngineAuto = () => {
+    const normalized = String(searchParams.get('lawEngineAuto') || '').trim().toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes';
+  };
+  const activeTab = getRequestedCreditReportTab();
   const [reportData, setReportData] = useState(detailedReport);
   const [apiData, setApiData] = useState<any>(null);
+  const [clientRecord, setClientRecord] = useState<any>(null);
   const [missingBureaus, setMissingBureaus] = useState<string[]>([]);
   const [qualifyView, setQualifyView] = useState<'cards' | 'table'>('table');
   const [refreshAuditNonce, setRefreshAuditNonce] = useState(0);
@@ -2510,6 +2538,7 @@ export default function CreditReport() {
   const [underwritingAccountsSearch, setUnderwritingAccountsSearch] = useState('');
   const [underwritingAccountsTypeFilter, setUnderwritingAccountsTypeFilter] = useState<'all' | 'revolving' | 'installment' | 'mortgage' | 'others'>('all');
   const [underwritingAccountsStatusFilter, setUnderwritingAccountsStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const shouldForceReportPullPrompt = normalizeBasicAdminBooleanParam(searchParams.get('reportPullPrompt'));
   const analysisRef = useRef<HTMLDivElement>(null);
   const [personalInfoMode, setPersonalInfoMode] = useState<'normal' | 'credit_repair'>('normal');
   const [smPiLoading, setSmPiLoading] = useState(false);
@@ -2554,7 +2583,7 @@ export default function CreditReport() {
   const [letterTemplatesError, setLetterTemplatesError] = useState<string | null>(null);
   const [smPiResult, setSmPiResult] = useState<any | null>(null);
   const [smPiError, setSmPiError] = useState<string | null>(null);
-  const [lawEngineAutoMode, setLawEngineAutoMode] = useState(false);
+  const lawEngineAutoMode = getRequestedLawEngineAuto();
   const [lawEngineNoticeOpen, setLawEngineNoticeOpen] = useState(false);
   const [pendingLawEngineTab, setPendingLawEngineTab] = useState<string | null>(null);
   const [metro2ExpandedRows, setMetro2ExpandedRows] = useState<Record<string, boolean>>({});
@@ -2562,6 +2591,27 @@ export default function CreditReport() {
   const [pendingFundingAuditTab, setPendingFundingAuditTab] = useState<string | null>(null);
   const creditReportTabs = ['overview', 'personal', 'inquiries', 'public', 'accounts'] as const;
   type CreditReportTab = (typeof creditReportTabs)[number];
+  const updateCreditReportView = (nextTab: string, nextLawEngineAutoMode: boolean = lawEngineAutoMode) => {
+    const normalizedTab = allowedCreditReportTabs.includes(nextTab as typeof allowedCreditReportTabs[number])
+      ? nextTab
+      : 'overview';
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', normalizedTab);
+
+    if (nextLawEngineAutoMode) {
+      params.set('lawEngineAuto', 'true');
+    } else {
+      params.delete('lawEngineAuto');
+    }
+
+    setSearchParams(params, { replace: true });
+  };
+  const setActiveTab = (nextTab: string) => {
+    updateCreditReportView(nextTab, lawEngineAutoMode);
+  };
+  const setLawEngineAutoMode = (nextLawEngineAutoMode: boolean) => {
+    updateCreditReportView(activeTab, nextLawEngineAutoMode);
+  };
   const isLawEngineView = lawEngineAutoMode && (creditReportTabs as readonly string[]).includes(activeTab);
   const shouldEnforceEliteCreditRepairAccess = ['admin', 'employee', 'user', 'funding_manager'].includes(String(userProfile?.role || ''));
   const isCreditRepairAccessResolved =
@@ -2867,8 +2917,7 @@ export default function CreditReport() {
 
   const acknowledgeLawEngineNotice = () => {
     setLawEngineNoticeOpen(false);
-    setLawEngineAutoMode(true);
-    if (pendingLawEngineTab) setActiveTab(pendingLawEngineTab);
+    updateCreditReportView(pendingLawEngineTab || activeTab, true);
     setPendingLawEngineTab(null);
   };
 
@@ -2923,6 +2972,38 @@ export default function CreditReport() {
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
   const clientId = urlClientId || searchParams.get("clientId") || userProfile?.id;
   const activeClientId = searchParams.get('clientId') || urlClientId || (userProfile?.role === 'client' ? userProfile?.id : undefined);
+  const shouldShowBasicAdminReportPullPrompt = isBasicAdminPortalUser && Boolean(clientRecord) && (!apiData || shouldForceReportPullPrompt);
+
+  useEffect(() => {
+    if (isBasicAdminPortalUser && (activeClientId || clientId)) {
+      rememberBasicAdminClientId(String(activeClientId || clientId));
+    }
+  }, [activeClientId, clientId, isBasicAdminPortalUser]);
+
+  const handleBasicAdminReportPullStarted = async (values: {
+    platform: string;
+    platform_email: string;
+    platform_password: string;
+    ssn_last_four: string;
+  }) => {
+    rememberBasicAdminClientId(clientRecord?.id || activeClientId || clientId);
+
+    setClientRecord((current: any) => current ? {
+      ...current,
+      platform: values.platform,
+      platform_email: values.platform_email,
+      platform_password: values.platform_password,
+      ssn_last_four: values.ssn_last_four || current.ssn_last_four,
+    } : current);
+
+    const params = new URLSearchParams(searchParams);
+    params.delete('reportPullPrompt');
+    setSearchParams(params, { replace: true });
+
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  };
 
   // Credit Repair - Document Handlers
   const handleDocumentUpload = async (type: 'dl_or_id_card' | 'poa' | 'ssc', file: File) => {
@@ -5667,7 +5748,6 @@ export default function CreditReport() {
   const [showEligibilityAuditModal, setShowEligibilityAuditModal] = useState(false);
   const [auditRunning, setAuditRunning] = useState(false);
   const [auditResult, setAuditResult] = useState<string | null>(null);
-  const [clientRecord, setClientRecord] = useState<any>(null);
   const [formData, setFormData] = useState({
     // Business Information
     titlePosition: '',
@@ -8223,6 +8303,8 @@ export default function CreditReport() {
       title={`Credit Report - ${clientName}`}
       description="Detailed credit report analysis and information"
     >
+      <div className="relative min-h-screen">
+        <div className={shouldShowBasicAdminReportPullPrompt ? "pointer-events-none select-none blur-sm opacity-80" : ""}>
       <Dialog
         open={lawEngineNoticeOpen}
         onOpenChange={(open) => {
@@ -8865,7 +8947,7 @@ export default function CreditReport() {
                 {/* Overview */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => { setLawEngineAutoMode(false); setActiveTab('overview'); }}
+                    onClick={() => updateCreditReportView('overview', false)}
                     className={`step-indicator flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
                       activeTab === 'overview'
                         ? 'bg-[radial-gradient(circle_at_30%_25%,#dbeafe,#3b82f6_55%,#1d4ed8)] border-blue-500 text-white shadow-[0_10px_25px_rgba(29,78,216,0.35)] scale-110'
@@ -8894,7 +8976,7 @@ export default function CreditReport() {
                 {/* Personal */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => { setLawEngineAutoMode(false); setActiveTab('personal'); }}
+                    onClick={() => updateCreditReportView('personal', false)}
                     className={`step-indicator flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
                       activeTab === 'personal'
                         ? 'bg-[radial-gradient(circle_at_30%_25%,#f3e8ff,#a855f7_55%,#7c3aed)] border-purple-500 text-white shadow-[0_10px_25px_rgba(124,58,237,0.35)] scale-110'
@@ -8923,7 +9005,7 @@ export default function CreditReport() {
                 {/* Inquiries */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => { setLawEngineAutoMode(false); setActiveTab('inquiries'); }}
+                    onClick={() => updateCreditReportView('inquiries', false)}
                     className={`step-indicator flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
                       activeTab === 'inquiries'
                         ? 'bg-[radial-gradient(circle_at_30%_25%,#fef3c7,#facc15_55%,#ca8a04)] border-amber-500 text-slate-900 shadow-[0_10px_25px_rgba(202,138,4,0.35)] scale-110'
@@ -8951,7 +9033,7 @@ export default function CreditReport() {
                 {/* Public Records */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => { setLawEngineAutoMode(false); setActiveTab('public'); }}
+                    onClick={() => updateCreditReportView('public', false)}
                     className={`step-indicator flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
                       activeTab === 'public'
                         ? 'bg-[radial-gradient(circle_at_30%_25%,#fee2e2,#ef4444_55%,#b91c1c)] border-red-500 text-white shadow-[0_10px_25px_rgba(185,28,28,0.35)] scale-110'
@@ -8980,7 +9062,13 @@ export default function CreditReport() {
                 {/* Accounts (moved to end, after Public Records) */}
                 <div className="flex items-center">
                   <button
-                    onClick={() => { setLawEngineAutoMode(false); if (subscriptionStatus.hasActiveSubscription) setActiveTab('accounts'); }}
+                    onClick={() => {
+                      if (subscriptionStatus.hasActiveSubscription) {
+                        updateCreditReportView('accounts', false);
+                      } else {
+                        updateCreditReportView(activeTab, false);
+                      }
+                    }}
                     disabled={!subscriptionStatus.hasActiveSubscription}
                     className={`step-indicator flex items-center justify-center w-12 h-12 rounded-full border-2 transition-all duration-300 ${
                       !subscriptionStatus.hasActiveSubscription
@@ -26408,6 +26496,22 @@ export default function CreditReport() {
         title="Send Print Request"
         description="Confirm the sender details that should go to the printing team with this dispute letter package."
       />
+
+        </div>
+
+        <BasicAdminReportPullPrompt
+          open={shouldShowBasicAdminReportPullPrompt}
+          clientId={clientId ? String(clientId) : undefined}
+          clientName={clientName}
+          initialValues={clientRecord ? {
+            platform: clientRecord.platform,
+            platform_email: clientRecord.platform_email,
+            platform_password: clientRecord.platform_password,
+            ssn_last_four: clientRecord.ssn_last_four,
+          } : null}
+          onPullStarted={handleBasicAdminReportPullStarted}
+        />
+      </div>
 
 
     </DashboardLayout>

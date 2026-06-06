@@ -91,6 +91,13 @@ const STATUS_OPTIONS = [
   { value: 'suspended', label: 'Suspended', color: 'bg-red-100 text-red-800' }
 ];
 
+const SCORE_MACHINE_ELITE_PERMISSION = 'score_machine_elite';
+const SCORE_MACHINE_BASIC_PERMISSION = 'score_machine_basic';
+const SCORE_MACHINE_PORTAL_PERMISSION_IDS = [
+  SCORE_MACHINE_ELITE_PERMISSION,
+  SCORE_MACHINE_BASIC_PERMISSION,
+] as const;
+
   const PERMISSIONS = [
     { id: 'user_management', label: 'User Management', category: 'Users' },
     { id: 'subscription_management', label: 'Subscription Management', category: 'Billing' },
@@ -100,11 +107,24 @@ const STATUS_OPTIONS = [
     { id: 'system_settings', label: 'System Settings', category: 'System' },
     { id: 'admin_management', label: 'Admin Management', category: 'Admin' },
     { id: 'score_machine_elite', label: 'Allow Score Machine Elite', category: 'Admin' },
+    { id: 'score_machine_basic', label: 'Allow Basic Only', category: 'Admin' },
     { id: 'unlimited_ai_tokens', label: 'Unlimited AI Tokens (no AI-Matched limit)', category: 'Admin' },
     { id: 'unlimited_openai_prompts', label: 'Unlimited Open AI Prompt', category: 'Admin' },
     { id: 'billing_management', label: 'Billing Management', category: 'Billing' },
     { id: 'support_management', label: 'Support Management', category: 'Support' }
   ];
+
+const normalizePortalPermissions = (permissions: string[]): string[] => {
+  const uniquePermissions = Array.from(new Set(permissions));
+  const hasElite = uniquePermissions.includes(SCORE_MACHINE_ELITE_PERMISSION);
+  const hasBasic = uniquePermissions.includes(SCORE_MACHINE_BASIC_PERMISSION);
+
+  if (hasElite && hasBasic) {
+    return uniquePermissions.filter((permission) => permission !== SCORE_MACHINE_BASIC_PERMISSION);
+  }
+
+  return uniquePermissions;
+};
 
 const normalizeAccessLevel = (accessLevel?: string): 'full' | 'limited' | 'read-only' => {
   switch (accessLevel) {
@@ -126,14 +146,18 @@ const normalizeAccessLevel = (accessLevel?: string): 'full' | 'limited' | 'read-
 
 const normalizePermissions = (permissions: unknown): string[] => {
   if (Array.isArray(permissions)) {
-    return permissions.filter((permission): permission is string => typeof permission === 'string');
+    return normalizePortalPermissions(
+      permissions.filter((permission): permission is string => typeof permission === 'string')
+    );
   }
 
   if (typeof permissions === 'string') {
     try {
       const parsed = JSON.parse(permissions);
       if (Array.isArray(parsed)) {
-        return parsed.filter((permission): permission is string => typeof permission === 'string');
+        return normalizePortalPermissions(
+          parsed.filter((permission): permission is string => typeof permission === 'string')
+        );
       }
     } catch {
       return [];
@@ -181,7 +205,18 @@ const AdminForm = React.memo(({
   setShowPassword: React.Dispatch<React.SetStateAction<boolean>>;
   handlePermissionChange: (permissionId: string, checked: boolean) => void;
   isEdit?: boolean;
-}) => (
+}) => {
+  const groupedPermissions = PERMISSIONS.reduce((acc, permission) => {
+    if (!acc[permission.category]) acc[permission.category] = [];
+    acc[permission.category].push(permission);
+    return acc;
+  }, {} as Record<string, typeof PERMISSIONS>);
+
+  const portalPermissions = PERMISSIONS.filter((permission) =>
+    SCORE_MACHINE_PORTAL_PERMISSION_IDS.includes(permission.id as (typeof SCORE_MACHINE_PORTAL_PERMISSION_IDS)[number])
+  );
+
+  return (
   <div className="space-y-6">
     {/* Basic Information */}
     <div className="space-y-4">
@@ -341,17 +376,37 @@ const AdminForm = React.memo(({
         Permissions
       </h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Object.entries(
-          PERMISSIONS.reduce((acc, permission) => {
-            if (!acc[permission.category]) acc[permission.category] = [];
-            acc[permission.category].push(permission);
-            return acc;
-          }, {} as Record<string, typeof PERMISSIONS>)
-        ).map(([category, permissions]) => (
+        {Object.entries(groupedPermissions).map(([category, permissions]) => {
+          const standardPermissions = permissions.filter(
+            (permission) => !SCORE_MACHINE_PORTAL_PERMISSION_IDS.includes(permission.id as (typeof SCORE_MACHINE_PORTAL_PERMISSION_IDS)[number])
+          );
+
+          return (
           <div key={category} className="space-y-3">
             <h4 className="font-medium text-sm text-gray-700">{category}</h4>
             <div className="space-y-2">
-              {permissions.map((permission) => (
+              {category === 'Admin' && (
+                <div className="space-y-3 rounded-lg border border-gray-200 p-3">
+                  <p className="text-sm font-medium text-gray-700">
+                    Allow Score Machine Elite | Allow Basic Only
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {portalPermissions.map((permission) => (
+                      <div key={permission.id} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={permission.id}
+                          checked={formData.permissions.includes(permission.id)}
+                          onCheckedChange={(checked) => handlePermissionChange(permission.id, checked as boolean)}
+                        />
+                        <Label htmlFor={permission.id} className="text-sm font-normal cursor-pointer">
+                          {permission.label}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {standardPermissions.map((permission) => (
                 <div key={permission.id} className="flex items-center space-x-3">
                   <Checkbox
                     id={permission.id}
@@ -365,11 +420,12 @@ const AdminForm = React.memo(({
               ))}
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </div>
   </div>
-));
+  );
+});
 
 const AdminProfileManagement: React.FC = () => {
   const { toast } = useToast();
@@ -642,9 +698,24 @@ const AdminProfileManagement: React.FC = () => {
   const handlePermissionChange = useCallback((permissionId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      permissions: checked
-        ? Array.from(new Set([...prev.permissions, permissionId]))
-        : prev.permissions.filter(p => p !== permissionId)
+      permissions: normalizePortalPermissions(
+        checked
+          ? [
+              ...prev.permissions.filter((permission) => {
+                if (permissionId === SCORE_MACHINE_ELITE_PERMISSION) {
+                  return permission !== SCORE_MACHINE_BASIC_PERMISSION;
+                }
+
+                if (permissionId === SCORE_MACHINE_BASIC_PERMISSION) {
+                  return permission !== SCORE_MACHINE_ELITE_PERMISSION;
+                }
+
+                return true;
+              }),
+              permissionId,
+            ]
+          : prev.permissions.filter(p => p !== permissionId)
+      )
     }));
   }, []);
 

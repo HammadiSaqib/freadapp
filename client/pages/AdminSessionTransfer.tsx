@@ -11,7 +11,7 @@ import {
   postTransferDebug,
   setPortalTransferRedirectPath,
 } from "@/lib/authStorage";
-import { getPortalNavigationTarget } from "@/lib/hostRouting";
+import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 import { useAuthContext } from "@/contexts/AuthContext";
 
 const DEFAULT_REDIRECT_PATH = "/dashboard";
@@ -113,8 +113,8 @@ export default function AdminSessionTransfer() {
     const transferRedirectPath = getSafeRedirectPath(getPortalTransferRedirectPath());
     clearPortalTransferRedirectPath();
 
-    const navigateToAdminPath = (pathname: string) => {
-      const target = getPortalNavigationTarget("admin", pathname);
+    const navigateToAdminPath = (pathname: string, profile?: any) => {
+      const target = resolveAdminPortalTarget(pathname, profile);
 
       if (target.external) {
         window.location.href = target.target;
@@ -180,12 +180,20 @@ export default function AdminSessionTransfer() {
           // Non-blocking: navigation should proceed even if profile refresh fails.
         }
 
+        let profile = user;
+        try {
+          const profileResponse = await authApi.getProfile();
+          profile = profileResponse.data?.user || profileResponse.data || user;
+        } catch {
+          profile = user;
+        }
+
         postTransferDebug("admin_session_success", {
           redirectTo: transferRedirectPath,
         });
 
         if (!cancelled) {
-          navigateToAdminPath(transferRedirectPath);
+          navigateToAdminPath(transferRedirectPath, profile);
         }
       } catch (err) {
         postTransferDebug("admin_session_verify_error", {

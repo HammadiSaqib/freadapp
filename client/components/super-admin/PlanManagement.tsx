@@ -16,6 +16,10 @@ import { superAdminApi, coursesApi } from "@/lib/api";
 // WebSocket removed to eliminate connection errors
 
 // Available admin dashboard pages that can be controlled
+const SCORE_MACHINE_ELITE_PAGE = 'score-machine-elite';
+const SCORE_MACHINE_BASIC_PAGE = 'score-machine-basic';
+const SCORE_MACHINE_PORTAL_PAGE_IDS = [SCORE_MACHINE_ELITE_PAGE, SCORE_MACHINE_BASIC_PAGE] as const;
+
 const ADMIN_PAGES = [
   { id: 'dashboard', name: 'Dashboard', path: '/dashboard', description: 'Main dashboard overview' },
   { id: 'clients', name: 'Clients', path: '/clients', description: 'Client management' },
@@ -28,10 +32,23 @@ const ADMIN_PAGES = [
   { id: 'school', name: 'School', path: '/school', description: 'Educational content' },
   { id: 'analytics', name: 'Analytics', path: '/analytics', description: 'Analytics and insights' },
   { id: 'score-machine-elite', name: 'Score Machine Elite', path: '/score-machine-elite', description: 'Score Machine Elite access' },
+  { id: 'score-machine-basic', name: 'Score Machine Basic', path: '/score-machine-basic', description: 'Score Machine Basic access' },
   { id: 'affiliate', name: 'Affiliate', path: '/affiliate', description: 'Affiliate program management' },
   { id: 'support', name: 'Support', path: '/support', description: 'Customer support and help desk' },
   { id: 'settings', name: 'Settings', path: '/settings', description: 'Account and system settings' }
 ];
+
+const normalizePortalPagePermissions = (pagePermissions: string[]) => {
+  const uniquePermissions = Array.from(new Set(pagePermissions));
+  const hasElite = uniquePermissions.includes(SCORE_MACHINE_ELITE_PAGE);
+  const hasBasic = uniquePermissions.includes(SCORE_MACHINE_BASIC_PAGE);
+
+  if (hasElite && hasBasic) {
+    return uniquePermissions.filter((pagePermission) => pagePermission !== SCORE_MACHINE_BASIC_PAGE);
+  }
+
+  return uniquePermissions;
+};
 
 interface SubscriptionPlan {
   id: number;
@@ -229,7 +246,8 @@ export default function PlanManagement() {
     setEditingPlan(null);
     setFormData({
       ...initialFormData,
-      assigned_courses: []
+      assigned_courses: [],
+      page_permissions: []
     });
     setAffiliateSearchTerm('');
     setAllowedEmailsText('');
@@ -239,9 +257,24 @@ export default function PlanManagement() {
   const handlePagePermissionChange = (pageId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      page_permissions: checked 
-        ? [...prev.page_permissions, pageId]
-        : prev.page_permissions.filter(id => id !== pageId)
+      page_permissions: normalizePortalPagePermissions(
+        checked
+          ? [
+              ...prev.page_permissions.filter((existingPageId) => {
+                if (pageId === SCORE_MACHINE_ELITE_PAGE) {
+                  return existingPageId !== SCORE_MACHINE_BASIC_PAGE;
+                }
+
+                if (pageId === SCORE_MACHINE_BASIC_PAGE) {
+                  return existingPageId !== SCORE_MACHINE_ELITE_PAGE;
+                }
+
+                return true;
+              }),
+              pageId,
+            ]
+          : prev.page_permissions.filter(id => id !== pageId)
+      )
     }));
   };
 
@@ -253,7 +286,7 @@ export default function PlanManagement() {
       price: plan.price,
       billing_cycle: plan.billing_cycle,
       features: [...plan.features],
-      page_permissions: plan.page_permissions || [],
+      page_permissions: normalizePortalPagePermissions(plan.page_permissions || []),
       assigned_courses: plan.assigned_courses || [],
       trial_price_id: plan.trial_price_id || '',
       stripe_monthly_price_id: plan.stripe_monthly_price_id || '',
@@ -285,7 +318,7 @@ export default function PlanManagement() {
         ...formData,
         allowed_admin_emails: normalizedEmails,
         page_permissions: {
-          pages: formData.page_permissions,
+          pages: normalizePortalPagePermissions(formData.page_permissions),
           is_specific: formData.is_specific,
           allowed_admin_emails: normalizedEmails,
           restricted_to_current_subscribers: formData.restricted_to_current_subscribers,
@@ -730,8 +763,35 @@ export default function PlanManagement() {
                     <p className="text-sm text-muted-foreground mb-3">
                       Select which admin dashboard pages will be accessible for this plan
                     </p>
+                    <div className="mb-4 space-y-3 rounded-lg border p-3">
+                      <p className="text-sm font-medium">
+                        Score Machine Elite | Score Machine Basic
+                      </p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {ADMIN_PAGES.filter((page) => SCORE_MACHINE_PORTAL_PAGE_IDS.includes(page.id as (typeof SCORE_MACHINE_PORTAL_PAGE_IDS)[number])).map((page) => (
+                          <div key={page.id} className="flex items-start space-x-2">
+                            <Checkbox
+                              id={`page-${page.id}`}
+                              checked={formData.page_permissions.includes(page.id)}
+                              onCheckedChange={(checked) => handlePagePermissionChange(page.id, checked as boolean)}
+                            />
+                            <div className="grid gap-1.5 leading-none">
+                              <label
+                                htmlFor={`page-${page.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {page.name}
+                              </label>
+                              <p className="text-xs text-muted-foreground">
+                                {page.description}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {ADMIN_PAGES.map((page) => (
+                      {ADMIN_PAGES.filter((page) => !SCORE_MACHINE_PORTAL_PAGE_IDS.includes(page.id as (typeof SCORE_MACHINE_PORTAL_PAGE_IDS)[number])).map((page) => (
                         <div key={page.id} className="flex items-start space-x-2">
                           <Checkbox
                             id={`page-${page.id}`}

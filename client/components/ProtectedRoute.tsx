@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { authApi, getAuthToken } from "@/lib/api";
+import { buildBasicAdminSubscriptionUrl, hasAdminBasicPortalAccess, isAdminPrimaryPortalHost } from "@/lib/adminPortalAccess";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { usePagePermissions, getPageIdFromPath } from "@/hooks/usePagePermissions";
 import { Loader2, Lock } from "lucide-react";
@@ -16,6 +17,7 @@ export default function ProtectedRoute({ children, allowUnpaidAccess = false, pa
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isBasicOnlyAdmin, setIsBasicOnlyAdmin] = useState(false);
   const location = useLocation();
   const subscriptionStatus = useSubscriptionStatus();
   const pagePermissions = usePagePermissions();
@@ -37,7 +39,9 @@ export default function ProtectedRoute({ children, allowUnpaidAccess = false, pa
           // Try to get user profile to determine role
           try {
             const profileResponse = await authApi.getProfile();
-            setUserRole(profileResponse.data?.role || null);
+            const profile = profileResponse.data?.user || profileResponse.data;
+            setUserRole(profile?.role || null);
+            setIsBasicOnlyAdmin(hasAdminBasicPortalAccess(profile));
           } catch (profileError) {
             console.warn('Could not fetch user profile:', profileError);
           }
@@ -61,6 +65,47 @@ export default function ProtectedRoute({ children, allowUnpaidAccess = false, pa
   if (!isAuthenticated) {
     // Save the attempted location so we can redirect back after login
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  const shouldBlockPrimaryAdminPortal = typeof window !== 'undefined'
+    && userRole === 'admin'
+    && isBasicOnlyAdmin
+    && isAdminPrimaryPortalHost(window.location.hostname, window.location.port);
+
+  if (shouldBlockPrimaryAdminPortal) {
+    const subscriptionUrl = buildBasicAdminSubscriptionUrl();
+
+    return (
+      <div className="relative min-h-screen overflow-hidden">
+        <div className="pointer-events-none select-none blur-sm opacity-80">
+          {children}
+        </div>
+
+        <div className="fixed inset-0 z-[11000] bg-slate-950/35 backdrop-blur-sm" />
+
+        <div className="fixed inset-0 z-[11001] flex items-center justify-center px-4">
+          <div className="mx-4 w-full max-w-md rounded-2xl border border-gray-200 bg-white/95 p-8 text-center shadow-2xl dark:border-slate-700 dark:bg-slate-800/95">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-cyan-600">
+              <Lock className="h-8 w-8 text-white" />
+            </div>
+            <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
+              Basic Access Only
+            </h2>
+            <p className="mb-6 text-gray-600 dark:text-gray-300">
+              You currently have Basic access only. Upgrade your plan to open the Pro and Elite admin portal.
+            </p>
+            <button
+              onClick={() => {
+                window.location.href = subscriptionUrl;
+              }}
+              className="w-full rounded-md bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:from-blue-700 hover:to-cyan-700"
+            >
+              Upgrade Plan
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Check if user is admin and needs subscription (unless explicitly allowed unpaid access)

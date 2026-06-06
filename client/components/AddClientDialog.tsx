@@ -25,6 +25,7 @@ import {
   openReportPullLoading,
   showReportPullError,
 } from "@/lib/reportPullFeedback";
+import { notifyBasicAdminClientChanged } from "@/lib/basicAdminReportPull";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
@@ -516,6 +517,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
       const clientId = responseData?.id;
       const clientName = `${firstName} ${lastName}`;
       if (clientId) {
+        notifyBasicAdminClientChanged(clientId);
         navigate(`/credit-report?clientId=${clientId}&clientName=${encodeURIComponent(clientName)}`);
       }
     } catch (error: any) {
@@ -634,6 +636,10 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         title: "Success!",
         description: `Client ${data.first_name} ${data.last_name} has been added manually.`,
       });
+
+      if (responseData?.id) {
+        notifyBasicAdminClientChanged(responseData.id);
+      }
 
       // Stay on the current page after manual addition
     } catch (error: any) {

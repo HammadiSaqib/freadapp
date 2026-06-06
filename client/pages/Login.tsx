@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authApi, setAuthToken } from "@/lib/api";
 import { clearPortalReturnContext } from "@/lib/authStorage";
 import { usePortalLoginRedirect } from "@/hooks/usePortalLoginRedirect";
-import { getPortalNavigationTarget } from "@/lib/hostRouting";
+import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -190,6 +190,8 @@ export default function Login() {
       }
 
       setAuthToken(payload.token);
+      const profileResponse = await authApi.getProfile();
+      const profile = profileResponse.data?.user || profileResponse.data;
       await refreshProfile();
       clearPortalReturnContext();
       toast({
@@ -197,7 +199,7 @@ export default function Login() {
         description: successDescription,
       });
 
-      const dashboardTarget = getPortalNavigationTarget("admin", "/dashboard");
+      const dashboardTarget = resolveAdminPortalTarget("/dashboard", profile);
       if (dashboardTarget.external) {
         window.location.href = dashboardTarget.target;
         return;

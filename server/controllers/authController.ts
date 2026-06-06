@@ -7,6 +7,7 @@ import { getQuery, runQuery } from '../database/databaseAdapter.js';
 import { ENV_CONFIG } from '../config/environment.js';
 import { emailService } from '../services/emailService.js';
 import { extractLoginInfo } from '../utils/loginUtils.js';
+import { getScoreMachinePortalAccessStatus } from '../utils/scoreMachineEliteAccess.js';
 
 const JWT_SECRET: Secret = ENV_CONFIG.JWT_SECRET;
 const googleOAuthClient = new OAuth2Client();
@@ -1697,10 +1698,26 @@ export class AuthController {
           (userData as any).is_subscription_exempt = Array.isArray(parsedPermissions) && (
             parsedPermissions.includes('subscription_exempt') || parsedPermissions.includes('no_subscription_required')
           );
+
+          const portalAccess = await getScoreMachinePortalAccessStatus(user.id);
+          (userData as any).admin_portal_mode = portalAccess.portalMode;
+          (userData as any).has_score_machine_basic_access = portalAccess.hasBasicAccess;
+          (userData as any).has_score_machine_elite_access = portalAccess.hasEliteAccess;
+          (userData as any).has_direct_score_machine_basic_permission = portalAccess.hasDirectBasicPermission;
+          (userData as any).has_direct_score_machine_elite_permission = portalAccess.hasDirectElitePermission;
+          (userData as any).has_plan_score_machine_basic_access = portalAccess.hasPlanBasicAccess;
+          (userData as any).has_plan_score_machine_elite_access = portalAccess.hasPlanEliteAccess;
         } catch (profileErr) {
           console.warn('Admin profile not found or permissions unavailable:', profileErr);
           (userData as any).permissions = [];
           (userData as any).is_subscription_exempt = false;
+          (userData as any).admin_portal_mode = 'standard';
+          (userData as any).has_score_machine_basic_access = false;
+          (userData as any).has_score_machine_elite_access = false;
+          (userData as any).has_direct_score_machine_basic_permission = false;
+          (userData as any).has_direct_score_machine_elite_permission = false;
+          (userData as any).has_plan_score_machine_basic_access = false;
+          (userData as any).has_plan_score_machine_elite_access = false;
         }
       }
 

@@ -37,6 +37,13 @@ interface UserProfile {
   funding_override_signed_at?: string | null;
   permissions?: string[];
   is_subscription_exempt?: boolean;
+  admin_portal_mode?: 'standard' | 'basic' | 'elite';
+  has_score_machine_basic_access?: boolean;
+  has_score_machine_elite_access?: boolean;
+  has_direct_score_machine_basic_permission?: boolean;
+  has_direct_score_machine_elite_permission?: boolean;
+  has_plan_score_machine_basic_access?: boolean;
+  has_plan_score_machine_elite_access?: boolean;
 }
 
 interface AuthContextType {

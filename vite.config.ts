@@ -3,6 +3,13 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { createServer } from "./server";
 import fs from "fs";
+import http from "http";
+import net from "net";
+
+const primaryDevPort = 3001;
+const secondaryDevPort = 3000;
+const devHost = "0.0.0.0";
+const devProxyTargetHost = "127.0.0.1";
 
 const portalAliases = [
   'admin',
@@ -20,11 +27,12 @@ const portalLocalhostOrigins = portalAliases.flatMap((alias) => [
 ]);
 
 //1 https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   server: {
     // Bind to IPv4 to ensure external access over public IP on VPS
-    host: "0.0.0.0",
-    port: 3001,
+    host: devHost,
+    port: primaryDevPort,
+    strictPort: true,
     allowedHosts: ['.localhost', '.lvh.me', '.localtest.me'],
   },
   publicDir: path.resolve(__dirname, "./client/public"),
@@ -51,6 +59,28 @@ function expressPlugin(): Plugin {
       // Use return so the configuration is async
       return createServer(server)
         .then(({ app, httpServer, websocketService }) => {
+          let activeDevPort = primaryDevPort;
+          let aliasServer: http.Server | null = null;
+
+          server.httpServer?.once("listening", () => {
+            const address = server.httpServer?.address();
+            if (address && typeof address === "object") {
+              activeDevPort = address.port;
+
+              if (activeDevPort !== primaryDevPort) {
+                console.warn(
+                  `Primary dev port ${primaryDevPort} is unavailable. The secondary listener is proxying to port ${activeDevPort} instead.`,
+                );
+              }
+            }
+
+            aliasServer = createDevPortAliasServer(secondaryDevPort, () => activeDevPort);
+          });
+
+          server.httpServer?.once("close", () => {
+            aliasServer?.close();
+          });
+
           // Add the express app as middleware before Vite's internal middleware
           server.middlewares.use((req, res, next) => {
             const urlPath = req.url?.split("?")[0] || "";
@@ -151,4 +181,108 @@ function expressPlugin(): Plugin {
         });
     },
   };
+}
+
+function createDevPortAliasServer(sourcePort: number, getTargetPort: () => number) {
+  if (sourcePort === getTargetPort()) {
+    throw new Error("The secondary dev port must differ from the primary dev port.");
+  }
+
+  const rewriteHostHeader = (hostHeader?: string) => {
+    const targetPort = getTargetPort();
+
+    if (!hostHeader) {
+      return `localhost:${targetPort}`;
+    }
+
+    return hostHeader.replace(/:\d+$/, `:${targetPort}`);
+  };
+
+  const aliasServer = http.createServer((req, res) => {
+    const targetPort = getTargetPort();
+    const proxyRequest = http.request(
+      {
+        host: devProxyTargetHost,
+        port: targetPort,
+        method: req.method,
+        path: req.url,
+        headers: {
+          ...req.headers,
+          host: rewriteHostHeader(req.headers.host),
+        },
+      },
+      (proxyResponse) => {
+        res.writeHead(proxyResponse.statusCode ?? 502, proxyResponse.headers);
+        proxyResponse.pipe(res);
+      },
+    );
+
+    proxyRequest.on("error", (error) => {
+      if (!res.headersSent) {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+      }
+
+      res.end(`Unable to reach the development server on port ${targetPort}: ${error.message}`);
+    });
+
+    req.pipe(proxyRequest);
+  });
+
+  aliasServer.on("upgrade", (req, socket, head) => {
+    const targetPort = getTargetPort();
+    const upstream = net.connect(targetPort, devProxyTargetHost, () => {
+      const requestHeaders = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
+
+      for (let index = 0; index < req.rawHeaders.length; index += 2) {
+        const headerName = req.rawHeaders[index];
+        const headerValue = headerName.toLowerCase() === "host"
+          ? rewriteHostHeader(req.rawHeaders[index + 1])
+          : req.rawHeaders[index + 1];
+
+        requestHeaders.push(`${headerName}: ${headerValue}`);
+      }
+
+      requestHeaders.push("", "");
+      upstream.write(requestHeaders.join("\r\n"));
+
+      if (head.length > 0) {
+        upstream.write(head);
+      }
+
+      upstream.pipe(socket);
+      socket.pipe(upstream);
+    });
+
+    const destroySockets = () => {
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+
+      if (!upstream.destroyed) {
+        upstream.destroy();
+      }
+    };
+
+    upstream.on("error", destroySockets);
+    socket.on("error", destroySockets);
+  });
+
+  aliasServer.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+      console.warn(
+        `Port ${sourcePort} is already in use, so the secondary dev listener was not started.`,
+      );
+      return;
+    }
+
+    console.error(`Failed to start the secondary dev listener on port ${sourcePort}:`, error);
+  });
+
+  aliasServer.listen(sourcePort, devHost, () => {
+    console.log(
+      `Secondary dev listener ready on http://localhost:${sourcePort} -> http://localhost:${getTargetPort()}`,
+    );
+  });
+
+  return aliasServer;
 }

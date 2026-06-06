@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "@/lib/api";
 import { clearStoredAuth } from "@/lib/authStorage";
+import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 
 interface UsePortalLoginRedirectOptions {
   allowedRoles: string[];
@@ -56,7 +57,22 @@ export function usePortalLoginRedirect({
           "userName",
           `${user.first_name || ""} ${user.last_name || ""}`.trim(),
         );
-        navigate(resolvedRedirectPath, { replace: true });
+
+        let profile = user;
+        try {
+          const profileResponse = await authApi.getProfile();
+          profile = profileResponse.data?.user || profileResponse.data || user;
+        } catch {
+          profile = user;
+        }
+
+        const target = resolveAdminPortalTarget(resolvedRedirectPath, profile);
+        if (target.external) {
+          window.location.href = target.target;
+          return;
+        }
+
+        navigate(target.target, { replace: true });
       } catch {
         if (!cancelled) {
           clearStoredAuth();

@@ -1,9 +1,28 @@
 import { getDatabaseAdapter } from '../database/databaseAdapter.js';
 
+const SCORE_MACHINE_ELITE_PERMISSION = 'score_machine_elite';
+const SCORE_MACHINE_BASIC_PERMISSION = 'score_machine_basic';
+const SCORE_MACHINE_ELITE_PAGE = 'score-machine-elite';
+const SCORE_MACHINE_BASIC_PAGE = 'score-machine-basic';
+
+export type ScoreMachinePortalMode = 'standard' | 'basic' | 'elite';
+
 export interface ScoreMachineEliteAccessStatus {
   hasAccess: boolean;
   hasDirectPermission: boolean;
   hasPlanPermission: boolean;
+  effectiveAdminUserId: number;
+}
+
+export interface ScoreMachinePortalAccessStatus {
+  portalMode: ScoreMachinePortalMode;
+  hasBasicAccess: boolean;
+  hasEliteAccess: boolean;
+  hasDirectBasicPermission: boolean;
+  hasDirectElitePermission: boolean;
+  hasPlanBasicAccess: boolean;
+  hasPlanEliteAccess: boolean;
+  hasAnyActivePlans: boolean;
   effectiveAdminUserId: number;
 }
 
@@ -47,7 +66,49 @@ const parseStringArray = (value: unknown): string[] => {
   return [];
 };
 
-export const getScoreMachineEliteAccessStatus = async (userId: number): Promise<ScoreMachineEliteAccessStatus> => {
+const getActivePlanPermissionSets = async (effectiveAdminUserId: number): Promise<string[][]> => {
+  const adapter = getDatabaseAdapter();
+  const permissionSets: string[][] = [];
+
+  try {
+    const activeSubscriptions = await adapter.allQuery(
+      `SELECT sp.page_permissions
+       FROM subscriptions s
+       LEFT JOIN subscription_plans sp ON LOWER(TRIM(sp.name)) = LOWER(TRIM(s.plan_name))
+       WHERE s.user_id = ? AND LOWER(TRIM(s.status)) = 'active'
+       ORDER BY s.created_at DESC`,
+      [effectiveAdminUserId]
+    );
+
+    permissionSets.push(
+      ...activeSubscriptions.map((subscription) => parseStringArray(subscription?.page_permissions))
+    );
+  } catch (subscriptionError) {
+    console.warn('Failed to read subscriptions while checking Score Machine portal access:', subscriptionError);
+  }
+
+  try {
+    const adminSubscriptions = await adapter.allQuery(
+      `SELECT sp.page_permissions
+       FROM admin_subscriptions asub
+       JOIN admin_profiles ap ON ap.id = asub.admin_id
+       JOIN subscription_plans sp ON sp.id = asub.plan_id
+       WHERE ap.user_id = ? AND LOWER(TRIM(asub.status)) = 'active'
+       ORDER BY asub.created_at DESC`,
+      [effectiveAdminUserId]
+    );
+
+    permissionSets.push(
+      ...adminSubscriptions.map((subscription) => parseStringArray(subscription?.page_permissions))
+    );
+  } catch (adminSubscriptionError) {
+    console.warn('Failed to read admin_subscriptions while checking Score Machine portal access:', adminSubscriptionError);
+  }
+
+  return permissionSets;
+};
+
+export const getScoreMachinePortalAccessStatus = async (userId: number): Promise<ScoreMachinePortalAccessStatus> => {
   const adapter = getDatabaseAdapter();
   const effectiveAdminUserId = await resolveScoreMachineEliteAdminUserId(userId);
 
@@ -56,61 +117,49 @@ export const getScoreMachineEliteAccessStatus = async (userId: number): Promise<
     [effectiveAdminUserId]
   );
   const adminPermissions = parseStringArray(adminProfile?.permissions);
-  const hasDirectPermission = adminPermissions.includes('score_machine_elite');
+  const hasDirectElitePermission = adminPermissions.includes(SCORE_MACHINE_ELITE_PERMISSION);
+  const hasDirectBasicPermission = !hasDirectElitePermission && adminPermissions.includes(SCORE_MACHINE_BASIC_PERMISSION);
 
-  if (hasDirectPermission) {
-    return {
-      hasAccess: true,
-      hasDirectPermission: true,
-      hasPlanPermission: false,
-      effectiveAdminUserId,
-    };
+  const planPermissionSets = await getActivePlanPermissionSets(effectiveAdminUserId);
+  const hasAnyActivePlans = planPermissionSets.length > 0;
+  const hasPlanEliteAccess = planPermissionSets.some((permissions) => permissions.includes(SCORE_MACHINE_ELITE_PAGE));
+  const hasPlanBasicAccess = hasAnyActivePlans && planPermissionSets.every(
+    (permissions) => permissions.includes(SCORE_MACHINE_BASIC_PAGE) && !permissions.includes(SCORE_MACHINE_ELITE_PAGE)
+  );
+
+  let portalMode: ScoreMachinePortalMode = 'standard';
+
+  if (hasDirectElitePermission) {
+    portalMode = 'elite';
+  } else if (hasDirectBasicPermission) {
+    portalMode = 'basic';
+  } else if (hasPlanBasicAccess) {
+    portalMode = 'basic';
+  } else if (hasPlanEliteAccess) {
+    portalMode = 'elite';
   }
-
-  let planPagePermissions: string[] = [];
-
-  try {
-    const activeSubscription = await adapter.getQuery(
-      `SELECT sp.page_permissions
-       FROM subscriptions s
-       LEFT JOIN subscription_plans sp ON LOWER(TRIM(sp.name)) = LOWER(TRIM(s.plan_name))
-       WHERE s.user_id = ? AND LOWER(TRIM(s.status)) = 'active'
-       ORDER BY s.created_at DESC
-       LIMIT 1`,
-      [effectiveAdminUserId]
-    );
-
-    planPagePermissions = parseStringArray(activeSubscription?.page_permissions);
-  } catch (subscriptionError) {
-    console.warn('Failed to read subscriptions while checking Score Machine Elite access:', subscriptionError);
-  }
-
-  if (planPagePermissions.length === 0) {
-    try {
-      const adminSubscription = await adapter.getQuery(
-        `SELECT sp.page_permissions
-         FROM admin_subscriptions asub
-         JOIN admin_profiles ap ON ap.id = asub.admin_id
-         JOIN subscription_plans sp ON sp.id = asub.plan_id
-         WHERE ap.user_id = ? AND LOWER(TRIM(asub.status)) = 'active'
-         ORDER BY asub.created_at DESC
-         LIMIT 1`,
-        [effectiveAdminUserId]
-      );
-
-      planPagePermissions = parseStringArray(adminSubscription?.page_permissions);
-    } catch (adminSubscriptionError) {
-      console.warn('Failed to read admin_subscriptions while checking Score Machine Elite access:', adminSubscriptionError);
-    }
-  }
-
-  const hasPlanPermission = planPagePermissions.includes('score-machine-elite');
 
   return {
-    hasAccess: hasPlanPermission,
-    hasDirectPermission,
-    hasPlanPermission,
+    portalMode,
+    hasBasicAccess: portalMode === 'basic',
+    hasEliteAccess: portalMode === 'elite',
+    hasDirectBasicPermission,
+    hasDirectElitePermission,
+    hasPlanBasicAccess,
+    hasPlanEliteAccess,
+    hasAnyActivePlans,
     effectiveAdminUserId,
+  };
+};
+
+export const getScoreMachineEliteAccessStatus = async (userId: number): Promise<ScoreMachineEliteAccessStatus> => {
+  const portalAccess = await getScoreMachinePortalAccessStatus(userId);
+
+  return {
+    hasAccess: portalAccess.hasEliteAccess,
+    hasDirectPermission: portalAccess.hasDirectElitePermission,
+    hasPlanPermission: portalAccess.hasPlanEliteAccess,
+    effectiveAdminUserId: portalAccess.effectiveAdminUserId,
   };
 };
 

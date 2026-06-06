@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,7 @@ export default function ClientProfileStandard() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [client, setClient] = useState<ClientData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +106,12 @@ export default function ClientProfileStandard() {
   const [reportsLoading, setReportsLoading] = useState(false);
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [scoreHistoryLoading, setScoreHistoryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("info");
+  const allowedClientProfileTabs = ["info", "history", "scores", "json"] as const;
+  const getClientProfileTab = () => {
+    const tab = String(searchParams.get("tab") || "").trim();
+    return allowedClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : "info";
+  };
+  const activeTab = getClientProfileTab();
   const [scrapingLoading, setScrapingLoading] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [jsonSearchTerm, setJsonSearchTerm] = useState("");
@@ -115,6 +121,16 @@ export default function ClientProfileStandard() {
   const [selectedFundingType, setSelectedFundingType] = useState<"personal" | "business" | "both" | "">("");
   const [selectedFundingMethod, setSelectedFundingMethod] = useState<"diy" | "dfy" | "">("");
   const [startWithType, setStartWithType] = useState<"personal" | "business">("personal");
+
+  const handleClientProfileTabChange = (nextTab: string) => {
+    if (!allowedClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number])) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", nextTab);
+    setSearchParams(params, { replace: true });
+  };
 
   useEffect(() => {
     const state = location.state as { openEdit?: boolean } | null;
@@ -756,7 +772,7 @@ export default function ClientProfileStandard() {
           </Card>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-2 min-w-[520px] sm:min-w-0">
               <TabsTrigger value="info" className="flex items-center space-x-2">

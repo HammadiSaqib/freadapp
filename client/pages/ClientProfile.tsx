@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +14,16 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import EditClientForm from "@/components/EditClientForm";
 import ClientProfileStandard from "@/pages/ClientProfileStandard";
+import BasicAdminReportPullPrompt from "@/components/BasicAdminReportPullPrompt";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
 import { PrintRequestDialog, type PrintRequestSenderFormValues } from "@/components/PrintRequestDialog";
 import { US_STATE_OPTIONS, isUsStateOption } from "@shared/usStates";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
+import {
+  hasStoredClientReport,
+  normalizeBasicAdminBooleanParam,
+  rememberBasicAdminClientId,
+} from "@/lib/basicAdminReportPull";
 import {
   Dialog,
   DialogContent,
@@ -259,7 +266,7 @@ export default function ClientProfile() {
     );
   }
 
-  const showEnhancedClientProfile = isSuperAdminUser || isEliteActive;
+  const showEnhancedClientProfile = isSuperAdminUser || isEliteActive || hasAdminBasicPortalAccess(userProfile);
 
   return showEnhancedClientProfile ? <EnhancedClientProfile /> : <ClientProfileStandard />;
 }
@@ -371,6 +378,7 @@ function EnhancedClientProfile() {
   const { clientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { userProfile } = useAuthContext();
   const [client, setClient] = useState<ClientData | null>(null);
@@ -379,7 +387,12 @@ function EnhancedClientProfile() {
   const [reportsLoading, setReportsLoading] = useState(false);
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [scoreHistoryLoading, setScoreHistoryLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("info");
+  const allowedClientProfileTabs = ["info", "history", "scores", "letters", "equifax", "json"] as const;
+  const getClientProfileTab = () => {
+    const tab = String(searchParams.get("tab") || "").trim();
+    return allowedClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : "info";
+  };
+  const activeTab = getClientProfileTab();
   const [scrapingLoading, setScrapingLoading] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [jsonSearchTerm, setJsonSearchTerm] = useState("");
@@ -413,6 +426,53 @@ function EnhancedClientProfile() {
   const [equifaxLiveError, setEquifaxLiveError] = useState<string | null>(null);
   const [equifaxSavedScreenshot, setEquifaxSavedScreenshot] = useState<any>(null);
   const [securityFreezePinSaveState, setSecurityFreezePinSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+  const shouldForceReportPullPrompt = normalizeBasicAdminBooleanParam(searchParams.get("reportPullPrompt"));
+  const shouldShowBasicAdminReportPullPrompt = isBasicAdminPortalUser
+    && Boolean(client)
+    && (!hasStoredClientReport(client) || shouldForceReportPullPrompt);
+
+  useEffect(() => {
+    if (isBasicAdminPortalUser && clientId) {
+      rememberBasicAdminClientId(clientId);
+    }
+  }, [clientId, isBasicAdminPortalUser]);
+
+  const handleClientProfileTabChange = (nextTab: string) => {
+    if (!allowedClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number])) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", nextTab);
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleBasicAdminReportPullStarted = async (values: {
+    platform: string;
+    platform_email: string;
+    platform_password: string;
+    ssn_last_four: string;
+  }) => {
+    rememberBasicAdminClientId(client?.id || clientId);
+
+    setClient((current) => current ? {
+      ...current,
+      platform: values.platform,
+      platform_email: values.platform_email,
+      platform_password: values.platform_password,
+      ssn_last_four: values.ssn_last_four || current.ssn_last_four,
+    } : current);
+
+    const params = new URLSearchParams(searchParams);
+    params.delete("reportPullPrompt");
+    setSearchParams(params, { replace: true });
+
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 2000);
+  };
   const securityFreezePinSaveTimeoutRef = useRef<number | null>(null);
   const securityFreezePinStatusTimeoutRef = useRef<number | null>(null);
   const dateOfBirthPickerRef = useRef<HTMLInputElement>(null);
@@ -1610,6 +1670,8 @@ function EnhancedClientProfile() {
 
   return (
     <DashboardLayout>
+      <div className="relative min-h-screen">
+        <div className={shouldShowBasicAdminReportPullPrompt ? "pointer-events-none select-none blur-sm opacity-80" : ""}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1753,7 +1815,7 @@ function EnhancedClientProfile() {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-2 min-w-[700px] sm:min-w-0">
               <TabsTrigger value="info" className="flex items-center space-x-2">
@@ -2751,6 +2813,22 @@ function EnhancedClientProfile() {
           onSuccess={handleEditSuccess}
         />
       )}
+
+      </div>
+        </div>
+
+        <BasicAdminReportPullPrompt
+          open={shouldShowBasicAdminReportPullPrompt}
+          clientId={client?.id}
+          clientName={client?.name}
+          initialValues={client ? {
+            platform: client.platform,
+            platform_email: client.platform_email,
+            platform_password: client.platform_password,
+            ssn_last_four: client.ssn_last_four,
+          } : null}
+          onPullStarted={handleBasicAdminReportPullStarted}
+        />
 
       <PrintRequestDialog
         open={Boolean(historyPrintDialogRow)}
