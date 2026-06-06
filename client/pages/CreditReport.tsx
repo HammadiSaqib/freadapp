@@ -2274,20 +2274,20 @@ const buildNegativeItemsFromReport = (base: any): any[] => {
 
   if (Array.isArray(publicRecords)) {
     publicRecords.forEach((record: any, index: number) => {
-      const recordType = record.type || record.Type || 'public-record';
+      const recordType = record.type || record.Type || record.RecordType || 'public-record';
       const recordIdentifier = record.caseNumber || record.CaseNumber || record.id || `${recordType}-${index}`;
       const accountKey = getNegativeItemAccountKey(recordIdentifier, `${recordType}-${index}`);
 
       addItem({
         id: record.id || recordIdentifier,
-        type: record.type || record.Type || 'Public Record',
+        type: record.type || record.Type || record.RecordType || 'Public Record',
         creditor: record.creditor || record.Court || 'Court/Government',
         bureau: record.bureau || record.BureauId || 'Multiple',
         accountNumber: record.caseNumber || record.CaseNumber || record.id,
         accountDate: record.Date || record.date || record.DateFiled || record.filingDate || record.ClosingDate || record.dischargeDate,
         category: 'public-record',
         accountKey,
-        status: record.status || record.Status || record.Classification || record.type || record.Type || 'Public Record',
+        status: record.status || record.Status || record.Classification || record.type || record.Type || record.RecordType || 'Public Record',
         classification: record.Classification || record.classification || '',
         amount: record.Amount ?? record.amount ?? '',
         dateFiled: record.DateFiled || record.filingDate || '',
@@ -2506,6 +2506,10 @@ export default function CreditReport() {
   const [refreshAuditNonce, setRefreshAuditNonce] = useState(0);
   const [isRerunningAudit, setIsRerunningAudit] = useState(false);
   const [eligibilityBureau, setEligibilityBureau] = useState<'all' | 'tu' | 'ex' | 'eq'>('all');
+  const [underwritingAccountsBureau, setUnderwritingAccountsBureau] = useState<'all' | 'tu' | 'ex' | 'eq'>('all');
+  const [underwritingAccountsSearch, setUnderwritingAccountsSearch] = useState('');
+  const [underwritingAccountsTypeFilter, setUnderwritingAccountsTypeFilter] = useState<'all' | 'revolving' | 'installment' | 'mortgage' | 'others'>('all');
+  const [underwritingAccountsStatusFilter, setUnderwritingAccountsStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
   const analysisRef = useRef<HTMLDivElement>(null);
   const [personalInfoMode, setPersonalInfoMode] = useState<'normal' | 'credit_repair'>('normal');
   const [smPiLoading, setSmPiLoading] = useState(false);
@@ -2573,6 +2577,241 @@ export default function CreditReport() {
     }),
     [userProfile?.first_name, userProfile?.last_name, userProfile?.email, userProfile?.phone],
   );
+
+  const normalizeSharedPublicRecordText = (value: unknown) => String(value ?? "").trim();
+  const normalizeSharedPublicRecordDate = (value: unknown) => {
+    const text = String(value ?? "").trim();
+    if (!text) return "";
+    const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    const parsed = Date.parse(text);
+    return Number.isNaN(parsed) ? text : new Date(parsed).toISOString().slice(0, 10);
+  };
+  const normalizeSharedPublicRecordValue = (value: unknown) => value === null || value === undefined ? "" : String(value).trim();
+  const getPublicRecordDisplayType = (record: any) => normalizeSharedPublicRecordText(
+    record?.type
+    ?? record?.Type
+    ?? record?.RecordType
+    ?? record?.publicRecordType
+    ?? record?.Classification
+    ?? record?.classification,
+  ) || "Public Record";
+  const getPublicRecordDisplayStatus = (record: any) => normalizeSharedPublicRecordText(
+    record?.status
+    ?? record?.Status
+    ?? record?.Disposition
+    ?? record?.disposition
+    ?? record?.Classification
+    ?? record?.classification,
+  );
+  const getPublicRecordDisplayAmount = (record: any) => normalizeSharedPublicRecordValue(
+    record?.amount
+    ?? record?.Amount
+    ?? record?.AssetAmount
+    ?? record?.assetAmount,
+  );
+  const getPublicRecordDisplayDateFiled = (record: any) => normalizeSharedPublicRecordDate(
+    record?.DateFiled
+    ?? record?.dateFiled
+    ?? record?.filingDate,
+  );
+  const getPublicRecordDisplayDateReported = (record: any) => normalizeSharedPublicRecordDate(
+    record?.DateReported
+    ?? record?.dateReported,
+  );
+  const getPublicRecordDisplayClosingDate = (record: any) => normalizeSharedPublicRecordDate(
+    record?.ClosingDate
+    ?? record?.closingDate
+    ?? record?.DischargeDate
+    ?? record?.dischargeDate,
+  );
+  const getPublicRecordDisplayCourt = (record: any) => normalizeSharedPublicRecordText(
+    record?.court
+    ?? record?.Court
+    ?? record?.CourtName
+    ?? record?.courtName,
+  );
+  const getPublicRecordDisplayReferenceNumber = (record: any) => normalizeSharedPublicRecordText(
+    record?.ReferenceNumber
+    ?? record?.referenceNumber
+    ?? record?.ReferenceNo
+    ?? record?.referenceNo,
+  );
+  const getPublicRecordClassification = (record: any) => normalizeSharedPublicRecordText(
+    record?.classification
+    ?? record?.Classification,
+  );
+  const getPublicRecordIndustry = (record: any) => normalizeSharedPublicRecordText(
+    record?.industry
+    ?? record?.Industry,
+  );
+  const getPublicRecordDesignator = (record: any) => normalizeSharedPublicRecordText(
+    record?.accountDesignator
+    ?? record?.AccountDesignator,
+  );
+  const getPublicRecordCaseNumber = (record: any) => normalizeSharedPublicRecordText(
+    record?.CaseNumber
+    ?? record?.caseNumber
+    ?? record?.accountNumber
+    ?? record?.id
+    ?? record?.ReferenceNumber
+    ?? record?.referenceNumber,
+  );
+  const getPublicRecordPrimaryDate = (record: any) => normalizeSharedPublicRecordDate(
+    record?.Date
+    ?? record?.date
+    ?? record?.accountDate
+    ?? record?.DateFiled
+    ?? record?.dateFiled
+    ?? record?.filingDate
+    ?? record?.DateReported
+    ?? record?.dateReported
+    ?? record?.ClosingDate
+    ?? record?.closingDate
+    ?? record?.DischargeDate
+    ?? record?.dischargeDate,
+  );
+  const isBankruptcyPublicRecord = (record: any) => {
+    const haystack = [
+      record?.Classification,
+      record?.classification,
+      record?.Type,
+      record?.type,
+      record?.RecordType,
+      record?.publicRecordType,
+    ].map((value) => String(value || "").toLowerCase()).join(" ");
+    return haystack.includes("bankruptcy");
+  };
+  const formatPublicRecordDateForDisplay = (value: unknown) => {
+    const normalized = normalizeSharedPublicRecordDate(value);
+    if (!normalized) return "N/A";
+    const parsed = Date.parse(normalized);
+    return Number.isNaN(parsed) ? normalized : new Date(parsed).toLocaleDateString();
+  };
+  const formatPublicRecordAmountForDisplay = (value: unknown) => {
+    const text = normalizeSharedPublicRecordValue(value);
+    if (!text) return "N/A";
+
+    const numericText = text.replace(/[$,\s]/g, "");
+    if (/^-?\d+(\.\d+)?$/.test(numericText)) {
+      const numericValue = Number(numericText);
+      if (Number.isFinite(numericValue)) {
+        return new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: "USD",
+          maximumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+        }).format(numericValue);
+      }
+    }
+
+    return text;
+  };
+  const getPublicRecordDetailFields = (record: any) => {
+    const fields = [
+      { label: "Filed", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayDateFiled(record)), alwaysShow: true },
+      { label: "Status", value: getPublicRecordDisplayStatus(record) || "N/A", alwaysShow: true },
+      { label: "Amount", value: formatPublicRecordAmountForDisplay(getPublicRecordDisplayAmount(record)), alwaysShow: true },
+      { label: "Reported", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayDateReported(record)) },
+      { label: "Court", value: getPublicRecordDisplayCourt(record) },
+      { label: "Case Number", value: getPublicRecordCaseNumber(record) },
+      { label: "Reference Number", value: getPublicRecordDisplayReferenceNumber(record) },
+      { label: "Classification", value: getPublicRecordClassification(record) },
+      { label: "Industry", value: getPublicRecordIndustry(record) },
+      { label: "Designator", value: getPublicRecordDesignator(record) },
+      { label: "Closing Date", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayClosingDate(record)) },
+      { label: "Asset Amount", value: formatPublicRecordAmountForDisplay(record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets) },
+      { label: "Liability", value: formatPublicRecordAmountForDisplay(record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities) },
+      { label: "Exempt Amount", value: formatPublicRecordAmountForDisplay(record?.ExemptAmount ?? record?.exemptAmount) },
+      { label: "Name", value: normalizeSharedPublicRecordText(record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName) },
+      { label: "Remarks", value: normalizeSharedPublicRecordText(record?.Remarks ?? record?.Remark ?? record?.remarks) },
+    ];
+
+    return fields.filter((field) => field.alwaysShow || (field.value && field.value !== "N/A"));
+  };
+  const renderPublicRecordFieldGrid = (record: any, compact = false) => {
+    const detailFields = getPublicRecordDetailFields(record);
+    const labelClassName = compact ? "text-[11px] text-muted-foreground" : "text-muted-foreground";
+    const valueClassName = compact ? "text-xs font-medium break-words" : "text-sm font-medium break-words";
+    const containerClassName = compact ? "grid sm:grid-cols-2 gap-x-3 gap-y-2" : "grid sm:grid-cols-2 gap-4";
+
+    return (
+      <div className={containerClassName}>
+        {detailFields.map((field) => (
+          <div key={`${field.label}-${field.value}`}>
+            <span className={labelClassName}>{field.label}:</span>
+            <p className={valueClassName}>{field.value}</p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+  const normalizePublicRecordRecord = (record: any, index: number) => {
+    const type = getPublicRecordDisplayType(record);
+    const status = getPublicRecordDisplayStatus(record);
+    const classification = getPublicRecordClassification(record);
+    const industry = getPublicRecordIndustry(record);
+    const accountDesignator = getPublicRecordDesignator(record);
+    const referenceNumber = getPublicRecordDisplayReferenceNumber(record);
+    const caseNumber = getPublicRecordCaseNumber(record);
+    const date = getPublicRecordPrimaryDate(record);
+    const dateFiled = getPublicRecordDisplayDateFiled(record);
+    const dateReported = getPublicRecordDisplayDateReported(record);
+    const closingDate = getPublicRecordDisplayClosingDate(record);
+    const amount = getPublicRecordDisplayAmount(record);
+    const court = getPublicRecordDisplayCourt(record);
+    const assetAmount = normalizeSharedPublicRecordValue(record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets);
+    const liability = normalizeSharedPublicRecordValue(record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities);
+    const exemptAmount = normalizeSharedPublicRecordValue(record?.ExemptAmount ?? record?.exemptAmount);
+    const remarks = normalizeSharedPublicRecordText(record?.Remarks ?? record?.Remark ?? record?.remarks);
+    const name = normalizeSharedPublicRecordText(record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName);
+    const chapterMatch = type.match(/chapter\s+[0-9a-z]+/i);
+    const chapter = normalizeSharedPublicRecordText(record?.chapter ?? record?.Chapter ?? chapterMatch?.[0]);
+    const fallbackId = `${type.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "public-record"}-${index + 1}`;
+
+    return {
+      ...record,
+      id: record?.id ?? caseNumber ?? referenceNumber ?? fallbackId,
+      type,
+      Type: record?.Type ?? record?.RecordType ?? type,
+      RecordType: record?.RecordType ?? record?.Type ?? type,
+      status,
+      Status: record?.Status ?? record?.status ?? status,
+      classification,
+      Classification: record?.Classification ?? record?.classification ?? classification,
+      amount,
+      Amount: record?.Amount ?? record?.amount ?? amount,
+      date,
+      Date: record?.Date ?? record?.date ?? date,
+      filingDate: dateFiled,
+      DateFiled: record?.DateFiled ?? record?.dateFiled ?? record?.filingDate ?? dateFiled,
+      dateReported,
+      DateReported: record?.DateReported ?? record?.dateReported ?? dateReported,
+      closingDate,
+      dischargeDate: record?.dischargeDate ?? record?.DischargeDate ?? record?.ClosingDate ?? record?.closingDate ?? closingDate,
+      ClosingDate: record?.ClosingDate ?? record?.closingDate ?? record?.DischargeDate ?? record?.dischargeDate ?? closingDate,
+      court,
+      Court: record?.Court ?? record?.court ?? record?.CourtName ?? record?.courtName ?? court,
+      industry,
+      Industry: record?.Industry ?? record?.industry ?? industry,
+      accountDesignator,
+      AccountDesignator: record?.AccountDesignator ?? record?.accountDesignator ?? accountDesignator,
+      referenceNumber,
+      ReferenceNumber: record?.ReferenceNumber ?? record?.referenceNumber ?? referenceNumber,
+      caseNumber,
+      CaseNumber: record?.CaseNumber ?? record?.caseNumber ?? caseNumber,
+      assetAmount,
+      AssetAmount: record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets ?? assetAmount,
+      liability,
+      Liability: record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities ?? liability,
+      exemptAmount,
+      ExemptAmount: record?.ExemptAmount ?? record?.exemptAmount ?? exemptAmount,
+      remarks,
+      Remarks: record?.Remarks ?? record?.Remark ?? record?.remarks ?? remarks,
+      name,
+      Name: record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName ?? name,
+      chapter,
+    };
+  };
 
   const submitPrintRequest = async (values: PrintRequestSenderFormValues) => {
     try {
@@ -3610,6 +3849,197 @@ export default function CreditReport() {
       { normalizedKey: "BANKRUPTCY_CASE_NUMBER", slug: "bankruptcy_case_number", key: "caseNumber" },
     ];
     const normalizeBankruptcyValue = (value: unknown) => value === null || value === undefined ? "" : String(value).trim();
+    const getPublicRecordDisplayType = (record: any) => normalizePersonalInfoText(
+      record?.type
+      ?? record?.Type
+      ?? record?.RecordType
+      ?? record?.publicRecordType
+      ?? record?.Classification
+      ?? record?.classification,
+    ) || "Public Record";
+    const getPublicRecordDisplayStatus = (record: any) => normalizePersonalInfoText(
+      record?.status
+      ?? record?.Status
+      ?? record?.Disposition
+      ?? record?.disposition
+      ?? record?.Classification
+      ?? record?.classification,
+    );
+    const getPublicRecordDisplayAmount = (record: any) => normalizeBankruptcyValue(
+      record?.amount
+      ?? record?.Amount
+      ?? record?.AssetAmount
+      ?? record?.assetAmount,
+    );
+    const getPublicRecordDisplayDateFiled = (record: any) => normalizePersonalInfoDate(
+      record?.DateFiled
+      ?? record?.dateFiled
+      ?? record?.filingDate,
+    );
+    const getPublicRecordDisplayDateReported = (record: any) => normalizePersonalInfoDate(
+      record?.DateReported
+      ?? record?.dateReported,
+    );
+    const getPublicRecordDisplayClosingDate = (record: any) => normalizePersonalInfoDate(
+      record?.ClosingDate
+      ?? record?.closingDate
+      ?? record?.DischargeDate
+      ?? record?.dischargeDate,
+    );
+    const getPublicRecordDisplayCourt = (record: any) => normalizePersonalInfoText(
+      record?.court
+      ?? record?.Court
+      ?? record?.CourtName
+      ?? record?.courtName,
+    );
+    const getPublicRecordDisplayReferenceNumber = (record: any) => normalizePersonalInfoText(
+      record?.ReferenceNumber
+      ?? record?.referenceNumber
+      ?? record?.ReferenceNo
+      ?? record?.referenceNo,
+    );
+    const getPublicRecordClassification = (record: any) => normalizePersonalInfoText(
+      record?.classification
+      ?? record?.Classification,
+    );
+    const getPublicRecordIndustry = (record: any) => normalizePersonalInfoText(
+      record?.industry
+      ?? record?.Industry,
+    );
+    const getPublicRecordDesignator = (record: any) => normalizePersonalInfoText(
+      record?.accountDesignator
+      ?? record?.AccountDesignator,
+    );
+    const formatPublicRecordDateForDisplay = (value: unknown) => {
+      const normalized = normalizePersonalInfoDate(value);
+      if (!normalized) return "N/A";
+      const parsed = Date.parse(normalized);
+      return Number.isNaN(parsed) ? normalized : new Date(parsed).toLocaleDateString();
+    };
+    const formatPublicRecordAmountForDisplay = (value: unknown) => {
+      const text = normalizeBankruptcyValue(value);
+      if (!text) return "N/A";
+
+      const numericText = text.replace(/[$,\s]/g, "");
+      if (/^-?\d+(\.\d+)?$/.test(numericText)) {
+        const numericValue = Number(numericText);
+        if (Number.isFinite(numericValue)) {
+          return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+          }).format(numericValue);
+        }
+      }
+
+      return text;
+    };
+    const getPublicRecordDetailFields = (record: any) => {
+      const fields = [
+        { label: "Filed", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayDateFiled(record)), alwaysShow: true },
+        { label: "Status", value: getPublicRecordDisplayStatus(record) || "N/A", alwaysShow: true },
+        { label: "Amount", value: formatPublicRecordAmountForDisplay(getPublicRecordDisplayAmount(record)), alwaysShow: true },
+        { label: "Reported", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayDateReported(record)) },
+        { label: "Court", value: getPublicRecordDisplayCourt(record) },
+        { label: "Case Number", value: getPublicRecordCaseNumber(record) },
+        { label: "Reference Number", value: getPublicRecordDisplayReferenceNumber(record) },
+        { label: "Classification", value: getPublicRecordClassification(record) },
+        { label: "Industry", value: getPublicRecordIndustry(record) },
+        { label: "Designator", value: getPublicRecordDesignator(record) },
+        { label: "Closing Date", value: formatPublicRecordDateForDisplay(getPublicRecordDisplayClosingDate(record)) },
+        { label: "Asset Amount", value: formatPublicRecordAmountForDisplay(record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets) },
+        { label: "Liability", value: formatPublicRecordAmountForDisplay(record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities) },
+        { label: "Exempt Amount", value: formatPublicRecordAmountForDisplay(record?.ExemptAmount ?? record?.exemptAmount) },
+        { label: "Name", value: normalizePersonalInfoText(record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName) },
+        { label: "Remarks", value: normalizePersonalInfoText(record?.Remarks ?? record?.Remark ?? record?.remarks) },
+      ];
+
+      return fields.filter((field) => field.alwaysShow || (field.value && field.value !== "N/A"));
+    };
+    const renderPublicRecordFieldGrid = (record: any, compact = false) => {
+      const detailFields = getPublicRecordDetailFields(record);
+      const labelClassName = compact ? "text-[11px] text-muted-foreground" : "text-muted-foreground";
+      const valueClassName = compact ? "text-xs font-medium break-words" : "text-sm font-medium break-words";
+      const containerClassName = compact ? "grid sm:grid-cols-2 gap-x-3 gap-y-2" : "grid sm:grid-cols-2 gap-4";
+
+      return (
+        <div className={containerClassName}>
+          {detailFields.map((field) => (
+            <div key={`${field.label}-${field.value}`}>
+              <span className={labelClassName}>{field.label}:</span>
+              <p className={valueClassName}>{field.value}</p>
+            </div>
+          ))}
+        </div>
+      );
+    };
+    const normalizePublicRecordRecord = (record: any, index: number) => {
+      const type = getPublicRecordDisplayType(record);
+      const status = getPublicRecordDisplayStatus(record);
+      const classification = getPublicRecordClassification(record);
+      const industry = getPublicRecordIndustry(record);
+      const accountDesignator = getPublicRecordDesignator(record);
+      const referenceNumber = getPublicRecordDisplayReferenceNumber(record);
+      const caseNumber = getPublicRecordCaseNumber(record);
+      const date = getPublicRecordPrimaryDate(record);
+      const dateFiled = getPublicRecordDisplayDateFiled(record);
+      const dateReported = getPublicRecordDisplayDateReported(record);
+      const closingDate = getPublicRecordDisplayClosingDate(record);
+      const amount = getPublicRecordDisplayAmount(record);
+      const court = getPublicRecordDisplayCourt(record);
+      const assetAmount = normalizeBankruptcyValue(record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets);
+      const liability = normalizeBankruptcyValue(record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities);
+      const exemptAmount = normalizeBankruptcyValue(record?.ExemptAmount ?? record?.exemptAmount);
+      const remarks = normalizePersonalInfoText(record?.Remarks ?? record?.Remark ?? record?.remarks);
+      const name = normalizePersonalInfoText(record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName);
+      const chapterMatch = type.match(/chapter\s+[0-9a-z]+/i);
+      const chapter = normalizePersonalInfoText(record?.chapter ?? record?.Chapter ?? chapterMatch?.[0]);
+      const fallbackId = `${type.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "public-record"}-${index + 1}`;
+
+      return {
+        ...record,
+        id: record?.id ?? caseNumber ?? referenceNumber ?? fallbackId,
+        type,
+        Type: record?.Type ?? record?.RecordType ?? type,
+        RecordType: record?.RecordType ?? record?.Type ?? type,
+        status,
+        Status: record?.Status ?? record?.status ?? status,
+        classification,
+        Classification: record?.Classification ?? record?.classification ?? classification,
+        amount,
+        Amount: record?.Amount ?? record?.amount ?? amount,
+        date,
+        Date: record?.Date ?? record?.date ?? date,
+        filingDate: dateFiled,
+        DateFiled: record?.DateFiled ?? record?.dateFiled ?? record?.filingDate ?? dateFiled,
+        dateReported,
+        DateReported: record?.DateReported ?? record?.dateReported ?? dateReported,
+        closingDate,
+        dischargeDate: record?.dischargeDate ?? record?.DischargeDate ?? record?.ClosingDate ?? record?.closingDate ?? closingDate,
+        ClosingDate: record?.ClosingDate ?? record?.closingDate ?? record?.DischargeDate ?? record?.dischargeDate ?? closingDate,
+        court,
+        Court: record?.Court ?? record?.court ?? record?.CourtName ?? record?.courtName ?? court,
+        industry,
+        Industry: record?.Industry ?? record?.industry ?? industry,
+        accountDesignator,
+        AccountDesignator: record?.AccountDesignator ?? record?.accountDesignator ?? accountDesignator,
+        referenceNumber,
+        ReferenceNumber: record?.ReferenceNumber ?? record?.referenceNumber ?? referenceNumber,
+        caseNumber,
+        CaseNumber: record?.CaseNumber ?? record?.caseNumber ?? caseNumber,
+        assetAmount,
+        AssetAmount: record?.AssetAmount ?? record?.assetAmount ?? record?.Assets ?? record?.assets ?? assetAmount,
+        liability,
+        Liability: record?.Liability ?? record?.liability ?? record?.Liabilities ?? record?.liabilities ?? liability,
+        exemptAmount,
+        ExemptAmount: record?.ExemptAmount ?? record?.exemptAmount ?? exemptAmount,
+        remarks,
+        Remarks: record?.Remarks ?? record?.Remark ?? record?.remarks ?? remarks,
+        name,
+        Name: record?.Name ?? record?.name ?? record?.ConsumerName ?? record?.consumerName ?? name,
+        chapter,
+      };
+    };
     const getLatestPublicRecordEntries = () => {
       const sources = [
         latestReportRoot?.PublicRecords,
@@ -3632,6 +4062,8 @@ export default function CreditReport() {
         record?.classification,
         record?.Type,
         record?.type,
+        record?.RecordType,
+        record?.publicRecordType,
       ].map((value) => String(value || "").toLowerCase()).join(" ");
       return haystack.includes("bankruptcy");
     };
@@ -3664,7 +4096,7 @@ export default function CreditReport() {
     const buildBankruptcyProfileFromRecord = (record: any): BankruptcyPlaceholderProfile => {
       if (!record) return { ...EMPTY_BANKRUPTCY_PROFILE };
 
-      const type = normalizePersonalInfoText(record?.Type ?? record?.type)
+      const type = normalizePersonalInfoText(record?.Type ?? record?.type ?? record?.RecordType ?? record?.publicRecordType)
         || normalizePersonalInfoText(record?.Classification ?? record?.classification)
         || (isBankruptcyPublicRecord(record) ? "Bankruptcy" : "");
       const classification = normalizePersonalInfoText(record?.Classification ?? record?.classification) || type;
@@ -3696,7 +4128,7 @@ export default function CreditReport() {
       const referenceAccountKey = String(referenceItem?.accountKey || "").trim().toLowerCase();
       const recordAccountKey = getPublicRecordAccountKey(record);
       const referenceType = String(referenceItem?.type || "").trim().toLowerCase();
-      const recordType = normalizePersonalInfoText(record?.Type ?? record?.type).toLowerCase();
+      const recordType = getPublicRecordDisplayType(record).toLowerCase();
       const recordClassification = normalizePersonalInfoText(record?.Classification ?? record?.classification).toLowerCase();
       const referenceCreditor = String(referenceItem?.creditor || "");
       const recordCreditor = String(record?.Court ?? record?.court ?? record?.creditor ?? record?.Name ?? record?.name ?? "");
@@ -7398,9 +7830,7 @@ export default function CreditReport() {
 
               const bureauPublicRecords = apiData.reportData?.PublicRecords?.filter((rec: any) => rec.BureauId === bureauId) || [];
               const hasBankruptcy = bureauPublicRecords.some((rec: any) => {
-                const cls = String(rec.Classification || '').toLowerCase();
-                const typ = String(rec.Type || '').toLowerCase();
-                return cls.includes('bankruptcy') || typ.includes('bankruptcy');
+                return isBankruptcyPublicRecord(rec);
               });
               criteria[bureauId].noBankruptcies = !hasBankruptcy;
             });
@@ -7428,6 +7858,9 @@ export default function CreditReport() {
             nestedReport?.PublicRecords ||
             nestedReport?.reportData?.PublicRecords ||
             [];
+          const normalizedPublicRecordsSource = Array.isArray(publicRecordsSource)
+            ? publicRecordsSource.map((record: any, index: number) => normalizePublicRecordRecord(record, index))
+            : [];
 
           const transformedData = {
             ...detailedReport,
@@ -7458,7 +7891,7 @@ export default function CreditReport() {
               date: inquiry.DateInquiry || new Date().toISOString().split('T')[0],
               bureau: inquiry.BureauId === 1 ? 'TransUnion' : inquiry.BureauId === 2 ? 'Experian' : inquiry.BureauId === 3 ? 'Equifax' : 'Unknown'
             })),
-            publicRecords: publicRecordsSource,
+            publicRecords: normalizedPublicRecordsSource,
             // Keep the original structure for other data
             creditUtilization: detailedReport.creditUtilization,
             debtUtilization: debtUtilization, // Add calculated debt utilization
@@ -11912,6 +12345,359 @@ export default function CreditReport() {
             </CardContent>
           </Card>
 
+          <Card className="border-0 shadow-xl bg-card scroll-mt-24 dark:bg-slate-800 dark:border dark:border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold text-foreground dark:text-white">Accounts</CardTitle>
+              <CardDescription className="text-muted-foreground">Review all tradelines by bureau, type, and status, including estimated 30% paydown for revolving accounts.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <ToggleGroup
+                  type="single"
+                  value={underwritingAccountsBureau}
+                  onValueChange={(val) => setUnderwritingAccountsBureau((val as 'all' | 'tu' | 'ex' | 'eq') || 'all')}
+                  className="flex flex-wrap justify-start"
+                >
+                  <ToggleGroupItem value="all" className="px-3 py-1 text-sm">All</ToggleGroupItem>
+                  <ToggleGroupItem value="tu" className="px-3 py-1 text-sm">TransUnion</ToggleGroupItem>
+                  <ToggleGroupItem value="eq" className="px-3 py-1 text-sm">Equifax</ToggleGroupItem>
+                  <ToggleGroupItem value="ex" className="px-3 py-1 text-sm">Experian</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px]">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Search:</Label>
+                  <Input
+                    value={underwritingAccountsSearch}
+                    onChange={(event) => setUnderwritingAccountsSearch(event.target.value)}
+                    placeholder="Creditor, account, type, or bureau"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Filter by Type:</Label>
+                  <Select
+                    value={underwritingAccountsTypeFilter}
+                    onValueChange={(value) => setUnderwritingAccountsTypeFilter(value as 'all' | 'revolving' | 'installment' | 'mortgage' | 'others')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="revolving">Revolving</SelectItem>
+                      <SelectItem value="installment">Installment</SelectItem>
+                      <SelectItem value="mortgage">Mortgage</SelectItem>
+                      <SelectItem value="others">Others</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Filter by Status:</Label>
+                  <Select
+                    value={underwritingAccountsStatusFilter}
+                    onValueChange={(value) => setUnderwritingAccountsStatusFilter(value as 'all' | 'open' | 'closed')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="dark:border-slate-700">
+                      <TableHead className="dark:text-white">Type</TableHead>
+                      <TableHead className="dark:text-white">Creditor</TableHead>
+                      <TableHead className="dark:text-white">Status</TableHead>
+                      <TableHead className="dark:text-white">Designator</TableHead>
+                      <TableHead className="dark:text-white">Opened</TableHead>
+                      <TableHead className="dark:text-white">Age</TableHead>
+                      <TableHead className="text-right dark:text-white">Limit</TableHead>
+                      <TableHead className="text-right dark:text-white">Balance</TableHead>
+                      <TableHead className="text-right dark:text-white">30% Paydown</TableHead>
+                      <TableHead className="dark:text-white">Bureau</TableHead>
+                      <TableHead className="dark:text-white">Account</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(() => {
+                      const parseDate = (value: any): Date | null => {
+                        if (!value) return null;
+                        const text = String(value).trim();
+                        if (!text) return null;
+                        const isoMatch = text.match(/^(\d{4}-\d{2}-\d{2})/);
+                        const parsed = new Date(isoMatch ? `${isoMatch[1]}T00:00:00` : text);
+                        return Number.isNaN(parsed.getTime()) ? null : parsed;
+                      };
+
+                      const formatDate = (value: any) => {
+                        const parsed = parseDate(value);
+                        return parsed
+                          ? parsed.toLocaleDateString('en-US', {
+                              month: '2-digit',
+                              day: '2-digit',
+                              year: 'numeric',
+                            })
+                          : 'N/A';
+                      };
+
+                      const getAccountAge = (value: any) => {
+                        const opened = parseDate(value);
+                        if (!opened) return { years: 0, months: 0, totalMonths: 0 };
+                        const now = new Date();
+                        let totalMonths = (now.getFullYear() - opened.getFullYear()) * 12 + (now.getMonth() - opened.getMonth());
+                        if (now.getDate() < opened.getDate()) totalMonths -= 1;
+                        totalMonths = Math.max(0, totalMonths);
+                        return {
+                          years: Math.floor(totalMonths / 12),
+                          months: totalMonths % 12,
+                          totalMonths,
+                        };
+                      };
+
+                      const formatAge = (value: any) => {
+                        const { years, months, totalMonths } = getAccountAge(value);
+                        if (totalMonths <= 0) return 'N/A';
+                        const parts = [] as string[];
+                        if (years) parts.push(`${years} ${years === 1 ? 'year' : 'years'}`);
+                        if (months) parts.push(`${months} ${months === 1 ? 'month' : 'months'}`);
+                        return parts.join(' ');
+                      };
+
+                      const toAmount = (value: any) => {
+                        if (value === null || value === undefined || value === '') return 0;
+                        const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
+                        return Number.isFinite(numeric) ? numeric : 0;
+                      };
+
+                      const formatCurrency = (value: number) =>
+                        new Intl.NumberFormat('en-US', {
+                          style: 'currency',
+                          currency: 'USD',
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }).format(value || 0);
+
+                      const resolveDesignator = (value: any) => {
+                        const text = String(value || '').toLowerCase();
+                        if (!text) return 'Unknown';
+                        if (text.includes('joint') || text.includes('co-borrower') || text.includes('co-maker') || text.includes('co signer') || text.includes('co-signer')) {
+                          return 'Joint';
+                        }
+                        if (text.includes('authorized')) return 'Authorized';
+                        if (text.includes('individual') || text.includes('primary')) return 'Individual';
+                        if (text.includes('terminated')) return 'Terminated';
+                        return String(value);
+                      };
+
+                      const resolveBureauKey = (account: any): 'tu' | 'ex' | 'eq' | 'unknown' => {
+                        const rawId = Number(account?.BureauId ?? account?.bureauId ?? account?.bureau_id);
+                        if (rawId === 1) return 'tu';
+                        if (rawId === 2) return 'ex';
+                        if (rawId === 3) return 'eq';
+                        const rawText = String(account?.bureau ?? account?.Bureau ?? account?.bureauName ?? account?.BureauName ?? account?.Source?.Bureau?.symbol ?? '').toLowerCase();
+                        if (/^tu$|trans\s*union|tuc/.test(rawText)) return 'tu';
+                        if (/^ex$|experian|exp|xpn/.test(rawText)) return 'ex';
+                        if (/^eq$|equifax|efx|eqf/.test(rawText)) return 'eq';
+                        return 'unknown';
+                      };
+
+                      const resolveBureauLabel = (bureauKey: 'tu' | 'ex' | 'eq' | 'unknown') => {
+                        if (bureauKey === 'tu') return 'TransUnion';
+                        if (bureauKey === 'ex') return 'Experian';
+                        if (bureauKey === 'eq') return 'Equifax';
+                        return 'Unknown';
+                      };
+
+                      const classifyAccountType = (account: any): 'Revolving' | 'Installment' | 'Mortgage' | 'Others' => {
+                        const text = [
+                          account?.CreditType,
+                          account?.AccountTypeDescription,
+                          account?.AccountType,
+                          account?.SpecificAccountType,
+                          account?.LoanType,
+                          account?.PortfolioType,
+                          account?.type,
+                          account?.classification,
+                        ]
+                          .map((value) => String(value || '').toLowerCase())
+                          .join(' ');
+
+                        if (/mortgage|real\s*estate|home\s*loan/.test(text)) return 'Mortgage';
+                        if (/revolving|credit\s*card|charge\s*account|charge\s*card|line\s*of\s*credit|bank\s*credit\s*card/.test(text)) return 'Revolving';
+                        if (/installment|student\s*loan|auto\s*loan|personal\s*loan|loan/.test(text)) return 'Installment';
+                        return 'Others';
+                      };
+
+                      const resolveStatus = (account: any) => {
+                        const raw = String(account?.AccountStatus || account?.AccountCondition || account?.open_closed || account?.status || '').trim();
+                        const normalized = raw.toLowerCase();
+                        if (!normalized) return 'Unknown';
+                        if (normalized.includes('open') || normalized.includes('current')) return 'Open';
+                        if (normalized.includes('closed') || normalized.includes('paid') || normalized.includes('terminated')) return 'Closed';
+                        return raw;
+                      };
+
+                      const getLimit = (account: any, accountType: 'Revolving' | 'Installment' | 'Mortgage' | 'Others') => {
+                        const directLimit = toAmount(account?.CreditLimit ?? account?.creditLimit ?? account?.limit);
+                        if (directLimit > 0) return directLimit;
+                        if (accountType === 'Revolving') {
+                          return toAmount(account?.HighBalance ?? account?.highBalance);
+                        }
+                        return 0;
+                      };
+
+                      const getBalance = (account: any) =>
+                        toAmount(
+                          account?.CurrentBalance ??
+                          account?.currentBalance ??
+                          account?.balance ??
+                          account?.Balance ??
+                          account?.AmountPastDue ??
+                          account?.amountPastDue,
+                        );
+
+                      const apiAccounts =
+                        (apiData as any)?.Accounts ||
+                        (apiData as any)?.reportData?.Accounts ||
+                        (apiData as any)?.reportData?.reportData?.Accounts;
+                      const reportAccounts =
+                        (reportData as any)?.accounts ||
+                        (reportData as any)?.Accounts ||
+                        [];
+                      const sourceAccounts = Array.isArray(apiAccounts) && apiAccounts.length > 0
+                        ? apiAccounts
+                        : Array.isArray(reportAccounts)
+                          ? reportAccounts
+                          : [];
+
+                      const bureauOrder: Record<'tu' | 'ex' | 'eq' | 'unknown', number> = {
+                        tu: 0,
+                        eq: 1,
+                        ex: 2,
+                        unknown: 3,
+                      };
+
+                      const filteredAccounts = sourceAccounts
+                        .map((account: any, index: number) => {
+                          const bureauKey = resolveBureauKey(account);
+                          const bureauLabel = resolveBureauLabel(bureauKey);
+                          const type = classifyAccountType(account);
+                          const status = resolveStatus(account);
+                          const designator = resolveDesignator(
+                            account?.AccountDesignator ||
+                            account?.AccountOwnership ||
+                            account?.Responsibility ||
+                            account?.ownership ||
+                            account?.OwnershipType,
+                          );
+                          const opened =
+                            account?.DateOpened ||
+                            account?.dateOpened ||
+                            account?.OpenDate ||
+                            account?.opened ||
+                            account?.date_opened ||
+                            account?.DateReported ||
+                            account?.dateReported ||
+                            account?.status_date;
+                          const limit = getLimit(account, type);
+                          const balance = getBalance(account);
+                          const paydown30 = type === 'Revolving' && limit > 0
+                            ? Math.max(balance - (limit * 0.3), 0)
+                            : 0;
+                          const creditor = String(
+                            account?.CreditorName ||
+                            account?.creditorName ||
+                            account?.Creditor ||
+                            account?.creditor ||
+                            account?.name ||
+                            '—',
+                          ).trim() || '—';
+                          const accountNumber = String(
+                            account?.AccountNumber ||
+                            account?.accountNumber ||
+                            account?.MaskAccountNumber ||
+                            account?.number ||
+                            '',
+                          ).trim();
+
+                          return {
+                            key: `${bureauKey}-${accountNumber || creditor}-${index}`,
+                            type,
+                            creditor,
+                            status,
+                            designator,
+                            opened,
+                            age: formatAge(opened),
+                            limit,
+                            balance,
+                            paydown30,
+                            bureauKey,
+                            bureauLabel,
+                            accountNumber,
+                          };
+                        })
+                        .filter((account) => account.creditor !== '—' || account.accountNumber)
+                        .filter((account) => underwritingAccountsBureau === 'all' || account.bureauKey === underwritingAccountsBureau)
+                        .filter((account) => underwritingAccountsTypeFilter === 'all' || account.type.toLowerCase() === underwritingAccountsTypeFilter)
+                        .filter((account) => underwritingAccountsStatusFilter === 'all' || account.status.toLowerCase() === underwritingAccountsStatusFilter)
+                        .filter((account) => {
+                          const haystack = [
+                            account.type,
+                            account.creditor,
+                            account.status,
+                            account.designator,
+                            account.accountNumber,
+                            account.bureauLabel,
+                          ].join(' ').toLowerCase();
+                          return haystack.includes(underwritingAccountsSearch.trim().toLowerCase());
+                        })
+                        .sort((left, right) => {
+                          const bureauDiff = bureauOrder[left.bureauKey] - bureauOrder[right.bureauKey];
+                          if (bureauDiff !== 0) return bureauDiff;
+                          return left.creditor.localeCompare(right.creditor);
+                        });
+
+                      if (!filteredAccounts.length) {
+                        return (
+                          <TableRow className="dark:border-slate-700">
+                            <TableCell colSpan={11} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                              No accounts match your current filters.
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      return filteredAccounts.map((account) => (
+                        <TableRow key={account.key} className="dark:border-slate-700">
+                          <TableCell className="dark:text-white">{account.type}</TableCell>
+                          <TableCell className="font-medium dark:text-white">{account.creditor}</TableCell>
+                          <TableCell className="dark:text-white">{account.status}</TableCell>
+                          <TableCell className="dark:text-white">{account.designator}</TableCell>
+                          <TableCell className="dark:text-white">{formatDate(account.opened)}</TableCell>
+                          <TableCell className="dark:text-white">{account.age}</TableCell>
+                          <TableCell className="text-right dark:text-white">{formatCurrency(account.limit)}</TableCell>
+                          <TableCell className="text-right dark:text-white">{formatCurrency(account.balance)}</TableCell>
+                          <TableCell className="text-right dark:text-white">{formatCurrency(account.paydown30)}</TableCell>
+                          <TableCell className="dark:text-white">{account.bureauLabel}</TableCell>
+                          <TableCell className="font-mono text-xs dark:text-white">{account.accountNumber || 'N/A'}</TableCell>
+                        </TableRow>
+                      ));
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Pay Down */}
           <Card id="uw-paydown" className="border-0 shadow-xl bg-card scroll-mt-24 dark:bg-slate-800 dark:border dark:border-slate-700">
             <CardHeader>
@@ -12576,16 +13362,16 @@ export default function CreditReport() {
                   });
                 });
 
-                publicRecords.forEach((record: any) => {
-                  const recDigits = String(record.caseNumber || record.id || '').replace(/\D/g, '');
-                  const accountKey = recDigits ? (recDigits.length >= 4 ? recDigits.slice(-4) : recDigits) : String(record.caseNumber || record.id || '').toLowerCase();
+                publicRecords.forEach((record: any, index: number) => {
+                  const recordType = record.type || record.Type || record.RecordType || 'public-record';
+                  const recordIdentifier = record.caseNumber || record.CaseNumber || record.id || `${recordType}-${index}`;
+                  const accountKey = getNegativeItemAccountKey(recordIdentifier, `${recordType}-${index}`);
                   allNegativeItems.push({
-                    id: record.id,
-                    type: record.type || 'Public Record',
-                    creditor: record.creditor || 'Court/Government',
-                    bureau: record.bureau || 'Multiple',
-                    accountNumber: record.caseNumber || record.id,
-                    accountDate: record.filingDate || record.dischargeDate,
+                    id: record.id || recordIdentifier,
+                    type: recordType,
+                    creditor: record.creditor || record.Court || 'Court/Government',
+                    accountNumber: record.caseNumber || record.CaseNumber || record.id,
+                    accountDate: record.Date || record.date || record.DateFiled || record.filingDate || record.ClosingDate || record.dischargeDate,
                     category: 'public-record',
                     accountKey
                   });
@@ -12698,7 +13484,7 @@ export default function CreditReport() {
                       const accountKey = digits ? (digits.length >= 4 ? digits.slice(-4) : digits) : String(r.caseNumber || r.id || '').toLowerCase();
                       items.push({
                         id: r.id,
-                        type: r.type || 'Public Record',
+                        type: r.type || r.Type || r.RecordType || 'Public Record',
                         creditor: r.creditor || 'Court/Government',
                         bureau: r.bureau || 'Multiple',
                         accountNumber: r.caseNumber || r.id,
@@ -17160,24 +17946,22 @@ export default function CreditReport() {
                             <div className="space-y-2">
                               {experianRecords.map((record, idx) => (
                                 <div key={idx} className="border border-border/20 rounded-lg p-2">
-                                  <div className="text-xs font-medium">{record.type ?? record.RecordType ?? record.Type ?? 'Public Record'}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Status: {record.status ?? record.Status ?? 'Unknown'}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Filed: {(record.filingDate || record.DateFiled) ? new Date(record.filingDate || record.DateFiled).toLocaleDateString() : 'N/A'}
-                                  </div>
-                                  {(record.court ?? record.CourtName ?? record.Court) && (
-                                    <div className="text-xs text-muted-foreground">
-                                      Court: {record.court ?? record.CourtName ?? record.Court}
-                                    </div>
+                                  <div className="text-xs font-medium">{getPublicRecordDisplayType(record)}</div>
+                                  {getPublicRecordClassification(record) && getPublicRecordClassification(record) !== getPublicRecordDisplayType(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordClassification(record)}</div>
+                                  )}
+                                  {getPublicRecordIndustry(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordIndustry(record)}</div>
                                   )}
                                   <Badge 
-                                    variant={(record.status ?? record.Status) === 'Discharged' ? 'secondary' : 'destructive'}
+                                    variant={getPublicRecordDisplayStatus(record) === 'Discharged' ? 'secondary' : 'destructive'}
                                     className="text-xs mt-1"
                                   >
-                                    {record.status ?? record.Status ?? 'Unknown'}
+                                    {getPublicRecordDisplayStatus(record) || 'Unknown'}
                                   </Badge>
+                                  <div className="mt-2">
+                                    {renderPublicRecordFieldGrid(record, true)}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -17216,24 +18000,22 @@ export default function CreditReport() {
                             <div className="space-y-2">
                               {transUnionRecords.map((record, idx) => (
                                 <div key={idx} className="border border-border/20 rounded-lg p-2">
-                                  <div className="text-xs font-medium">{record.type ?? record.RecordType ?? record.Type ?? 'Public Record'}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Status: {record.status ?? record.Status ?? 'Unknown'}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Filed: {(record.filingDate || record.DateFiled) ? new Date(record.filingDate || record.DateFiled).toLocaleDateString() : 'N/A'}
-                                  </div>
-                                  {(record.court ?? record.CourtName ?? record.Court) && (
-                                    <div className="text-xs text-muted-foreground">
-                                      Court: {record.court ?? record.CourtName ?? record.Court}
-                                    </div>
+                                  <div className="text-xs font-medium">{getPublicRecordDisplayType(record)}</div>
+                                  {getPublicRecordClassification(record) && getPublicRecordClassification(record) !== getPublicRecordDisplayType(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordClassification(record)}</div>
+                                  )}
+                                  {getPublicRecordIndustry(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordIndustry(record)}</div>
                                   )}
                                   <Badge 
-                                    variant={(record.status ?? record.Status) === 'Discharged' ? 'secondary' : 'destructive'}
+                                    variant={getPublicRecordDisplayStatus(record) === 'Discharged' ? 'secondary' : 'destructive'}
                                     className="text-xs mt-1"
                                   >
-                                    {record.status ?? record.Status ?? 'Unknown'}
+                                    {getPublicRecordDisplayStatus(record) || 'Unknown'}
                                   </Badge>
+                                  <div className="mt-2">
+                                    {renderPublicRecordFieldGrid(record, true)}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -17272,24 +18054,22 @@ export default function CreditReport() {
                             <div className="space-y-2">
                               {equifaxRecords.map((record, idx) => (
                                 <div key={idx} className="border border-border/20 rounded-lg p-2">
-                                  <div className="text-xs font-medium">{record.type ?? record.RecordType ?? record.Type ?? 'Public Record'}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Status: {record.status ?? record.Status ?? 'Unknown'}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    Filed: {(record.filingDate || record.DateFiled) ? new Date(record.filingDate || record.DateFiled).toLocaleDateString() : 'N/A'}
-                                  </div>
-                                  {(record.court ?? record.CourtName ?? record.Court) && (
-                                    <div className="text-xs text-muted-foreground">
-                                      Court: {record.court ?? record.CourtName ?? record.Court}
-                                    </div>
+                                  <div className="text-xs font-medium">{getPublicRecordDisplayType(record)}</div>
+                                  {getPublicRecordClassification(record) && getPublicRecordClassification(record) !== getPublicRecordDisplayType(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordClassification(record)}</div>
+                                  )}
+                                  {getPublicRecordIndustry(record) && (
+                                    <div className="text-[11px] text-muted-foreground">{getPublicRecordIndustry(record)}</div>
                                   )}
                                   <Badge 
-                                    variant={(record.status ?? record.Status) === 'Discharged' ? 'secondary' : 'destructive'}
+                                    variant={getPublicRecordDisplayStatus(record) === 'Discharged' ? 'secondary' : 'destructive'}
                                     className="text-xs mt-1"
                                   >
-                                    {record.status ?? record.Status ?? 'Unknown'}
+                                    {getPublicRecordDisplayStatus(record) || 'Unknown'}
                                   </Badge>
+                                  <div className="mt-2">
+                                    {renderPublicRecordFieldGrid(record, true)}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -18227,51 +19007,22 @@ export default function CreditReport() {
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="font-semibold text-orange-800">
-                            {record.type}
+                            {getPublicRecordDisplayType(record)}
                           </div>
-                          <div className="text-sm text-orange-700">
-                            {record.chapter}
-                          </div>
+                          {getPublicRecordClassification(record) && getPublicRecordClassification(record) !== getPublicRecordDisplayType(record) && (
+                            <div className="text-sm text-orange-700">
+                              {getPublicRecordClassification(record)}
+                            </div>
+                          )}
                         </div>
                         <Badge
                           variant="outline"
                           className="border-orange-500 text-orange-700"
                         >
-                          {record.status}
+                          {getPublicRecordDisplayStatus(record) || 'Unknown'}
                         </Badge>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Filed:</span>
-                          <div className="font-medium">
-                            {new Date(record.filingDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">
-                            Discharged:
-                          </span>
-                          <div className="font-medium">
-                            {new Date(
-                              record.dischargeDate,
-                            ).toLocaleDateString()}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Assets:</span>
-                          <div className="font-medium">
-                            ${(record.assets || 0).toLocaleString()}
-                          </div>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">
-                            Liabilities:
-                          </span>
-                          <div className="font-medium">
-                            ${(record.liabilities || 0).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
+                      {renderPublicRecordFieldGrid(record)}
                     </div>
                   ))}
                 </div>
@@ -20090,12 +20841,12 @@ export default function CreditReport() {
 
                 rawPublicRecords.forEach((record: any) => {
                   const digits = String(record?.caseNumber || record?.CaseNumber || record?.id || "").replace(/[^0-9]/g, "");
-                  const key = digits ? digits.slice(-6) : `${record?.type || record?.Type || "public"}`;
+                  const key = digits ? digits.slice(-6) : `${record?.type || record?.Type || record?.RecordType || "public"}`;
                   pushItem({
                     id: record?.id || key,
                     key,
                     category: "public-record",
-                    type: record?.type || record?.Type || "Public Record",
+                    type: record?.type || record?.Type || record?.RecordType || "Public Record",
                     creditor: resolveCreditor(record?.creditor || record?.Creditor || "Court / Government"),
                     accountNumber: record?.caseNumber || record?.CaseNumber ? `Case ${record.caseNumber || record.CaseNumber}` : "—",
                     bureaus: [normalizeBureau(record?.BureauId) || normalizeBureau(record?.bureau) || "Multiple"].filter(Boolean),
@@ -23614,30 +24365,19 @@ export default function CreditReport() {
                           >
                             <div className="flex justify-between items-start mb-3">
                               <div>
-                                <h5 className="font-medium text-orange-800">{record?.Type || "Public Record"}</h5>
-                                {record?.Classification && (
-                                  <p className="text-sm text-orange-700">{record.Classification}</p>
+                                <h5 className="font-medium text-orange-800">{getPublicRecordDisplayType(record)}</h5>
+                                {getPublicRecordClassification(record) && getPublicRecordClassification(record) !== getPublicRecordDisplayType(record) && (
+                                  <p className="text-sm text-orange-700">{getPublicRecordClassification(record)}</p>
                                 )}
-                                {record?.Industry && (
-                                  <p className="text-xs text-muted-foreground">{record.Industry}</p>
+                                {getPublicRecordIndustry(record) && (
+                                  <p className="text-xs text-muted-foreground">{getPublicRecordIndustry(record)}</p>
                                 )}
                               </div>
                               <Badge variant="outline" className="border-orange-500 text-orange-700">
-                                {record?.Status || "Unknown"}
+                                {getPublicRecordDisplayStatus(record) || "Unknown"}
                               </Badge>
                             </div>
-                            <div className="grid md:grid-cols-2 gap-4 text-sm mb-3">
-                              <div>
-                                <span className="text-muted-foreground">Date:</span>
-                                <p className="font-medium">
-                                  {record?.Date ? new Date(record.Date).toLocaleDateString() : "N/A"}
-                                </p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Designator:</span>
-                                <p className="font-medium">{record?.AccountDesignator || "N/A"}</p>
-                              </div>
-                            </div>
+                            {renderPublicRecordFieldGrid(record)}
                           </div>
                         ))}
                       </div>

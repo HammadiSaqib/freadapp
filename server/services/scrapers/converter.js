@@ -663,43 +663,110 @@ function mapInquiries(payload) {
 }
 
 function mapPublicRecords(payload) {
-  const source = firstNonNull(payload?.PublicRecords, payload?.publicRecords, payload?.Borrower?.PublicRecords);
+  const source = firstNonNull(
+    payload?.PublicRecords,
+    payload?.publicRecords,
+    payload?.public_records,
+    payload?.Borrower?.PublicRecords,
+    payload?.Borrower?.publicRecords,
+    payload?.Borrower?.public_records,
+  );
   if (!source) return [];
 
   const normalizePublicRecord = (item, fallbackBureauId = null) => {
     if (!item || typeof item !== 'object') return null;
 
-    const explicitBureauId = Number.parseInt(String(firstNonNull(item?.BureauId, item?.bureauId, '')), 10);
+    const explicitBureauId = Number.parseInt(String(firstNonNull(item?.BureauId, item?.bureauId, item?.bureau_id, '')), 10);
     const bureauId = Number.isFinite(explicitBureauId) && explicitBureauId > 0
       ? explicitBureauId
-      : firstNonNull(fallbackBureauId, toBureauId(firstNonNull(item?.bureau, item?.bureauCode, item?.provider)));
+      : firstNonNull(
+        fallbackBureauId,
+        toBureauId(firstNonNull(item?.bureau, item?.bureauCode, item?.bureau_name, item?.provider)),
+      );
 
     if (!bureauId) return null;
 
-    const dateFiled = epochToISO(firstNonNull(item?.DateFiled, item?.dateFiled));
-    const dateReported = epochToISO(firstNonNull(item?.DateReported, item?.dateReported));
-    const date = epochToISO(firstNonNull(item?.Date, item?.date, dateFiled, dateReported));
+    const dateFiled = epochToISO(firstNonNull(
+      item?.DateFiled,
+      item?.dateFiled,
+      item?.filed_date,
+      item?.filing_date,
+      item?.date_filed,
+      item?.filed,
+    ));
+    const dateReported = epochToISO(firstNonNull(item?.DateReported, item?.dateReported, item?.date_reported));
+    const statusDate = epochToISO(firstNonNull(item?.StatusDate, item?.statusDate, item?.status_date, item?.date_status));
+    const closingDate = epochToISO(firstNonNull(item?.ClosingDate, item?.closingDate, item?.dateClosed, item?.date_closed));
+    const date = epochToISO(firstNonNull(item?.Date, item?.date, dateFiled, dateReported, statusDate, closingDate));
+    const recordType = asString(firstNonNull(
+      item?.RecordType,
+      item?.record_type,
+      item?.Type,
+      item?.type,
+      item?.publicRecordType,
+      item?.public_record_type,
+      item?.bankruptcy_chapter,
+      item?.judgment_type,
+    ));
+    const referenceNumber = asString(firstNonNull(
+      item?.ReferenceNumber,
+      item?.referenceNumber,
+      item?.reference_number,
+      item?.ReferenceNo,
+      item?.referenceNo,
+      item?.CaseNumber,
+      item?.caseNumber,
+      item?.docketNumber,
+    ));
+    const caseNumber = asString(firstNonNull(
+      item?.CaseNumber,
+      item?.caseNumber,
+      item?.reference_number,
+      item?.ReferenceNumber,
+      item?.referenceNumber,
+    ));
+    const comments = Array.isArray(item?.comments)
+      ? item.comments
+        .map((entry) => {
+          if (entry === null || entry === undefined) return '';
+          if (typeof entry === 'string' || typeof entry === 'number') return asString(entry);
+          return asString(firstNonNull(entry?.text, entry?.value, entry?.comment, entry?.description, entry?.code));
+        })
+        .filter(Boolean)
+      : [];
+    const remarks = asString(firstNonNull(item?.Remarks, item?.remarks, comments.join('; ')));
+    const responsibility = asString(firstNonNull(item?.Responsibility, item?.responsibility, item?.AccountDesignator, item?.accountDesignator));
+    const rawSequenceId = firstNonNull(item?.SequenceId, item?.sequence_id);
+    const sequenceId = rawSequenceId === null || rawSequenceId === undefined || rawSequenceId === ''
+      ? null
+      : Number.parseInt(String(rawSequenceId), 10);
 
     return {
       BureauId: bureauId,
-      Type: asString(firstNonNull(item?.Type, item?.type, item?.publicRecordType)),
-      Classification: asString(firstNonNull(item?.Classification, item?.classification, item?.Type, item?.type, item?.publicRecordType)),
-      Amount: asString(firstNonNull(item?.Amount, item?.amount, item?.AssetAmount, item?.assetAmount)),
+      Type: recordType,
+      RecordType: recordType,
+      Classification: asString(firstNonNull(item?.Classification, item?.classification, recordType)),
+      Amount: asString(firstNonNull(item?.Amount, item?.amount, item?.balance_due, item?.AssetAmount, item?.assetAmount)),
       Date: date,
       DateFiled: dateFiled || date,
       DateReported: dateReported || date,
-      Status: asString(firstNonNull(item?.Status, item?.status)),
+      Status: asString(firstNonNull(item?.Status, item?.status, item?.disposition)),
       Industry: asString(firstNonNull(item?.Industry, item?.industry)),
-      AccountDesignator: asString(firstNonNull(item?.AccountDesignator, item?.accountDesignator)),
-      ReferenceNumber: asString(firstNonNull(item?.ReferenceNumber, item?.referenceNumber, item?.CaseNumber, item?.caseNumber, item?.docketNumber)),
-      ClosingDate: epochToISO(firstNonNull(item?.ClosingDate, item?.closingDate, item?.dateClosed)),
+      AccountDesignator: responsibility,
+      Responsibility: responsibility,
+      ReferenceNumber: referenceNumber,
+      StatusDate: statusDate,
+      ClosingDate: closingDate,
       Court: asString(firstNonNull(item?.Court, item?.court, item?.courtName)),
-      AssetAmount: asString(firstNonNull(item?.AssetAmount, item?.assetAmount, item?.Amount, item?.amount)),
+      AssetAmount: asString(firstNonNull(item?.AssetAmount, item?.assetAmount, item?.asset, item?.Amount, item?.amount)),
       Liability: asString(firstNonNull(item?.Liability, item?.liability)),
       ExemptAmount: asString(firstNonNull(item?.ExemptAmount, item?.exemptAmount)),
-      Remarks: asString(firstNonNull(item?.Remarks, item?.remarks)),
+      Remarks: remarks,
+      Comments: comments,
+      SegmentId: asString(firstNonNull(item?.SegmentId, item?.segment_id)),
+      SequenceId: Number.isFinite(sequenceId) ? sequenceId : null,
       Name: asString(firstNonNull(item?.Name, item?.name)),
-      CaseNumber: asString(firstNonNull(item?.CaseNumber, item?.caseNumber)),
+      CaseNumber: caseNumber,
     };
   };
 

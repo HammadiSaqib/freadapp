@@ -74,6 +74,29 @@ async function executeQuery(sql, params = []) {
   }
 }
 
+function normalizeSsnLastFour(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : '';
+}
+
+async function persistClientSsnLastFour(clientId, ssnLastFour) {
+  const normalizedClientId = Number.parseInt(String(clientId || ''), 10);
+  const normalizedSsnLastFour = normalizeSsnLastFour(ssnLastFour);
+
+  if (!Number.isFinite(normalizedClientId) || normalizedClientId <= 0 || !normalizedSsnLastFour) {
+    return;
+  }
+
+  await executeQuery(
+    `UPDATE clients
+        SET ssn_last_four = ?,
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+        AND (ssn_last_four IS NULL OR TRIM(ssn_last_four) = '')`,
+    [normalizedSsnLastFour, normalizedClientId]
+  );
+}
+
 /**
  * Create the credit_report_history table if it doesn't exist
  */
@@ -156,6 +179,7 @@ async function saveCreditReport(data) {
 
   try {
     const result = await executeQuery(sql, params);
+    await persistClientSsnLastFour(data.client_id, data.ssn_last_four);
     try {
       const clientId = data.client_id;
       let clientRow = null;

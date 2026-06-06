@@ -78,6 +78,47 @@ const findExistingClientIdForScrape = async (req, platform, username) => {
   return null;
 };
 
+const normalizeSsnLast4 = (value) => {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length >= 4 ? digits.slice(-4) : '';
+};
+
+const extractClientSsnLast4FromReport = (reportData, requestedSsnLast4) => {
+  const explicit = normalizeSsnLast4(requestedSsnLast4);
+  if (explicit) return explicit;
+
+  const candidates = [
+    reportData?.ssnLast4,
+    reportData?.ssn_last4,
+    reportData?.ssn_last_four,
+    reportData?.rawCreditData?.ssnLast4,
+    reportData?.rawCreditData?.ssn_last4,
+    reportData?.rawCreditData?.ssn_last_four,
+    reportData?.reportData?.Identity?.SSN,
+    reportData?.Identity?.SSN,
+  ];
+
+  const rawEntries = Array.isArray(reportData?.rawCreditData?.data)
+    ? reportData.rawCreditData.data
+    : [];
+  rawEntries.forEach((entry) => {
+    candidates.push(
+      entry?.ssnLast4,
+      entry?.ssn_last4,
+      entry?.ssn_last_four,
+      entry?.ssn_masked,
+      entry?.ssn,
+    );
+  });
+
+  for (const candidate of candidates) {
+    const digits = normalizeSsnLast4(candidate);
+    if (digits && digits !== '0000') return digits;
+  }
+
+  return '';
+};
+
 // Validation schema for scraper requests
 const scraperRequestSchema = z.object({
   platform: z.string().min(1).refine(val => {
@@ -248,6 +289,7 @@ router.post('/scrape', authenticateToken, async (req, res) => {
             }
 
             // Notes
+            const scrapedSsnLast4 = extractClientSsnLast4FromReport(reportData, scraperOptions.ssnLast4);
             notes = JSON.stringify({
               platform,
               scraped_at: new Date().toISOString(),
@@ -265,6 +307,7 @@ router.post('/scrape', authenticateToken, async (req, res) => {
               equifax_score: equifaxScore,
               transunion_score: transunionScore,
               report_date: reportDate,
+              ssn_last_four: scrapedSsnLast4 || null,
               notes
             };
 
@@ -1133,17 +1176,78 @@ const toDDMMYYYY = (s) => {
   return null;
 };
 
+const normalizePublicRecordComments = (value) => {
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((entry) => {
+        if (entry === null || entry === undefined) return '';
+        if (typeof entry === 'string' || typeof entry === 'number') return String(entry).trim();
+        return pick(entry?.text, entry?.value, entry?.comment, entry?.description, entry?.code);
+      })
+      .filter(Boolean);
+    return parts.length ? parts.join('; ') : null;
+  }
+
+  const text = normalizeStr(value, '');
+  return text || null;
+};
+
 // ===== Final converted report (UCS full schema) =====
-  let publicRecordsFormal = (Array.isArray(publicRecords) ? publicRecords : []).map((pr, idx) => ({
-    BureauId: pr?.bureau_id ?? bureauToIdMSQ(pr?.bureau || pr?.Bureau || pr?.Source?.Bureau?.symbol) ?? bureauIndexToIdMSQ(idx % 3),
-    RecordType: normalizeStr(pr?.RecordType || pr?.type || pr?.category || pr?.public_record_type || pr?.bankruptcy_chapter || pr?.judgment_type, ''),
-    DateFiled: (parseDate(pr?.DateFiled || pr?.filing_date || pr?.date_filed || pr?.filed) || null)?.slice(0,10) || null,
-    Status: (normalizeStr(pr?.Status || pr?.status || pr?.disposition, '') || null),
-    Amount: (normalizeStr(pr?.Amount || pr?.amount || pr?.liability || pr?.balance_due, '') || null)
-  }));
+  let publicRecordsFormal = (Array.isArray(publicRecords) ? publicRecords : []).map((pr, idx) => {
+    const bureauId = pr?.bureau_id ?? pr?.BureauId ?? bureauToIdMSQ(pr?.bureau || pr?.Bureau || pr?.Source?.Bureau?.symbol) ?? bureauIndexToIdMSQ(idx % 3);
+    const recordType = normalizeStr(pr?.RecordType || pr?.record_type || pr?.type || pr?.category || pr?.public_record_type || pr?.bankruptcy_chapter || pr?.judgment_type, '');
+    const dateFiled = toYMD(parseDate(pr?.DateFiled || pr?.filed_date || pr?.filing_date || pr?.date_filed || pr?.filed)) || null;
+    const dateReported = toYMD(parseDate(pr?.DateReported || pr?.dateReported || pr?.date_reported)) || null;
+    const statusDate = toYMD(parseDate(pr?.StatusDate || pr?.statusDate || pr?.status_date || pr?.date_status)) || null;
+    const referenceNumber = normalizeStr(pr?.ReferenceNumber || pr?.referenceNumber || pr?.reference_number || pr?.ReferenceNo || pr?.referenceNo, '') || null;
+    const caseNumber = normalizeStr(pr?.CaseNumber || pr?.caseNumber || pr?.reference_number || pr?.referenceNumber || pr?.ReferenceNumber, '') || null;
+    const court = normalizeStr(pr?.Court || pr?.court || pr?.courtName || pr?.court_name, '') || null;
+    const classification = normalizeStr(pr?.Classification || pr?.classification || pr?.record_type || pr?.RecordType || pr?.type, '') || null;
+    const responsibility = normalizeStr(pr?.Responsibility || pr?.responsibility || pr?.AccountDesignator || pr?.accountDesignator, '') || null;
+    const remarks = normalizePublicRecordComments(pr?.Remarks ?? pr?.remarks ?? pr?.comments);
+    const segmentId = normalizeStr(pr?.SegmentId || pr?.segment_id, '') || null;
+    const rawSequenceId = pr?.SequenceId ?? pr?.sequence_id;
+    const parsedSequenceId = rawSequenceId === null || rawSequenceId === undefined || rawSequenceId === ''
+      ? null
+      : Number.parseInt(String(rawSequenceId), 10);
+
+    return {
+      BureauId: bureauId,
+      RecordType: recordType,
+      DateFiled: dateFiled,
+      Status: normalizeStr(pr?.Status || pr?.status || pr?.disposition, '') || null,
+      Amount: pick(pr?.Amount, pr?.amount, pr?.balance_due, pr?.AssetAmount, pr?.assetAmount) || null,
+      DateReported: dateReported,
+      StatusDate: statusDate,
+      Court: court,
+      ReferenceNumber: referenceNumber,
+      CaseNumber: caseNumber,
+      Classification: classification,
+      Liability: normalizeStr(pr?.Liability || pr?.liability, '') || null,
+      AssetAmount: normalizeStr(pr?.AssetAmount || pr?.assetAmount || pr?.asset, '') || null,
+      Responsibility: responsibility,
+      Remarks: remarks,
+      SegmentId: segmentId,
+      SequenceId: Number.isFinite(parsedSequenceId) ? parsedSequenceId : null
+    };
+  });
   publicRecordsFormal = publicRecordsFormal.filter(pr => {
     const hasType = !!normalizeStr(pr.RecordType, '');
-    const hasAny = !!(pr.DateFiled || pr.Status || pr.Amount);
+    const hasAny = !!(
+      pr.DateFiled ||
+      pr.DateReported ||
+      pr.Status ||
+      pr.Amount ||
+      pr.Court ||
+      pr.ReferenceNumber ||
+      pr.CaseNumber ||
+      pr.StatusDate ||
+      pr.Classification ||
+      pr.Liability ||
+      pr.AssetAmount ||
+      pr.Responsibility ||
+      pr.Remarks
+    );
     return hasType && hasAny;
   });
 
@@ -1398,7 +1502,19 @@ const toDDMMYYYY = (s) => {
         RecordType: z.string(),
         DateFiled: z.string().nullable(),
         Status: z.string().nullable(),
-        Amount: z.string().nullable()
+        Amount: z.string().nullable(),
+        DateReported: z.string().nullable().optional(),
+        StatusDate: z.string().nullable().optional(),
+        Court: z.string().nullable().optional(),
+        ReferenceNumber: z.string().nullable().optional(),
+        CaseNumber: z.string().nullable().optional(),
+        Classification: z.string().nullable().optional(),
+        Liability: z.string().nullable().optional(),
+        AssetAmount: z.string().nullable().optional(),
+        Responsibility: z.string().nullable().optional(),
+        Remarks: z.string().nullable().optional(),
+        SegmentId: z.string().nullable().optional(),
+        SequenceId: z.number().nullable().optional()
       })),
       Accounts: z.array(z.object({
         BureauId: z.number(),
@@ -1992,6 +2108,7 @@ const toDDMMYYYY = (s) => {
       }
 
       // Create notes with additional report information
+      const scrapedSsnLast4 = extractClientSsnLast4FromReport(reportData, scraperOptions.ssnLast4);
       if (reportData && (reportData.reportData || reportData.Score)) {
         const noteData = {
           platform: platform,
@@ -2017,6 +2134,7 @@ const toDDMMYYYY = (s) => {
         equifax_score: equifaxScore,
         transunion_score: transunionScore,
         report_date: reportDate,
+        ssn_last_four: scrapedSsnLast4 || null,
         notes: notes
       };
       

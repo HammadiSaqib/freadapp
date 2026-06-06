@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Link2, Copy, Edit, Trash2, Eye, BarChart3, ExternalLink, Search, Filter, Calendar, TrendingUp, MousePointer, Users, Share2, Facebook, Twitter, Linkedin, MessageCircle, Check, X, AlertCircle, DollarSign } from "lucide-react";
+import { Plus, Link2, Copy, Edit, Trash2, Eye, BarChart3, ExternalLink, Search, Filter, Calendar, TrendingUp, MousePointer, Users, Share2, Facebook, Twitter, Linkedin, MessageCircle, Check, X, DollarSign } from "lucide-react";
 import { affiliateApi, authApi } from "@/lib/api";
 import { buildAffiliateInviteReferralUrl, buildReferralLandingUrl } from "@/lib/hostRouting";
 import { useToast } from "@/hooks/use-toast";
@@ -253,9 +253,30 @@ export default function AffiliateLinks() {
             Share your product link to earn commissions or invite new affiliates under you
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8">
             {/* Main Affiliate Link */}
-            <div className="space-y-3">
+            <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-2xl border border-blue-200/80 bg-gradient-to-br from-white via-blue-50 to-sky-100/80 p-5 shadow-sm">
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-blue-200/50 blur-2xl" />
+                <div className="relative flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-500/20">
+                    <DollarSign className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-900">Product Referral Link</h3>
+                      <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Customer Sales</Badge>
+                    </div>
+                    <p className="max-w-3xl text-sm leading-6 text-slate-700">
+                      Share this link with customers who want to purchase The Score Machine. You earn commissions every time someone buys through your referral link.
+                    </p>
+                    <div className="inline-flex rounded-xl border border-blue-200/80 bg-white/80 px-3 py-2 text-xs font-medium text-blue-800 shadow-sm">
+                      Best for direct customer sharing in DMs, email, text, or social posts.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {!affiliateInfo ? (
                 <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <p className="text-yellow-800">Loading your personalized affiliate link...</p>
@@ -295,7 +316,28 @@ export default function AffiliateLinks() {
                )}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
+              <div className="relative overflow-hidden rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-white via-emerald-50 to-teal-100/80 p-5 shadow-sm">
+                <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-200/50 blur-2xl" />
+                <div className="relative flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-500/20">
+                    <Users className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-900">Affiliate Invite Link</h3>
+                      <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">5% Override</Badge>
+                    </div>
+                    <p className="max-w-3xl text-sm leading-6 text-slate-700">
+                      Share this link with people who want to become affiliates. If they join through your invite link, you earn a 5% override commission on qualifying sales they generate.
+                    </p>
+                    <div className="inline-flex rounded-xl border border-emerald-200/80 bg-white/80 px-3 py-2 text-xs font-medium text-emerald-800 shadow-sm">
+                      Best for recruiting partners, influencers, and team members into your affiliate network.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {!affiliateInfo ? (
                 <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                   <p className="text-yellow-800">Loading your affiliate invite link...</p>

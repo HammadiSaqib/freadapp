@@ -472,6 +472,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         platform: newClient.platform,
         platform_email: newClient.email,
         platform_password: newClient.password,
+        ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
         notes: notesMessage,
       };
 
