@@ -224,6 +224,11 @@ const publicLocalhostOrigins = [
   'http://onboarding.localhost:3000',
 ];
 
+const trustedProductionBaseDomains = [
+  'thescoremachine.com',
+  'tsmbasic.com',
+] as const;
+
 const defaultCorsOrigins = [
   'http://localhost:3002',
   'http://localhost:8080',
@@ -234,6 +239,9 @@ const defaultCorsOrigins = [
   'https://api.thescoremachine.com',
   'https://thescoremachine.com',
   'https://www.thescoremachine.com',
+  'https://api.tsmbasic.com',
+  'https://tsmbasic.com',
+  'https://www.tsmbasic.com',
 ];
 
 const envCorsOrigins = (process.env.CORS_ORIGIN || "")
@@ -243,7 +251,7 @@ const envCorsOrigins = (process.env.CORS_ORIGIN || "")
 
 const allowedCorsOrigins = new Set([...defaultCorsOrigins, ...envCorsOrigins]);
 
-function isTrustedScoreMachineOrigin(origin: string) {
+function isTrustedProductionOrigin(origin: string) {
   try {
     const parsed = new URL(origin);
     const hostname = parsed.hostname.toLowerCase();
@@ -252,7 +260,9 @@ function isTrustedScoreMachineOrigin(origin: string) {
       return false;
     }
 
-    return hostname === "thescoremachine.com" || hostname.endsWith(".thescoremachine.com");
+    return trustedProductionBaseDomains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    );
   } catch {
     return false;
   }
@@ -316,8 +326,9 @@ export async function createServer(vite?: ViteDevServer) {
     if (/^www\.localhost(?::\d+)?$/.test(host)) {
       const targetHost = host.replace(/^www\./, '');
       return res.redirect(301, `http://${targetHost}${req.originalUrl}`);
-    } else if (/^www\.thescoremachine\.com(?::\d+)?$/.test(host)) {
-      return res.redirect(301, `https://thescoremachine.com${req.originalUrl}`);
+    } else if (/^www\.(?:thescoremachine|tsmbasic)\.com(?::\d+)?$/.test(host)) {
+      const targetHost = host.replace(/^www\./, '').replace(/:\d+$/, '');
+      return res.redirect(301, `https://${targetHost}${req.originalUrl}`);
     }
     next();
   });
@@ -350,7 +361,7 @@ export async function createServer(vite?: ViteDevServer) {
   // Middleware
   app.use(cors({
     origin: (origin, callback) => {
-      if (!origin || allowedCorsOrigins.has(origin) || isTrustedScoreMachineOrigin(origin)) {
+      if (!origin || allowedCorsOrigins.has(origin) || isTrustedProductionOrigin(origin)) {
         callback(null, true);
         return;
       }

@@ -27,6 +27,28 @@ const publicLocalhostOrigins = [
   'http://onboarding.localhost:3000',
 ];
 
+const trustedProductionBaseDomains = [
+  'thescoremachine.com',
+  'tsmbasic.com',
+] as const;
+
+function isTrustedProductionOrigin(origin: string) {
+  try {
+    const parsed = new URL(origin);
+    const hostname = parsed.hostname.toLowerCase();
+
+    if (parsed.protocol !== 'https:') {
+      return false;
+    }
+
+    return trustedProductionBaseDomains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Use the same JWT_SECRET as the rest of the application
 const JWT_SECRET = ENV_CONFIG.JWT_SECRET;
 
@@ -92,11 +114,18 @@ export class WebSocketService {
       envOrigins.push(process.env.FRONTEND_URL);
     }
 
+    const allowedOrigins = new Set([...devOrigins, ...envOrigins]);
+
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.NODE_ENV === 'production'
-          ? (process.env.FRONTEND_URL || 'https://mywarmachine.com')
-          : [...devOrigins, ...envOrigins],
+        origin: (origin, callback) => {
+          if (!origin || allowedOrigins.has(origin) || isTrustedProductionOrigin(origin)) {
+            callback(null, true);
+            return;
+          }
+
+          callback(new Error(`Origin not allowed by Socket.IO CORS: ${origin}`));
+        },
         methods: ['GET', 'POST'],
         credentials: true
       },
