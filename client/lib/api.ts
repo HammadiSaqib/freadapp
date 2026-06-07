@@ -11,13 +11,13 @@ export function resolveApiBaseUrl() {
 
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname.toLowerCase();
-    const isTrustedScoreMachineSubdomain =
-      hostname.endsWith('.thescoremachine.com') &&
-      hostname !== 'thescoremachine.com' &&
-      hostname !== 'www.thescoremachine.com';
+    const trustedProductionBaseDomains = ['thescoremachine.com', 'tsmbasic.com'];
+    const isTrustedProductionHostname = trustedProductionBaseDomains.some(
+      (domain) => hostname === domain || hostname === `www.${domain}` || hostname.endsWith(`.${domain}`),
+    );
     const isTrustedLocalAlias = hostname.endsWith('.localhost');
 
-    if (isTrustedScoreMachineSubdomain || isTrustedLocalAlias) {
+    if (isTrustedProductionHostname || isTrustedLocalAlias) {
       return window.location.origin;
     }
 
