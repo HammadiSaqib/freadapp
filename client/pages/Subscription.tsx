@@ -1,3 +1,5 @@
+import BasicSubscription from "@/components/BasicSubscription";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
@@ -118,6 +120,7 @@ const SubscriptionContent: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isEliteActive } = useScoreMachineEliteStatus();
+  const { userProfile } = useAuthContext();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -795,6 +798,28 @@ const SubscriptionContent: React.FC = () => {
           getStatusBadge={getStatusBadge}
         />
         {cancellationDialog}
+      </DashboardLayout>
+    );
+  }
+
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <DashboardLayout>
+        <BasicSubscription
+          subscription={subscription}
+          availablePlans={availablePlans}
+          billingFilter={billingFilter}
+          setBillingFilter={setBillingFilter}
+          recurringConsent={recurringConsent}
+          setRecurringConsent={setRecurringConsent}
+          upgrading={upgrading}
+          handleSelectPlan={handleSelectPlan}
+          handleOpenCancelDialog={handleOpenCancelDialog}
+          navigate={navigate}
+          getStatusBadge={getStatusBadge}
+        />
       </DashboardLayout>
     );
   }

@@ -33,7 +33,9 @@ import { API_BASE_URL, contractsApi } from "@/lib/api";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import { useAuthContext } from "@/contexts/AuthContext";
 import EliteSupport from "@/components/EliteSupport";
+import BasicSupport from "@/components/BasicSupport";
 import AddClientDialog from "@/components/AddClientDialog";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 
 interface SupportTicket {
   id: string;
@@ -82,6 +84,7 @@ interface ChatConversation {
 
 export default function Support() {
   const { isEliteActive } = useScoreMachineEliteStatus();
+  const { userProfile } = useAuthContext();
   const [activeTab, setActiveTab] = useState("livechat");
   const [ticketForm, setTicketForm] = useState({
     subject: "",
@@ -504,7 +507,7 @@ export default function Support() {
         body: JSON.stringify({ type: 'helpful' })
       });
       setFaqs(prev => prev.map(f => f.id === id ? { ...f, helpful: (f.helpful || 0) + 1 } : f));
-      setFaqVotes(prev => ({ ...prev, [id]: 'helpful' }));
+      setFaqVotes(prev => ({ ...prev, [id]: 'helpful' as const }));
       localStorage.setItem(voteKey(id), 'helpful');
     } catch {}
   };
@@ -517,7 +520,7 @@ export default function Support() {
         headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
         body: JSON.stringify({ type: 'not_helpful' })
       });
-      setFaqVotes(prev => ({ ...prev, [id]: 'not_helpful' }));
+      setFaqVotes(prev => ({ ...prev, [id]: 'not_helpful' as const }));
       localStorage.setItem(voteKey(id), 'not_helpful');
     } catch {}
   };
@@ -1068,6 +1071,27 @@ export default function Support() {
       </Card>
     </div>
   );
+
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <DashboardLayout
+        onAddClient={() => setShowAddClient(true)}
+      >
+        <BasicSupport
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          overviewTab={overviewTabContent}
+          ticketsTab={ticketsTabContent}
+          faqTab={faqTabContent}
+          contactTab={contactTabContent}
+          livechatTab={livechatTabContent}
+          setShowAddClient={setShowAddClient}
+        />
+      </DashboardLayout>
+    );
+  }
 
   if (isEliteActive) {
     return (

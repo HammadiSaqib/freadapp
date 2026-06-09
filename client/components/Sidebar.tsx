@@ -387,6 +387,13 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         lawEngineAuto: true,
       },
       {
+        name: 'Automated Analysis',
+        href: buildSidebarTabHref(creditReportPath, 'overview', { lawEngineAuto: true }),
+        pageKey: 'credit-report',
+        tab: 'overview',
+        lawEngineAuto: true,
+      },
+      {
         name: 'Credit Repair Negative Items',
         href: buildSidebarTabHref(creditReportPath, 'creditRepair'),
         pageKey: 'credit-report',
@@ -417,9 +424,9 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
     return [
       {
         key: 'clients',
-        name: 'Profile',
+        name: 'Client Profile',
         icon: Users,
-        badge: clientCount > 0 ? String(Math.min(clientCount, 1)) : null,
+        badge: null,
         pageKey: 'clients',
         items: basicAdminClientItems,
       },
@@ -427,7 +434,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         key: 'workArea',
         name: 'Work Area',
         icon: FileText,
-        badge: reportCount > 0 ? reportCount.toString() : null,
+        badge: null,
         pageKey: 'credit-report',
         items: basicAdminWorkAreaItems,
       },
@@ -723,6 +730,9 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const widthClass = isSmallScreen ? 'w-64' : (isCollapsed ? 'w-16' : 'w-64');
   const translateClass = isSmallScreen ? (isMobileOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0';
   const visibilityClass = isSmallScreen ? (isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none') : 'opacity-100';
+  const basicSidebarSurface = isBasicAdminPortalUser
+    ? 'bg-white/96 dark:bg-slate-950 border-r border-sky-100/80 dark:border-slate-800 shadow-xl shadow-sky-100/70 dark:shadow-none'
+    : 'bg-white dark:bg-slate-900 border-r border-border/40 dark:border-slate-700';
 
   // Extra items specifically for mobile bottom navigation
   const mobileNavExtras = [
@@ -796,8 +806,8 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
             disabled
               ? "text-slate-400 dark:text-slate-600"
               : active
-              ? (isEliteActive ? "text-[#7000ff]" : "text-white")
-              : (isEliteActive ? "text-slate-500 group-hover:text-[#7000ff]" : "text-slate-600 dark:text-slate-400 group-hover:text-ocean-blue")
+              ? (isEliteActive ? "text-[#7000ff]" : isBasicAdminPortalUser ? "text-sky-700 dark:text-sky-300" : "text-white")
+              : (isEliteActive ? "text-slate-500 group-hover:text-[#7000ff]" : isBasicAdminPortalUser ? "text-slate-500 group-hover:text-sky-700 dark:text-slate-400 dark:group-hover:text-sky-300" : "text-slate-600 dark:text-slate-400 group-hover:text-ocean-blue")
           }`}
         />
         {!collapsed && (
@@ -813,7 +823,9 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                     disabled
                       ? "bg-slate-100 text-slate-400 border-slate-200"
                       : active
-                      ? (isEliteActive ? "elite-sidebar-badge" : "bg-white/20 text-white border-white/30")
+                      ? (isEliteActive ? "elite-sidebar-badge" : isBasicAdminPortalUser ? "border-sky-200 bg-white text-sky-700 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300" : "bg-white/20 text-white border-white/30")
+                      : isBasicAdminPortalUser
+                      ? "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300"
                       : item.name === 'Subscription' && item.badge === 'Payment Required'
                       ? "bg-yellow-100 text-yellow-800 border-yellow-200"
                       : (isEliteActive ? "border-[#7000ff]/20 text-[#7000ff]" : "border-ocean-blue/20 text-ocean-blue")
@@ -851,8 +863,8 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         to={item.href}
         className={`flex items-center py-2.5 transition-all duration-200 group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'} ${
           active
-            ? (isEliteActive ? "elite-sidebar-item-active" : "gradient-primary text-white shadow-lg rounded-lg")
-            : (isEliteActive ? "elite-sidebar-item" : "rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gradient-soft hover:text-foreground")
+            ? (isEliteActive ? "elite-sidebar-item-active" : isBasicAdminPortalUser ? "rounded-lg border border-sky-100 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300" : "gradient-primary text-white shadow-lg rounded-lg")
+            : (isEliteActive ? "elite-sidebar-item" : isBasicAdminPortalUser ? "rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white" : "rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gradient-soft hover:text-foreground")
         }`}
       >
         {content}
@@ -931,17 +943,24 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       )}
 
       <div
-        className={`${widthClass} ${translateClass} ${visibilityClass} transform transition-transform duration-300 ease-in-out ${isEliteActive ? 'elite-sidebar' : 'bg-white dark:bg-slate-900 border-r border-border/40 dark:border-slate-700'} flex flex-col shadow-lg fixed left-0 top-0 h-screen z-[1000] overflow-hidden ${isCollapsed ? 'min-w-[4rem]' : 'min-w-[16rem]'} min-h-0 ${className ?? ''}`}
+        className={`${widthClass} ${translateClass} ${visibilityClass} transform transition-transform duration-300 ease-in-out ${isEliteActive ? 'elite-sidebar' : basicSidebarSurface} flex flex-col fixed left-0 top-0 h-screen z-[1000] overflow-hidden ${isCollapsed ? 'min-w-[4rem]' : 'min-w-[16rem]'} min-h-0 ${className ?? ''}`}
       >
       {/* Header */}
-      <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : 'border-border/40 dark:border-slate-700'}`}>
+      <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'}`}>
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <img src="/image.png" alt="Score Machine" className="w-20 h-14" />
-              <span className={`text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : 'gradient-text-primary'}`}>
-                Score Machine
-              </span>
+              <img src="/image.png" alt="Score Machine" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
+              <div className="min-w-0">
+                <span className={`block truncate text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : isBasicAdminPortalUser ? 'text-slate-900 dark:text-white' : 'gradient-text-primary'}`}>
+                  Score Machine
+                </span>
+                {isBasicAdminPortalUser && (
+                  <span className="block text-xs font-medium text-sky-600 dark:text-sky-300">
+                    Basic Portal
+                  </span>
+                )}
+              </div>
             </Link>
           )}
           {collapsed && (
@@ -959,7 +978,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 setCollapsed(!collapsed);
               }
             }}
-            className={isEliteActive ? 'hover:bg-blue-50' : 'hover:bg-gradient-soft'}
+            className={isEliteActive ? 'hover:bg-blue-50' : isBasicAdminPortalUser ? 'hover:bg-sky-50 dark:hover:bg-slate-800' : 'hover:bg-gradient-soft'}
             aria-label={isSmallScreen ? 'Close sidebar' : (collapsed ? 'Expand sidebar' : 'Collapse sidebar')}
           >
             {isSmallScreen ? (
@@ -975,15 +994,21 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
       {/* Search */}
       {!collapsed && (
-        <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : 'border-border/40 dark:border-slate-700'}`}>
+        <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'}`}>
           <div className="relative">
-            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isEliteActive ? 'text-cyan-500' : 'text-slate-600 dark:text-slate-400'}`} />
+            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isEliteActive ? 'text-cyan-500' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-slate-600 dark:text-slate-400'}`} />
             <input
               type="text"
               placeholder="Search..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className={isEliteActive ? 'w-full pl-10 pr-4 py-2 text-sm border border-slate-100 rounded-lg bg-slate-50 text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400' : 'w-full pl-10 pr-4 py-2 text-sm border border-border/40 dark:border-slate-700 rounded-lg bg-gradient-light focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'}
+              className={
+                isEliteActive
+                  ? 'w-full pl-10 pr-4 py-2 text-sm border border-slate-100 rounded-lg bg-slate-50 text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400'
+                  : isBasicAdminPortalUser
+                    ? 'w-full pl-10 pr-4 py-2 text-sm border border-sky-100 dark:border-slate-800 rounded-lg bg-sky-50/55 dark:bg-slate-900 text-slate-700 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300'
+                    : 'w-full pl-10 pr-4 py-2 text-sm border border-border/40 dark:border-slate-700 rounded-lg bg-gradient-light focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'
+              }
             />
           </div>
         </div>
@@ -991,7 +1016,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
       {/* Navigation */}
-      <nav className="p-4 space-y-2">
+      <nav className={`p-4 ${isBasicAdminPortalUser ? 'space-y-3' : 'space-y-2'}`}>
         {isBasicAdminPortalUser ? (
           <>
             {basicAdminStandaloneNavigation
@@ -1006,15 +1031,15 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
               const hasPrimaryClient = section.items.length > 0;
 
               return (
-                <div key={section.key} className="space-y-1 rounded-xl border border-border/40 bg-white/60 p-2 dark:border-slate-700 dark:bg-slate-900/40">
+                <div key={section.key} className="space-y-1 rounded-xl border border-sky-100 bg-sky-50/45 p-2 shadow-sm shadow-sky-100/60 dark:border-slate-800 dark:bg-slate-900/70 dark:shadow-none">
                   <button
                     type="button"
                     onClick={() => hasSectionAccess && hasPrimaryClient && toggleBasicAdminSection(section.key)}
                     className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition-all duration-200 ${
                       hasSectionAccess && hasPrimaryClient
                         ? isSectionActive
-                          ? 'bg-gradient-soft text-foreground'
-                          : 'text-slate-700 hover:bg-gradient-soft dark:text-slate-300'
+                          ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
+                          : 'text-slate-700 hover:bg-white hover:text-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                         : 'cursor-not-allowed opacity-50 text-slate-400'
                     }`}
                     aria-expanded={isExpanded}
@@ -1031,7 +1056,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {section.badge && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="border-sky-200 bg-white text-sky-700 text-xs dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
                           {section.badge}
                         </Badge>
                       )}
@@ -1050,11 +1075,11 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                             to={item.href}
                             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                               itemActive
-                                ? 'gradient-primary text-white shadow-md'
-                                : 'text-slate-600 hover:bg-gradient-soft hover:text-foreground dark:text-slate-400'
+                                ? 'bg-slate-900 text-white shadow-md dark:bg-sky-500 dark:text-slate-950'
+                                : 'text-slate-600 hover:bg-white hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
                             }`}
                           >
-                            <span className={`h-2 w-2 rounded-full ${itemActive ? 'bg-white' : 'bg-slate-400 dark:bg-slate-500'}`} />
+                            <span className={`h-2 w-2 rounded-full ${itemActive ? 'bg-sky-200 dark:bg-slate-950' : 'bg-sky-300 dark:bg-slate-600'}`} />
                             <span className="truncate">{item.name}</span>
                           </Link>
                         );
@@ -1076,7 +1101,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         {/* Quick Actions */}
         {!collapsed && (
           <div className="pt-6">
-            <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${isEliteActive ? 'text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
+            <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${isEliteActive ? 'text-slate-400' : isBasicAdminPortalUser ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
               Quick Actions
             </h4>
             <div className="space-y-2">
@@ -1089,7 +1114,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                   className={`w-full justify-start relative group ${
                     !basicAdminPrimaryClient?.id || !hasPermission('credit-report') || basicAdminRepullLoading
                       ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
-                      : isEliteActive ? "bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 border-0 font-bold shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] hover:opacity-90" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
+                      : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
                   }`}
                 >
                   {basicAdminRepullLoading ? (
@@ -1127,7 +1152,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 onClick={() => navigate("/invoices")}
                 variant="outline"
                 size="sm"
-                className={`w-full justify-start ${isEliteActive ? 'bg-slate-50 text-slate-700 border border-slate-100 font-bold hover:bg-purple-50 hover:text-[#7000ff] transition-all' : 'border-slate-300/60 text-slate-700 hover:bg-opacity-90'}`}
+                className={`w-full justify-start ${isEliteActive ? 'bg-slate-50 text-slate-700 border border-slate-100 font-bold hover:bg-purple-50 hover:text-[#7000ff] transition-all' : isBasicAdminPortalUser ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800' : 'border-slate-300/60 text-slate-700 hover:bg-opacity-90'}`}
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Invoices
@@ -1138,7 +1163,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       </nav>
 
       {/* Bottom Section */}
-      <div className="p-4 border-t border-border/40 dark:border-slate-700 space-y-2">
+      <div className={`p-4 border-t space-y-2 ${isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'}`}>
         {portalReturnContext && !collapsed && (
           <Button
             variant="outline"
@@ -1177,13 +1202,13 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
         {/* Full Admin Status for larger screens */}
         {!collapsed && !isSmallScreen && (
-          <div className="mt-3 p-4 bg-gradient-to-br from-cyan-50 via-teal-50 to-emerald-50 dark:from-slate-800/50 dark:via-slate-700/50 dark:to-slate-800/50 rounded-xl border-2 border-cyan-200/60 dark:border-cyan-600/40 shadow-lg">
+          <div className={`mt-3 p-4 rounded-xl shadow-lg ${isBasicAdminPortalUser ? 'bg-slate-50 border border-sky-100 dark:bg-slate-900 dark:border-slate-800' : 'bg-gradient-to-br from-cyan-50 via-teal-50 to-emerald-50 dark:from-slate-800/50 dark:via-slate-700/50 dark:to-slate-800/50 border-2 border-cyan-200/60 dark:border-cyan-600/40'}`}>
             <div className="flex items-center space-x-2 mb-3">
-              <div className="p-1 bg-gradient-to-r from-cyan-100 to-teal-100 dark:from-cyan-800/80 dark:to-teal-800/80 rounded-full">
+              <div className={`${isBasicAdminPortalUser ? 'p-1 bg-white border border-sky-100 dark:bg-slate-800 dark:border-slate-700' : 'p-1 bg-gradient-to-r from-cyan-100 to-teal-100 dark:from-cyan-800/80 dark:to-teal-800/80'} rounded-full`}>
                 <Shield className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
               </div>
-              <span className="text-sm font-bold gradient-text-primary">
-                Admin Status
+              <span className={`text-sm font-bold ${isBasicAdminPortalUser ? 'text-slate-800 dark:text-slate-100' : 'gradient-text-primary'}`}>
+                {isBasicAdminPortalUser ? 'Basic Access' : 'Admin Status'}
               </span>
             </div>
             <div className="mb-3">
@@ -1191,17 +1216,19 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 {subscriptionStatus.planName ? `${subscriptionStatus.planName} Plan` : 'No Active Plan'} {subscriptionStatus.hasActiveSubscription ? 'Active' : 'Inactive'}
               </div>
               <div className="text-xs text-teal-600 dark:text-teal-400 mt-1">
-                {subscriptionStatus.hasActiveSubscription ? 'Admin dashboard access enabled' : 'Limited access until activation'}
+                {isBasicAdminPortalUser ? 'Profile and Work Area access enabled' : subscriptionStatus.hasActiveSubscription ? 'Admin dashboard access enabled' : 'Limited access until activation'}
               </div>
             </div>
-            <Button
-              size="sm"
-              className="w-full gradient-primary hover:opacity-90 text-white text-[10px] sm:text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center whitespace-nowrap px-2"
-              onClick={() => openAffiliatePortal()}
-            >
-              <Share2 className="h-3 w-3 mr-1 shrink-0" />
-              <span className="truncate">Go to Affiliate Pro Dashboard</span>
-            </Button>
+            {!isBasicAdminPortalUser && (
+              <Button
+                size="sm"
+                className="w-full gradient-primary hover:opacity-90 text-white text-[10px] sm:text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center whitespace-nowrap px-2"
+                onClick={() => openAffiliatePortal()}
+              >
+                <Share2 className="h-3 w-3 mr-1 shrink-0" />
+                <span className="truncate">Go to Affiliate Pro Dashboard</span>
+              </Button>
+            )}
           </div>
         )}
 
@@ -1243,14 +1270,14 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       </div>
       </div>
 
-      <div className={`border-t ${isEliteActive ? 'border-white/50' : 'border-border/40 dark:border-slate-700'} p-4`}>
+      <div className={`border-t ${isEliteActive ? 'border-white/50' : isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'} p-4`}>
         {!collapsed && (
-          <div className={`flex items-center space-x-3 p-2 rounded-xl transition-colors ${isEliteActive ? 'bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:shadow-sm' : 'hover:bg-gradient-soft'}`}>
+          <div className={`flex items-center space-x-3 p-2 rounded-xl transition-colors ${isEliteActive ? 'bg-slate-50 border border-slate-100 hover:bg-slate-100 hover:shadow-sm' : isBasicAdminPortalUser ? 'bg-slate-50 border border-sky-100 hover:bg-white dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800' : 'hover:bg-gradient-soft'}`}>
             <Avatar className="h-8 w-8">
               {userProfile?.avatar && (
                 <AvatarImage src={userProfile.avatar} alt="Profile" />
               )}
-              <AvatarFallback className={`text-white text-sm font-bold ${isEliteActive ? 'bg-gradient-to-br from-[#00d4ff] to-[#7000ff]' : 'gradient-primary'}`}>
+              <AvatarFallback className={`text-white text-sm font-bold ${isEliteActive ? 'bg-gradient-to-br from-[#00d4ff] to-[#7000ff]' : isBasicAdminPortalUser ? 'bg-slate-900 dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary'}`}>
                 {userProfile ? 
                   `${userProfile.first_name?.charAt(0) || ''}${userProfile.last_name?.charAt(0) || ''}` 
                   : 'U'
@@ -1307,7 +1334,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                     ? "text-ocean-blue"
                     : "text-slate-600 dark:text-slate-300";
                   return (
-                    <li key={item.pageKey ?? item.name} className="flex-none">
+                    <li key={('pageKey' in item ? item.pageKey : item.key) ?? item.name} className="flex-none">
                       <Link
                         to={disabled || hasCustomClick ? location.pathname : item.href}
                         onClick={disabled

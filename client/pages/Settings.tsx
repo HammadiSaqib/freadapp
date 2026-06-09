@@ -1,3 +1,5 @@
+import BasicSettings from "@/components/BasicSettings";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -2718,6 +2720,18 @@ export default function Settings() {
         </TabsContent>
       </Tabs>
   );
+
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <DashboardLayout>
+        <BasicSettings activeTab={activeTab} setActiveTab={setActiveTab}>
+          {settingsContent}
+        </BasicSettings>
+      </DashboardLayout>
+    );
+  }
 
   if (isEliteActive) {
     return (

@@ -43,15 +43,17 @@ import DashboardLayout from "@/components/DashboardLayout";
 import AddClientDialog from "@/components/AddClientDialog";
 import PaymentForm from "@/components/PaymentForm";
 import EliteSchool from "@/components/EliteSchool";
+import BasicSchool from "@/components/BasicSchool";
 import { CommunityFeed } from "@/components/community/CommunityFeed";
 import Groups from "@/components/community/Groups";
 import AdminCalendar from "@/components/AdminCalendar";
-import { authApi, User, coursesApi, Course, calendarApi, CalendarEvent, billingApi, schoolManagementApi, contractsApi } from "@/lib/api";
+import { authApi, User, coursesApi, calendarApi, billingApi, schoolManagementApi, contractsApi } from "@/lib/api";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 import {
   BookOpen,
   GraduationCap,
@@ -1054,7 +1056,13 @@ export default function School() {
                 : '/placeholder.png',
             isEnrolled: false,
             isCompleted: false,
-            featured: Boolean(course.featured)
+            featured: Boolean(course.featured),
+            price: course.price || 0,
+            isPaid: !course.is_free,
+            documents: course.documents || [],
+            hasQuiz: course.has_quiz || false,
+            quizCompleted: course.quiz_completed || false,
+            category: course.category || 'General',
           }));
           setCourses(transformedCourses);
         }
@@ -1232,7 +1240,7 @@ export default function School() {
           courseName: course.title,
           type: 'course_purchase'
         }
-      });
+      } as any);
 
       if (response.data?.clientSecret) {
         // Set payment data for the PaymentForm component
@@ -1364,12 +1372,12 @@ export default function School() {
       });
 
       // Download each document
-      for (const document of course.documents) {
+      for (const courseDocument of course.documents) {
         try {
           // Create a downloadable link for each document
           const link = document.createElement('a');
-          link.href = document.url;
-          link.download = document.name || `${course.title}_document_${document.id}`;
+          link.href = courseDocument.url;
+          link.download = courseDocument.title || `${course.title}_document_${courseDocument.id}`;
           link.target = '_blank';
           
           // Append to body, click, and remove
@@ -1380,7 +1388,7 @@ export default function School() {
           // Small delay between downloads to avoid browser blocking
           await new Promise(resolve => setTimeout(resolve, 500));
         } catch (docError) {
-          console.error(`Error downloading document ${document.name}:`, docError);
+          console.error(`Error downloading document ${courseDocument.title}:`, docError);
         }
       }
 
@@ -1648,10 +1656,10 @@ export default function School() {
       ) : currentUser ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <CommunityFeed currentUser={currentUser} />
+            <CommunityFeed currentUser={{ ...currentUser, role: currentUser.role || 'user' }} />
           </div>
           <div className="lg:col-span-1">
-            <Groups currentUser={currentUser} />
+            <Groups currentUser={{ ...currentUser, role: currentUser.role || 'user' }} />
           </div>
         </div>
       ) : (
@@ -2163,6 +2171,35 @@ export default function School() {
     </div>
   );
 
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <DashboardLayout
+        onAddClient={() => setIsCreateCourseOpen(true)}
+      >
+        <BasicSchool
+          courses={courses as any}
+          coursesLoading={coursesLoading}
+          enrolledCourses={enrolledCourses}
+          userStats={userStats}
+          leaderboard={leaderboard}
+          leaderboardLoading={leaderboardLoading}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          navigate={safeNavigate}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          communityTab={communityTabContent}
+          calendarTab={calendarTabContent}
+          mapsTab={mapsTabContent}
+          businessDirectoryTab={businessDirectoryTabContent}
+          aboutTab={aboutTabContent}
+        />
+      </DashboardLayout>
+    );
+  }
+
   if (isEliteActive) {
     return (
       <DashboardLayout
@@ -2171,7 +2208,7 @@ export default function School() {
         onAddClient={() => setShowAddClient(true)}
       >
         <EliteSchool
-          courses={courses}
+          courses={courses as any}
           coursesLoading={coursesLoading}
           enrolledCourses={enrolledCourses}
           userStats={userStats}
@@ -2221,12 +2258,12 @@ export default function School() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Community Feed - Takes up 2/3 of the space */}
               <div className="lg:col-span-2">
-                <CommunityFeed currentUser={currentUser} />
+                <CommunityFeed currentUser={{ ...currentUser, role: currentUser.role || 'user' }} />
               </div>
               
               {/* Groups Section - Takes up 1/3 of the space */}
               <div className="lg:col-span-1">
-                <Groups currentUser={currentUser} />
+                <Groups currentUser={{ ...currentUser, role: currentUser.role || 'user' }} />
               </div>
             </div>
           ) : (

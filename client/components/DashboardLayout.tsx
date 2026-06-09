@@ -21,6 +21,8 @@ import AdminNotifications from "./AdminNotifications";
 import ScoreMachineElitePrompt from "./ScoreMachineElitePrompt";
 import AddClientDialog from "./AddClientDialog";
 import { AnimatePresence, motion } from "framer-motion";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
+import BasicAdminLayout from "./BasicAdminLayout";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -51,6 +53,7 @@ export default function DashboardLayout({
   const [showEliteTransition, setShowEliteTransition] = useState(false);
   const [eliteTransitionPhase, setEliteTransitionPhase] = useState<'idle' | 'blackout' | 'dissolve' | 'flash' | 'logo' | 'particles' | 'reveal' | 'welcome' | 'done'>('idle');
   const [eliteZoomIn, setEliteZoomIn] = useState(false);
+  const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
 
   // Listen for live elite activation after agreement is signed.
   useEffect(() => {
@@ -166,9 +169,27 @@ export default function DashboardLayout({
     onAddClient();
   };
 
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <BasicAdminLayout onAddClient={userProfile?.role === 'admin' ? handleLayoutAddClient : undefined} title={title}>
+        {children}
+        <AddClientDialog
+          isOpen={isSharedAddClientOpen}
+          onClose={() => setIsSharedAddClientOpen(false)}
+        />
+      </BasicAdminLayout>
+    );
+  }
+
   return (
     <motion.div
-      className={`min-h-screen flex ${isEliteActive ? 'elite-theme' : 'bg-gradient-to-br from-slate-50 via-white to-slate-50/80 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900'}`}
+      className={`min-h-screen flex ${
+        isEliteActive
+          ? 'elite-theme'
+          : isBasicAdminPortalUser
+            ? 'bg-[linear-gradient(135deg,#f7fbff_0%,#eef7f3_52%,#f8fafc_100%)] dark:bg-slate-950'
+            : 'bg-gradient-to-br from-slate-50 via-white to-slate-50/80 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900'
+      }`}
       initial={false}
       animate={
         eliteZoomIn
@@ -204,7 +225,13 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 lg:ml-64">
         {/* Top header */}
-        <header className={`sticky top-0 z-30 ${isEliteActive ? 'elite-navbar' : 'bg-slate-50 dark:bg-slate-800/50/80 dark:bg-slate-800/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-border/40'}`}>
+        <header className={`sticky top-0 z-30 ${
+          isEliteActive
+            ? 'elite-navbar'
+            : isBasicAdminPortalUser
+              ? 'bg-white/88 dark:bg-slate-950/88 backdrop-blur-xl border-b border-sky-100/80 dark:border-slate-800 shadow-sm shadow-sky-100/60 dark:shadow-none'
+              : 'bg-slate-50 dark:bg-slate-800/50/80 dark:bg-slate-800/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-border/40'
+        }`}>
           {isEliteActive && <div className="elite-neon-line-thick w-full" />}
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 sm:px-6">
             <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -218,11 +245,17 @@ export default function DashboardLayout({
               </Button>
               {title && (
                 <div>
-                  <h1 className={`text-base sm:text-xl font-semibold truncate ${isEliteActive ? 'elite-gradient-text' : 'gradient-text-primary'}`}>
+                  <h1 className={`text-base sm:text-xl font-semibold truncate ${
+                    isEliteActive
+                      ? 'elite-gradient-text'
+                      : isBasicAdminPortalUser
+                        ? 'text-slate-900 dark:text-slate-100'
+                        : 'gradient-text-primary'
+                  }`}>
                     {title}
                   </h1>
                   {description && (
-                    <p className="hidden sm:block text-sm text-muted-foreground">
+                    <p className={`hidden sm:block text-sm ${isBasicAdminPortalUser ? 'text-slate-500 dark:text-slate-400' : 'text-muted-foreground'}`}>
                       {description}
                     </p>
                   )}
@@ -268,11 +301,19 @@ export default function DashboardLayout({
 
               {/* Search */}
               <div className="hidden md:block relative">
-                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isEliteActive ? 'text-cyan-500' : 'text-muted-foreground'}`} />
+                <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${
+                  isEliteActive ? 'text-cyan-500' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-muted-foreground'
+                }`} />
                 <input
                   type="text"
                   placeholder="Search anything..."
-                  className={isEliteActive ? 'elite-navbar-search pl-10 pr-4 py-2 w-80 text-sm focus:outline-none' : 'pl-10 pr-4 py-2 w-80 text-sm border border-border/40 rounded-lg bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'}
+                  className={
+                    isEliteActive
+                      ? 'elite-navbar-search pl-10 pr-4 py-2 w-80 text-sm focus:outline-none'
+                      : isBasicAdminPortalUser
+                        ? 'pl-10 pr-4 py-2 w-72 text-sm border border-sky-100 rounded-lg bg-white/85 text-slate-700 placeholder:text-slate-400 shadow-inner shadow-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:shadow-none'
+                        : 'pl-10 pr-4 py-2 w-80 text-sm border border-border/40 rounded-lg bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'
+                  }
                 />
               </div>
 
@@ -288,7 +329,7 @@ export default function DashboardLayout({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={isEliteActive ? 'elite-navbar-btn' : 'hover:bg-gradient-soft text-slate-700 dark:text-slate-300 dark:text-slate-200 hover:text-slate-900 dark:text-white dark:hover:text-white'}
+                    className={isEliteActive ? 'elite-navbar-btn' : isBasicAdminPortalUser ? 'hover:bg-sky-50 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' : 'hover:bg-gradient-soft text-slate-700 dark:text-slate-300 dark:text-slate-200 hover:text-slate-900 dark:text-white dark:hover:text-white'}
                   >
                     {theme === "light" ? (
                       <Sun className="h-4 w-4" />
@@ -322,9 +363,9 @@ export default function DashboardLayout({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`sm:hidden ${isEliteActive ? 'elite-navbar-btn' : 'hover:bg-gradient-soft'}`}
+                    className={`sm:hidden ${isEliteActive ? 'elite-navbar-btn' : isBasicAdminPortalUser ? 'hover:bg-sky-50 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800' : 'hover:bg-gradient-soft'}`}
                     onClick={handleLayoutAddClient}
-                    aria-label="Add New Client"
+                    aria-label={isBasicAdminPortalUser ? "Add Report" : "Add New Client"}
                   >
                     <UserPlus className="h-4 w-4" />
                   </Button>
@@ -333,17 +374,17 @@ export default function DashboardLayout({
                   <Button
                     variant="default"
                     size="sm"
-                    className={`hidden sm:inline-flex ${isEliteActive ? 'elite-navbar-add-btn' : 'gradient-primary hover:opacity-90'}`}
+                    className={`hidden sm:inline-flex ${isEliteActive ? 'elite-navbar-add-btn' : isBasicAdminPortalUser ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-sm shadow-slate-200 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400 dark:shadow-none' : 'gradient-primary hover:opacity-90'}`}
                     onClick={handleLayoutAddClient}
                   >
                     <UserPlus className="h-4 w-4 mr-2" />
-                    {isEliteActive ? 'Add to CRM' : 'Add New Client'}
+                    {isEliteActive ? 'Add to CRM' : isBasicAdminPortalUser ? 'Add Report' : 'Add New Client'}
                   </Button>
                 </>
               )}
 
               {/* Upgrade to Pro - Crown Hover Card */}
-              {!hasActiveSubscription && (
+              {!hasActiveSubscription && !isBasicAdminPortalUser && (
                 <HoverCard>
                   <HoverCardTrigger asChild>
                     <Button
@@ -386,7 +427,7 @@ export default function DashboardLayout({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={isEliteActive ? 'elite-navbar-btn' : 'hover:bg-gradient-soft text-slate-700 dark:text-slate-300 dark:text-slate-200 hover:text-slate-900 dark:text-white dark:hover:text-white'}
+                    className={isEliteActive ? 'elite-navbar-btn' : isBasicAdminPortalUser ? 'hover:bg-sky-50 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white' : 'hover:bg-gradient-soft text-slate-700 dark:text-slate-300 dark:text-slate-200 hover:text-slate-900 dark:text-white dark:hover:text-white'}
                   >
                     <Settings className="h-4 w-4" />
                   </Button>
@@ -407,7 +448,7 @@ export default function DashboardLayout({
               </DropdownMenu>
 
               {/* User menu */}
-              <div className={`flex items-center space-x-3 pl-3 ${isEliteActive ? 'elite-user-divider' : 'border-l border-border/40'}`}>
+              <div className={`flex items-center space-x-3 pl-3 ${isEliteActive ? 'elite-user-divider' : isBasicAdminPortalUser ? 'border-l border-sky-100 dark:border-slate-800' : 'border-l border-border/40'}`}>
                 <div className="text-right hidden sm:block">
                   <div className={`text-sm font-medium ${isEliteActive ? 'text-slate-800 dark:text-slate-100' : ''}`}>
                     {userProfile ?
@@ -415,8 +456,8 @@ export default function DashboardLayout({
                       'Loading...'
                     }
                   </div>
-                  <div className={`text-xs ${isEliteActive ? 'elite-gradient-text font-semibold' : 'text-muted-foreground'}`}>
-                    {isEliteActive ? 'Elite Account' : (userProfile?.role === 'admin' ? 'Admin Account' : 'Pro Account')}
+                  <div className={`text-xs ${isEliteActive ? 'elite-gradient-text font-semibold' : isBasicAdminPortalUser ? 'font-medium text-sky-600 dark:text-sky-300' : 'text-muted-foreground'}`}>
+                    {isEliteActive ? 'Elite Account' : isBasicAdminPortalUser ? 'Basic Access' : (userProfile?.role === 'admin' ? 'Admin Account' : 'Pro Account')}
                   </div>
                 </div>
                 <div className={isEliteActive ? 'elite-avatar-ring' : ''}>
@@ -424,7 +465,7 @@ export default function DashboardLayout({
                     {userProfile?.avatar && (
                       <AvatarImage src={userProfile.avatar} alt="Profile" />
                     )}
-                    <AvatarFallback className={isEliteActive ? 'bg-gradient-to-br from-cyan-500 to-violet-600 text-white' : 'gradient-primary text-white'}>
+                    <AvatarFallback className={isEliteActive ? 'bg-gradient-to-br from-cyan-500 to-violet-600 text-white' : isBasicAdminPortalUser ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary text-white'}>
                       {userProfile ?
                         `${userProfile.first_name?.[0] || ''}${userProfile.last_name?.[0] || ''}` :
                         'U'
@@ -438,7 +479,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className={`flex-1 p-6 overflow-auto ${isEliteActive ? 'elite-page-bg' : ''}`}>{children}</main>
+        <main className={`flex-1 overflow-auto ${isEliteActive ? 'elite-page-bg p-6' : isBasicAdminPortalUser ? 'p-4 sm:p-6' : 'p-6'}`}>{children}</main>
       </div>
 
       {/* Score Machine Elite agreement prompt (moved from sidebar) */}

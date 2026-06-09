@@ -1,3 +1,5 @@
+import BasicInvoices from "@/components/BasicInvoices";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 import React, { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -277,6 +279,19 @@ export default function Invoices() {
         </CardContent>
       </Card>
   );
+
+  const { userProfile } = useAuthContext();
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return (
+      <DashboardLayout>
+        <BasicInvoices>
+          {invoiceContent}
+        </BasicInvoices>
+      </DashboardLayout>
+    );
+  }
 
   if (isEliteActive) {
     return (

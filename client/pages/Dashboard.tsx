@@ -100,6 +100,8 @@ import RestrictedFeature from "@/components/RestrictedFeature";
 import AdminCalendar from "@/components/AdminCalendar";
 import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 import AdminContractPrompt from "@/components/AdminContractPrompt";
+import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
+import { getRememberedBasicAdminClientId } from "@/lib/basicAdminReportPull";
 
 type DashboardStats = {
   totalClients: number;
@@ -299,6 +301,7 @@ export default function Dashboard() {
   const { isEliteActive } = useScoreMachineEliteStatus();
 
   const isSuperAdminUser = userProfile?.role === "super_admin";
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
   const showEliteDashboard = isSuperAdminUser || isEliteActive;
   const shouldAnimateEliteDashboardOnMount = dashboardOverviewCacheKey
     ? !eliteDashboardOverviewAnimatedUsers.has(dashboardOverviewCacheKey)
@@ -349,6 +352,24 @@ export default function Dashboard() {
     : "Scan the code below, open the registration page, or download the QR image to share it.";
   const qrModalAlt = qrModalType === "referral" ? "Referral link QR code" : "Credit report registration QR code";
   const qrLogoPath = "/image.png";
+  const basicDashboardClient = useMemo(() => {
+    if (!isBasicAdminPortalUser) {
+      return null;
+    }
+
+    const rememberedClientId = getRememberedBasicAdminClientId();
+    const matchedClient = rememberedClientId
+      ? clients.find((client) => String(client.id) === rememberedClientId)
+      : null;
+
+    return matchedClient || clients[0] || null;
+  }, [clients, isBasicAdminPortalUser]);
+  const basicProfileHref = basicDashboardClient
+    ? `/clients/${basicDashboardClient.id}?tab=info`
+    : "/clients";
+  const basicWorkAreaHref = basicDashboardClient
+    ? `/credit-report/${basicDashboardClient.id}?tab=overview`
+    : "/credit-report";
 
   useEffect(() => {
     if (authLoading || isDashboardOverviewCached) {
@@ -1496,8 +1517,8 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout
-      title="Dashboard Overview"
-      description="Monitor your funding business performance and client progress"
+      title={isBasicAdminPortalUser ? "Basic Dashboard" : "Dashboard Overview"}
+      description={isBasicAdminPortalUser ? "Profile, report, and Work Area" : "Monitor your funding business performance and client progress"}
       onAddClient={handleAddClient}
     >
       <Dialog open={showPhoneDialog} onOpenChange={(open) => {
@@ -1555,7 +1576,178 @@ export default function Dashboard() {
       )}
 
       {/* ── Elite Dashboard (Score Machine Elite + Agreement Signed) ── */}
-      {showEliteDashboard ? (
+      {isBasicAdminPortalUser ? (
+        <div className="space-y-6">
+          <section className="overflow-hidden rounded-lg border border-sky-100 bg-white shadow-sm shadow-sky-100/70 dark:border-slate-800 dark:bg-slate-950 dark:shadow-none">
+            <div className="flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl space-y-3">
+                <Badge className="border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
+                  Score Machine Basic
+                </Badge>
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-3xl">
+                    Welcome back{userProfile?.first_name ? `, ${userProfile.first_name}` : ""}
+                  </h2>
+                  <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
+                    Profile, report review, and Work Area are ready in one place.
+                  </p>
+                </div>
+              </div>
+              <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[360px]">
+                <Button
+                  onClick={() => navigate(basicProfileHref)}
+                  className="h-12 justify-start bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Open Profile
+                </Button>
+                <Button
+                  onClick={() => navigate(basicWorkAreaHref)}
+                  variant="outline"
+                  className="h-12 justify-start border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Open Work Area
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Profile</CardTitle>
+                <Users className="h-4 w-4 text-sky-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                  {loading ? "--" : (basicDashboardClient ? "Ready" : "Add")}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {basicDashboardClient ? basicDashboardClient.name : "Create your first profile"}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Report Pulls</CardTitle>
+                <FileText className="h-4 w-4 text-emerald-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                  {loading ? "--" : (stats.reportPulls || 0).toLocaleString()}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">This month</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Funding Status</CardTitle>
+                <Target className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                  {loading ? "--" : `${stats.fundable || 0}/${stats.notFundable || 0}`}
+                </div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Fundable / not fundable</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Access</CardTitle>
+                <CheckCircle className="h-4 w-4 text-sky-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold text-slate-950 dark:text-white">Basic</div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Profile and Work Area</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,0.8fr)]">
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader>
+                <CardTitle className="text-slate-950 dark:text-white">Your Current Profile</CardTitle>
+                <CardDescription>Continue from the most recent client/report you added.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-3">
+                    <div className="h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-4 w-64 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                    <div className="h-10 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                  </div>
+                ) : basicDashboardClient ? (
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950">
+                          {basicDashboardClient.name
+                            .split(" ")
+                            .filter(Boolean)
+                            .map((namePart) => namePart[0])
+                            .join("")
+                            .slice(0, 2) || "SM"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="truncate text-base font-semibold text-slate-950 dark:text-white">{basicDashboardClient.name}</div>
+                        <div className="truncate text-sm text-slate-500 dark:text-slate-400">{basicDashboardClient.email}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                        <Eye className="mr-2 h-4 w-4" />
+                        Profile
+                      </Button>
+                      <Button onClick={() => navigate(basicWorkAreaHref)} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
+                        <BarChart3 className="mr-2 h-4 w-4" />
+                        Work Area
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-sky-200 bg-sky-50/70 p-5 text-center dark:border-sky-900 dark:bg-slate-900">
+                    <UserPlus className="mx-auto h-8 w-8 text-sky-500" />
+                    <h3 className="mt-3 text-base font-semibold text-slate-950 dark:text-white">Add your first report</h3>
+                    <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
+                      Profile and Work Area appear after the first report is added.
+                    </p>
+                    <Button onClick={handleAddClient} className="mt-4 bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Report
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader>
+                <CardTitle className="text-slate-950 dark:text-white">Next Steps</CardTitle>
+                <CardDescription>Profile, report, and settings shortcuts.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <Users className="mr-2 h-4 w-4" />
+                  Review profile details
+                </Button>
+                <Button onClick={() => navigate(basicWorkAreaHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Review credit report
+                </Button>
+                <Button onClick={handleAddClient} className="h-11 w-full justify-start bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add or re-pull report
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      ) : showEliteDashboard ? (
         <EliteDashboard
           stats={stats}
           clients={clients}
