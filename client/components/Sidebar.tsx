@@ -17,8 +17,11 @@ import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import {
   BASIC_ADMIN_CLIENT_CHANGED_EVENT,
   getRememberedBasicAdminClientId,
+  getRememberedBasicAdminLastPulledClientId,
   hasReadyReportPullCredentials,
+  hasStoredClientReport,
   rememberBasicAdminClientId,
+  rememberBasicAdminLastPulledClientId,
   saveAndPullClientReport,
 } from "@/lib/basicAdminReportPull";
 import {
@@ -76,6 +79,16 @@ interface BasicAdminSidebarSection {
   items: BasicAdminSidebarItem[];
 }
 
+interface BasicAdminSidebarClientRecord {
+  id: string;
+  name: string;
+  latestJsonData?: unknown;
+  platform?: string | null;
+  platform_email?: string | null;
+  platform_password?: string | null;
+  ssn_last_four?: string | null;
+}
+
 const normalizeSidebarBooleanParam = (value: string | null) => {
   const normalized = String(value || "").trim().toLowerCase();
   return normalized === "1" || normalized === "true" || normalized === "yes";
@@ -108,14 +121,8 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const [reportCount, setReportCount] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [basicAdminClientRefreshNonce, setBasicAdminClientRefreshNonce] = useState(0);
-  const [basicAdminPrimaryClient, setBasicAdminPrimaryClient] = useState<{
-    id: string;
-    name: string;
-    platform?: string | null;
-    platform_email?: string | null;
-    platform_password?: string | null;
-    ssn_last_four?: string | null;
-  } | null>(null);
+  const [basicAdminPrimaryClient, setBasicAdminPrimaryClient] = useState<BasicAdminSidebarClientRecord | null>(null);
+  const [basicAdminRepullClient, setBasicAdminRepullClient] = useState<BasicAdminSidebarClientRecord | null>(null);
   const [basicAdminExpandedSections, setBasicAdminExpandedSections] = useState({
     clients: true,
     workArea: true,
@@ -405,18 +412,6 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         pageKey: 'credit-report',
         tab: 'debtConsolidation',
       },
-      {
-        name: 'Funding Audit Options',
-        href: buildSidebarTabHref(creditReportPath, 'funding'),
-        pageKey: 'credit-report',
-        tab: 'funding',
-      },
-      {
-        name: 'Funding Apply',
-        href: buildSidebarTabHref(creditReportPath, 'fundingApplications'),
-        pageKey: 'credit-report',
-        tab: 'fundingApplications',
-      },
     ];
   }, [basicAdminPrimaryClient?.id]);
 
@@ -514,6 +509,19 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   // Fetch client count
   useEffect(() => {
     const fetchClientCount = async () => {
+      const mapClientSummary = (client: any): BasicAdminSidebarClientRecord => ({
+        id: String(client.id),
+        name: [client.first_name, client.last_name]
+          .filter(Boolean)
+          .join(' ')
+          .trim() || String(client.name || 'Client'),
+        latestJsonData: client.latestJsonData,
+        platform: client.platform,
+        platform_email: client.platform_email,
+        platform_password: client.platform_password,
+        ssn_last_four: client.ssn_last_four,
+      });
+
       try {
         const response = await clientsApi.getClients({ limit: 1 });
         const payload = response.data;
@@ -531,6 +539,9 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         const preferredClientId = isBasicAdminPortalUser
           ? basicAdminRouteClientId || getRememberedBasicAdminClientId()
           : null;
+        const lastPulledClientId = isBasicAdminPortalUser
+          ? getRememberedBasicAdminLastPulledClientId()
+          : null;
 
         let primaryClient = clients[0];
 
@@ -546,29 +557,47 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         }
 
         if (primaryClient?.id !== undefined && primaryClient?.id !== null) {
-          const primaryClientName = [primaryClient.first_name, primaryClient.last_name]
-            .filter(Boolean)
-            .join(' ')
-            .trim() || String(primaryClient.name || 'Client');
+          const primaryClientRecord = mapClientSummary(primaryClient);
+
+          let repullClientRecord: BasicAdminSidebarClientRecord | null = null;
+
+          if (lastPulledClientId) {
+            if (primaryClientRecord.id === String(lastPulledClientId)) {
+              repullClientRecord = primaryClientRecord;
+            } else {
+              try {
+                const lastPulledClientResponse = await clientsApi.getClient(lastPulledClientId);
+                if (lastPulledClientResponse?.data?.id !== undefined && lastPulledClientResponse?.data?.id !== null) {
+                  repullClientRecord = mapClientSummary(lastPulledClientResponse.data);
+                }
+              } catch (lastPulledClientError) {
+                console.warn("Error fetching last pulled basic admin client:", lastPulledClientError);
+              }
+            }
+          }
+
+          if (!repullClientRecord && hasStoredClientReport(primaryClientRecord)) {
+            repullClientRecord = primaryClientRecord;
+          }
 
           if (isBasicAdminPortalUser) {
             rememberBasicAdminClientId(primaryClient.id);
+
+            if (!lastPulledClientId && repullClientRecord?.id) {
+              rememberBasicAdminLastPulledClientId(repullClientRecord.id);
+            }
           }
 
-          setBasicAdminPrimaryClient({
-            id: String(primaryClient.id),
-            name: primaryClientName,
-            platform: primaryClient.platform,
-            platform_email: primaryClient.platform_email,
-            platform_password: primaryClient.platform_password,
-            ssn_last_four: primaryClient.ssn_last_four,
-          });
+          setBasicAdminPrimaryClient(primaryClientRecord);
+          setBasicAdminRepullClient(repullClientRecord);
         } else {
           setBasicAdminPrimaryClient(null);
+          setBasicAdminRepullClient(null);
         }
       } catch (error) {
         console.error("Error fetching client count:", error);
         setBasicAdminPrimaryClient(null);
+        setBasicAdminRepullClient(null);
       }
     };
 
@@ -576,6 +605,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       fetchClientCount();
     } else {
       setBasicAdminPrimaryClient(null);
+      setBasicAdminRepullClient(null);
     }
   }, [basicAdminClientRefreshNonce, basicAdminRouteClientId, isBasicAdminPortalUser, userProfile]);
 
@@ -873,14 +903,14 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   };
 
   const handleBasicAdminRepull = async () => {
-    if (!basicAdminPrimaryClient?.id) {
+    if (!basicAdminRepullClient?.id) {
       return;
     }
 
-    const profileHref = buildSidebarTabHref(`/clients/${basicAdminPrimaryClient.id}`, 'info');
-    rememberBasicAdminClientId(basicAdminPrimaryClient.id);
+    const profileHref = buildSidebarTabHref(`/clients/${basicAdminRepullClient.id}`, 'info');
+    rememberBasicAdminClientId(basicAdminRepullClient.id);
 
-    if (!hasReadyReportPullCredentials(basicAdminPrimaryClient)) {
+    if (!hasReadyReportPullCredentials(basicAdminRepullClient)) {
       navigate(`${profileHref}&reportPullPrompt=true`);
       return;
     }
@@ -889,11 +919,11 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       setBasicAdminRepullLoading(true);
 
       await saveAndPullClientReport({
-        clientId: basicAdminPrimaryClient.id,
-        platform: String(basicAdminPrimaryClient.platform || ''),
-        platformEmail: String(basicAdminPrimaryClient.platform_email || ''),
-        platformPassword: String(basicAdminPrimaryClient.platform_password || ''),
-        ssnLast4: basicAdminPrimaryClient.ssn_last_four,
+        clientId: basicAdminRepullClient.id,
+        platform: String(basicAdminRepullClient.platform || ''),
+        platformEmail: String(basicAdminRepullClient.platform_email || ''),
+        platformPassword: String(basicAdminRepullClient.platform_password || ''),
+        ssnLast4: basicAdminRepullClient.ssn_last_four,
       });
 
       toast({
@@ -917,6 +947,8 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       setBasicAdminRepullLoading(false);
     }
   };
+
+  const shouldShowBasicAdminRepullAction = Boolean(basicAdminRepullClient?.id);
 
   return (
     <>
@@ -1099,31 +1131,33 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         )}
 
         {/* Quick Actions */}
-        {!collapsed && (
+        {!collapsed && (!isBasicAdminPortalUser || shouldShowBasicAdminRepullAction) && (
           <div className="pt-6">
             <h4 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${isEliteActive ? 'text-slate-400' : isBasicAdminPortalUser ? 'text-slate-500 dark:text-slate-400' : 'text-slate-600 dark:text-slate-400'}`}>
               Quick Actions
             </h4>
             <div className="space-y-2">
               {isBasicAdminPortalUser ? (
-                <Button
-                  onClick={basicAdminPrimaryClient?.id ? handleBasicAdminRepull : undefined}
-                  variant="outline"
-                  size="sm"
-                  disabled={!basicAdminPrimaryClient?.id || !hasPermission('credit-report') || basicAdminRepullLoading}
-                  className={`w-full justify-start relative group ${
-                    !basicAdminPrimaryClient?.id || !hasPermission('credit-report') || basicAdminRepullLoading
-                      ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
-                      : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  {basicAdminRepullLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Target className="h-4 w-4 mr-2" />
-                  )}
-                  {basicAdminRepullLoading ? 'Re Pulling Your Report...' : 'Re Pull Your Report'}
-                </Button>
+                shouldShowBasicAdminRepullAction ? (
+                  <Button
+                    onClick={handleBasicAdminRepull}
+                    variant="outline"
+                    size="sm"
+                    disabled={!hasPermission('credit-report') || basicAdminRepullLoading}
+                    className={`w-full justify-start relative group ${
+                      !hasPermission('credit-report') || basicAdminRepullLoading
+                        ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
+                        : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
+                    }`}
+                  >
+                    {basicAdminRepullLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Target className="h-4 w-4 mr-2" />
+                    )}
+                    {basicAdminRepullLoading ? 'Re Pulling Your Report...' : 'Re Pull Your Report'}
+                  </Button>
+                ) : null
               ) : (
                 <Button
                   onClick={hasPermission('clients') ? (onAddClient || (() => navigate("/clients"))) : undefined}

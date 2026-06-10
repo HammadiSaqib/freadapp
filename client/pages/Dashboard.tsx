@@ -101,7 +101,11 @@ import AdminCalendar from "@/components/AdminCalendar";
 import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 import AdminContractPrompt from "@/components/AdminContractPrompt";
 import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
-import { getRememberedBasicAdminClientId } from "@/lib/basicAdminReportPull";
+import {
+  getRememberedBasicAdminClientId,
+  rememberBasicAdminClientId,
+  rememberBasicAdminLastPulledClientId,
+} from "@/lib/basicAdminReportPull";
 
 type DashboardStats = {
   totalClients: number;
@@ -1464,6 +1468,11 @@ export default function Dashboard() {
       const clientId = responseData?.id;
       const clientName = `${firstName} ${lastName}`;
       if (clientId) {
+        if (isBasicAdminPortalUser) {
+          rememberBasicAdminClientId(clientId);
+          rememberBasicAdminLastPulledClientId(clientId);
+        }
+
         if (subscriptionStatus.hasActiveSubscription) {
           navigate(`/credit-report?clientId=${clientId}&clientName=${encodeURIComponent(clientName)}`);
         } else {

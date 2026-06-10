@@ -17,6 +17,7 @@ interface ResolveAdminPortalTargetOptions {
 
 const LOCAL_BASIC_PORT = "3000";
 const LOCAL_PRIMARY_PORT = "3001";
+const BASIC_ADMIN_PRODUCTION_HOSTS = new Set(["admin.tsmbasic.com"]);
 
 const normalizePath = (pathname: string) => {
   if (!pathname) {
@@ -103,6 +104,20 @@ export const resolveAdminPortalTarget = (
 
 export const isAdminPrimaryPortalHost = (hostname: string, port: string) => {
   return getHostAlias(hostname) === "admin" && isLocalPortalEnvironment(hostname) && port === LOCAL_PRIMARY_PORT;
+};
+
+export const isBasicAdminPortalHost = (hostname: string, port: string) => {
+  const normalizedHostname = hostname.toLowerCase();
+
+  if (getHostAlias(normalizedHostname) !== "admin") {
+    return false;
+  }
+
+  if (isLocalPortalEnvironment(normalizedHostname)) {
+    return port === LOCAL_BASIC_PORT;
+  }
+
+  return BASIC_ADMIN_PRODUCTION_HOSTS.has(normalizedHostname);
 };
 
 export const buildBasicAdminSubscriptionUrl = (options?: ResolveAdminPortalTargetOptions) => {

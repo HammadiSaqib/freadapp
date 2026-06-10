@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authApi, setAuthToken } from "@/lib/api";
 import { clearPortalReturnContext } from "@/lib/authStorage";
 import { usePortalLoginRedirect } from "@/hooks/usePortalLoginRedirect";
-import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
+import { isBasicAdminPortalHost, resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import BasicLogin from "@/components/BasicLogin";
@@ -826,7 +826,7 @@ export default function Login() {
     },
   ];
 
-  if (window.location.port === "3000") {
+  if (isBasicAdminPortalHost(window.location.hostname, window.location.port)) {
     return (
       <BasicLogin
         loginData={loginData}

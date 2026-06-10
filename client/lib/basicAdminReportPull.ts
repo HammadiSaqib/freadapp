@@ -25,7 +25,35 @@ export interface SaveAndPullClientReportInput {
 }
 
 const BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY = "sm_basic_admin_last_client_id";
+const BASIC_ADMIN_LAST_PULLED_CLIENT_STORAGE_KEY = "sm_basic_admin_last_pulled_client_id";
 export const BASIC_ADMIN_CLIENT_CHANGED_EVENT = "sm-basic-admin-client-changed";
+
+function getStoredBasicAdminClientId(storageKey: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const value = String(window.localStorage.getItem(storageKey) || "").trim();
+  return value || null;
+}
+
+function setStoredBasicAdminClientId(
+  storageKey: string,
+  clientId: string | number | null | undefined,
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const normalizedClientId = String(clientId ?? "").trim();
+
+  if (!normalizedClientId) {
+    window.localStorage.removeItem(storageKey);
+    return;
+  }
+
+  window.localStorage.setItem(storageKey, normalizedClientId);
+}
 
 export function normalizeBasicAdminBooleanParam(value: string | null | undefined) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -42,27 +70,19 @@ export function hasStoredClientReport(client: BasicAdminReportPullClient | null 
 }
 
 export function getRememberedBasicAdminClientId() {
-  if (typeof window === "undefined") {
-    return null;
-  }
+  return getStoredBasicAdminClientId(BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY);
+}
 
-  const value = String(window.localStorage.getItem(BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY) || "").trim();
-  return value || null;
+export function getRememberedBasicAdminLastPulledClientId() {
+  return getStoredBasicAdminClientId(BASIC_ADMIN_LAST_PULLED_CLIENT_STORAGE_KEY);
 }
 
 export function rememberBasicAdminClientId(clientId: string | number | null | undefined) {
-  if (typeof window === "undefined") {
-    return;
-  }
+  setStoredBasicAdminClientId(BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY, clientId);
+}
 
-  const normalizedClientId = String(clientId ?? "").trim();
-
-  if (!normalizedClientId) {
-    window.localStorage.removeItem(BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY);
-    return;
-  }
-
-  window.localStorage.setItem(BASIC_ADMIN_LAST_CLIENT_STORAGE_KEY, normalizedClientId);
+export function rememberBasicAdminLastPulledClientId(clientId: string | number | null | undefined) {
+  setStoredBasicAdminClientId(BASIC_ADMIN_LAST_PULLED_CLIENT_STORAGE_KEY, clientId);
 }
 
 export function notifyBasicAdminClientChanged(clientId: string | number | null | undefined) {
@@ -134,6 +154,9 @@ export async function saveAndPullClientReport(input: SaveAndPullClientReportInpu
     showReportPullError();
     throw new Error((response as any).data.error);
   }
+
+  rememberBasicAdminClientId(input.clientId);
+  rememberBasicAdminLastPulledClientId(input.clientId);
 
   return response;
 }
