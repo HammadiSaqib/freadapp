@@ -20,6 +20,7 @@ import { usePortalLoginRedirect } from "@/hooks/usePortalLoginRedirect";
 import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import BasicLogin from "@/components/BasicLogin";
 import {
   CreditCard,
   Mail,
@@ -824,6 +825,32 @@ export default function Login() {
       rating: 5,
     },
   ];
+
+  if (window.location.port === "3000") {
+    return (
+      <BasicLogin
+        loginData={loginData}
+        setLoginData={setLoginData}
+        signupData={signupData}
+        setSignupData={setSignupData}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+        isLoading={isLoading}
+        isGoogleLoading={isGoogleLoading}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        handleLogin={handleLogin}
+        handleSignup={handleSignup}
+        setShowForgotPassword={setShowForgotPassword}
+        setForgotPasswordData={setForgotPasswordData}
+        googleButtonRef={googleButtonRef}
+        showVerification={showVerification}
+        verificationData={verificationData}
+        setVerificationData={setVerificationData}
+        handleVerification={handleVerification}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 dark:from-slate-900 dark:via-slate-800/95 dark:to-slate-900 relative overflow-hidden">
