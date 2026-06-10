@@ -44,11 +44,11 @@ const Terms: React.FC = () => {
                 
                 <h3 className="text-xl font-semibold text-slate-800 mt-6">Core Agreement</h3>
                 <p className="text-slate-600 leading-relaxed">
-                  Welcome to The Score Machine! This Terms and Conditions of Service document (the "Agreement") is a legally binding contract between you, the User (individual or entity), and ADR Wealth Advisors LLC, doing business as The Score Machine (the "Company"). By clicking "I Accept," checking an acknowledgment box, signing, or otherwise accessing or using the Score Machine software platform or Services, you agree to be legally bound by all terms and conditions of this Agreement.
+                  Welcome to Fread App! This Terms and Conditions of Service document (the "Agreement") is a legally binding contract between you, the User (individual or entity), and ADR Wealth Advisors LLC, doing business as Fread App (the "Company"). By clicking "I Accept," checking an acknowledgment box, signing, or otherwise accessing or using the Fread App software platform or Services, you agree to be legally bound by all terms and conditions of this Agreement.
                 </p>
 
                 <p className="text-slate-600 leading-relaxed">
-                  Your access and use of the Score Machine software platform (the "Platform") and all associated features, modules, reports, and consultation services (the "Services") are strictly governed by this Agreement. You represent that you have read, understand, and agree to all its provisions. If you are accepting on behalf of an entity, you warrant that you have full authority to bind that entity.
+                  Your access and use of the Fread App software platform (the "Platform") and all associated features, modules, reports, and consultation services (the "Services") are strictly governed by this Agreement. You represent that you have read, understand, and agree to all its provisions. If you are accepting on behalf of an entity, you warrant that you have full authority to bind that entity.
                 </p>
 
                 <h3 className="text-xl font-semibold text-slate-800 mt-6">Nature of the Platform</h3>

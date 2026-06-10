@@ -106,7 +106,7 @@ const Footer: React.FC = () => {
                 <Shield className="h-6 w-6" />
               </div>
               <span className="text-xl font-black text-white tracking-tight">
-                Score Machine
+                Fread App
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed text-sm max-w-xs">
@@ -230,7 +230,7 @@ const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-300">
-          <p>© {currentYear} Score Machine. All rights reserved.</p>
+          <p>© {currentYear} Fread App. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/privacy" className="hover:text-teal-400 transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-teal-400 transition-colors">Terms</Link>

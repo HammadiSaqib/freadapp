@@ -72,7 +72,7 @@ const UpdateScreen = () => {
               System Update in Progress
             </h2>
             <p className="text-slate-600 text-lg mb-8 leading-relaxed">
-              The Score Machine just got some fresh updates! We're preparing your workspace with the latest features and improvements.
+              Fread App just got some fresh updates! We're preparing your workspace with the latest features and improvements.
             </p>
 
             <div className="w-full bg-slate-100 rounded-full h-3 mb-4 overflow-hidden relative">

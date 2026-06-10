@@ -82,7 +82,7 @@ export default function CarLoanCalculator() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Helmet>
-        <title>Car Loan Calculator | Score Machine</title>
+        <title>Car Loan Calculator | Fread App</title>
         <meta
           name="description"
           content="Estimate car loan amount and monthly payment including sales tax and fees."

@@ -18,9 +18,9 @@ export default function SiteHeader() {
     <header className="relative z-50 border-b bg-white/95 backdrop-blur-sm sticky top-0">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <img src="/image.png" alt="Score Machine" className="w-20 h-14" width="80" height="56" decoding="async" fetchpriority="high" />
+          <img src="/company-logo.svg" alt="Fread App" className="w-20 h-14" width="80" height="56" decoding="async" fetchpriority="high" />
           <span className="text-2xl font-bold bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent">
-            Score Machine
+            Fread App
           </span>
         </div>
         {/* Desktop Navigation */}

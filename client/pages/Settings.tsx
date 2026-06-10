@@ -576,10 +576,10 @@ export default function Settings() {
       try {
         return URL.createObjectURL(fundingSettings.gatewayLogoFile);
       } catch {
-        return (userProfile as any)?.nmi_gateway_logo || "/image.png";
+        return (userProfile as any)?.nmi_gateway_logo || "/company-logo.svg";
       }
     }
-    return (userProfile as any)?.nmi_gateway_logo || "/image.png";
+    return (userProfile as any)?.nmi_gateway_logo || "/company-logo.svg";
   }, [fundingSettings.gatewayLogoFile, userProfile]);
 
   // Revoke object URL when file changes/unmount to prevent memory leaks
@@ -1622,23 +1622,23 @@ export default function Settings() {
                 ) : null}
                 <ScrollArea className="h-[420px] rounded-md border border-border/40 bg-white/50 dark:bg-slate-900/30 p-4">
                   <div className="space-y-4 text-sm leading-relaxed">
-                    <div className="text-base font-semibold">THE SCORE MACHINE</div>
+                    <div className="text-base font-semibold">FREAD APP</div>
                     <div className="text-sm font-semibold">Funding Module Override Agreement</div>
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">
                       Mandatory Electronic Acceptance Required
                     </div>
                     <div>
                       This Funding Module Override Agreement (“Agreement”) is entered into by and between:
-                      The Score Machine, a SaaS credit analytics and educational software platform (“Company”),
+                      Fread App, a SaaS credit analytics and educational software platform (“Company”),
                       and The User / Affiliate / Partner enabling this setting (“User”).
                       By enabling the Funding Module Override setting inside the platform, User agrees to the following terms:
                     </div>
                     <div className="space-y-2">
                       <div className="font-semibold">1. Purpose of the Funding Module</div>
                       <div>
-                        The Score Machine software provides automated credit analytics, risk indicators, and fundability
+                        Fread App software provides automated credit analytics, risk indicators, and fundability
                         readiness metrics based on data supplied by the User and/or the end client. The standard system
-                        configuration requires certain Score Machine minimum qualification thresholds before a client is
+                        configuration requires certain Fread App minimum qualification thresholds before a client is
                         permitted access to the Funding Page. These thresholds exist to reduce client decline risk, improve
                         approval probability, protect affiliate conversion ratios, and maintain underwriting integrity.
                       </div>
@@ -1646,7 +1646,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">2. Override Election by User</div>
                       <div>
-                        The User is voluntarily choosing to disable Score Machine fundability requirements and allow all
+                        The User is voluntarily choosing to disable Fread App fundability requirements and allow all
                         clients access to the Funding Page regardless of qualification status. By selecting this option,
                         User acknowledges that they are overriding the system’s recommended underwriting safeguards.
                       </div>
@@ -1654,10 +1654,10 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">3. Assumption of Risk</div>
                       <div>
-                        If User disables the Score Machine fundability requirements: the Company makes no representation
+                        If User disables the Fread App fundability requirements: the Company makes no representation
                         regarding approval likelihood; the Company does not guarantee funding outcomes; the Company does not
                         guarantee lender engagement, approval, terms, rates, or funding amounts. User understands that the
-                        Score Machine’s qualification system is designed to reduce denials and bypassing these safeguards
+                        Fread App’s qualification system is designed to reduce denials and bypassing these safeguards
                         increases the probability of declines. User assumes full responsibility for client approval or denial
                         outcomes, client dissatisfaction, chargebacks or refund disputes, commission losses, reputation
                         damage, and any business loss resulting from funding denials.
@@ -1666,7 +1666,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">4. No Liability Clause</div>
                       <div>
-                        Under no circumstances shall The Score Machine, its owners, officers, developers, affiliates, or
+                        Under no circumstances shall Fread App, its owners, officers, developers, affiliates, or
                         representatives be liable for funding denials, reduced approval rates, client complaints related to
                         funding outcomes, lost revenue or commissions, or any indirect, incidental, consequential, or special
                         damages. If User elects to override system requirements, all resulting outcomes are the sole
@@ -1676,7 +1676,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">5. No Guarantee of Lender Approval</div>
                       <div>
-                        The Score Machine is not a lender, does not issue credit, does not make underwriting decisions, does
+                        Fread App is not a lender, does not issue credit, does not make underwriting decisions, does
                         not control lender criteria, and does not control approval algorithms. All funding decisions are made
                         solely by independent third-party lenders.
                       </div>
@@ -1684,7 +1684,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">6. Indemnification</div>
                       <div>
-                        User agrees to indemnify, defend, and hold harmless The Score Machine from and against any claims,
+                        User agrees to indemnify, defend, and hold harmless Fread App from and against any claims,
                         client disputes, regulatory complaints, chargebacks, lawsuits, damages, and legal fees arising from
                         the User’s decision to override system fundability requirements.
                       </div>
@@ -1700,7 +1700,7 @@ export default function Settings() {
                       <div className="font-semibold">8. Electronic Acceptance</div>
                       <div>
                         By enabling the Funding Override setting, User confirms they understand the risks, accept full
-                        responsibility, waive claims against The Score Machine, and legally agree to this Agreement.
+                        responsibility, waive claims against Fread App, and legally agree to this Agreement.
                         Electronic activation constitutes binding acceptance.
                       </div>
                     </div>
@@ -1725,8 +1725,8 @@ export default function Settings() {
                     <DialogHeader>
                       <DialogTitle>⚠️ Warning</DialogTitle>
                       <DialogDescription>
-                        You are disabling The Score Machine’s minimum fundability safeguards. This may increase client denials.
-                        All approval outcomes will be your responsibility. The Score Machine is not liable for funding results.
+                        You are disabling Fread App’s minimum fundability safeguards. This may increase client denials.
+                        All approval outcomes will be your responsibility. Fread App is not liable for funding results.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">

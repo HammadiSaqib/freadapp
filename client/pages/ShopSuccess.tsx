@@ -124,7 +124,7 @@ export default function ShopSuccess() {
   return (
     <div className="min-h-screen bg-gray-50/50 flex flex-col">
       <Helmet>
-        <title>Purchase Success - Score Machine</title>
+        <title>Purchase Success - Fread App</title>
         <meta name="description" content="Your purchase succeeded. Files are starting to download. Verify your email to re-download later." />
       </Helmet>
       <SiteHeader />

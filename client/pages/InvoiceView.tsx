@@ -142,9 +142,9 @@ const InvoiceView: React.FC = () => {
 
   // Branding derived from server response with sensible fallbacks
   const brand = useMemo(() => {
-    const name = (invoice?.sender?.company_name || invoice?.from_company_name || 'Score Machine').trim();
-    const email = (invoice?.sender?.email || invoice?.from_email || 'support@scoremachine.com').trim();
-    const logo = invoice?.sender?.logo_url || invoice?.from_logo_url || '/image.png';
+    const name = (invoice?.sender?.company_name || invoice?.from_company_name || 'Fread App').trim();
+    const email = (invoice?.sender?.email || invoice?.from_email || '').trim();
+    const logo = invoice?.sender?.logo_url || invoice?.from_logo_url || '/company-logo.svg';
     return { name, email, logo };
   }, [invoice?.sender, invoice?.from_company_name, invoice?.from_email, invoice?.from_logo_url]);
 
@@ -402,7 +402,7 @@ const InvoiceView: React.FC = () => {
                 <h3 className="text-sm font-medium text-muted-foreground">From</h3>
                 <div className="mt-2 text-sm">
                   <p className="font-medium">{brand.name}</p>
-                  <p className="text-muted-foreground">{brand.email}</p>
+                  {brand.email && <p className="text-muted-foreground">{brand.email}</p>}
                 </div>
               </div>
               {/* Bill To */}
@@ -543,7 +543,11 @@ const InvoiceView: React.FC = () => {
 
             {/* Footer Note */}
             <div className="mt-6 text-xs text-muted-foreground">
-              <p>Thank you for your business. For questions, contact {brand.email}.</p>
+              <p>
+                {brand.email
+                  ? `Thank you for your business. For questions, contact ${brand.email}.`
+                  : 'Thank you for your business. For questions, contact support.'}
+              </p>
             </div>
           </CardContent>
         </Card>

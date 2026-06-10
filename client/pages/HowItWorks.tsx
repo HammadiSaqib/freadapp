@@ -65,7 +65,7 @@ export default function HowItWorks() {
       <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">How Score Machine Works</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">How Fread App Works</h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
               Four simple steps to transform your credit profile with AI-powered precision
             </p>

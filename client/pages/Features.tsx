@@ -214,7 +214,7 @@ export default function Features() {
       <div className="bg-white py-8 px-4 border-t border-gray-100">
         <div className="container mx-auto max-w-4xl text-center">
           <p className="text-xs text-gray-500 leading-relaxed">
-            The Score Machine may not be used to make eligibility, approval, denial, or onboarding decisions for credit, employment, insurance, or housing.
+            Fread App may not be used to make eligibility, approval, denial, or onboarding decisions for credit, employment, insurance, or housing.
           </p>
         </div>
       </div>

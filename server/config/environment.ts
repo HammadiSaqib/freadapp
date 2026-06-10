@@ -159,7 +159,7 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     EMAIL_SECURE: process.env.EMAIL_SECURE === 'true',
     EMAIL_USER: process.env.EMAIL_USER || '',
     EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
-    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Score Machine',
+    EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Fread App',
     EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || '',
     JWT_SECRET: process.env.JWT_SECRET || 'your-super-secret-jwt-key-for-development',
     JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN || '24h',

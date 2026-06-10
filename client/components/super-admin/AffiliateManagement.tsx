@@ -973,7 +973,7 @@ const AffiliateManagement: React.FC = () => {
                       <div className="space-y-1">
                         <Label htmlFor="elite_landing_page" className="cursor-pointer">Allow Elite Landing page</Label>
                         <p className="text-sm text-muted-foreground">
-                          When enabled, this affiliate&apos;s referral link can offer both Score Machine Pro and Score Machine Elite landing pages.
+                          When enabled, this affiliate&apos;s referral link can offer both Fread App Pro and Fread App Elite landing pages.
                         </p>
                       </div>
                     </div>

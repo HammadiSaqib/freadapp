@@ -509,7 +509,7 @@ export default function EliteDashboard({
         <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white dark:bg-slate-900 dark:bg-slate-900/60 dark:bg-slate-900/60 backdrop-blur-xl p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
           <div>
             <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] tracking-tight">
-              Score Machine Elite
+              Fread App Elite
             </h1>
             <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Professional Command Center</p>
           </div>
@@ -708,7 +708,7 @@ export default function EliteDashboard({
                     <img src={qrCodeUrl} alt="Credit report registration QR code" className="h-full w-full object-contain" loading="lazy" />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="h-8 w-8 rounded-full bg-white dark:bg-slate-900 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 dark:border-slate-700 shadow flex items-center justify-center">
-                        <img src={qrLogoPath} alt="Score Machine logo" className="h-5 w-5 object-contain" />
+                        <img src={qrLogoPath} alt="Fread App logo" className="h-5 w-5 object-contain" />
                       </div>
                     </div>
                   </button>
@@ -779,7 +779,7 @@ export default function EliteDashboard({
                         <img src={referralQrCodeUrl} alt="Referral link QR code" className="h-full w-full object-contain" loading="lazy" />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="h-5 w-5 rounded-full bg-white dark:bg-slate-900 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 dark:border-slate-700 shadow flex items-center justify-center">
-                            <img src={qrLogoPath} alt="Score Machine logo" className="h-3 w-3 object-contain" />
+                            <img src={qrLogoPath} alt="Fread App logo" className="h-3 w-3 object-contain" />
                           </div>
                         </div>
                       </button>

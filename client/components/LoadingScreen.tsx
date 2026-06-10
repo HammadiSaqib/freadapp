@@ -5,7 +5,7 @@ interface LoadingScreenProps {
   message?: string;
 }
 
-const LoadingScreen = ({ message = "Loading Score Machine..." }: LoadingScreenProps) => {
+const LoadingScreen = ({ message = "Loading Fread App..." }: LoadingScreenProps) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -50,8 +50,8 @@ const LoadingScreen = ({ message = "Loading Score Machine..." }: LoadingScreenPr
           />
           
           <img
-            src="/image.png"
-            alt="Score Machine Logo"
+            src="/company-logo.svg"
+            alt="Fread App Logo"
             className="w-32 h-32 md:w-40 md:h-40 object-contain relative z-10"
           />
         </motion.div>

@@ -70,7 +70,7 @@ export default function AdminDetails() {
 
   const currentAgreements = activeAgreementTab === 'admin-contracts' ? adminAgreements : tsmEliteAgreements;
   const currentSelectedAgreement = activeAgreementTab === 'admin-contracts' ? selectedAdminAgreement : selectedTsmEliteAgreement;
-  const currentAgreementPdfLabel = activeAgreementTab === 'admin-contracts' ? 'Admin Contract PDF' : 'Score Machine Elite PDF';
+  const currentAgreementPdfLabel = activeAgreementTab === 'admin-contracts' ? 'Admin Contract PDF' : 'Fread App Elite PDF';
 
   const selectAgreement = (agreement: any) => {
     if (activeAgreementTab === 'admin-contracts') {
@@ -83,7 +83,7 @@ export default function AdminDetails() {
 
   const getEmptyAgreementHistoryMessage = () => {
     if (activeAgreementTab === 'score-machine-elite') {
-      return 'No Score Machine Elite history found for this admin yet.';
+      return 'No Fread App Elite history found for this admin yet.';
     }
 
     return 'No admin contract history found for this admin yet.';
@@ -262,7 +262,7 @@ export default function AdminDetails() {
             return nextAgreements.find((agreement: any) => agreement.id === currentAgreement.id) || nextAgreements[0] || null;
           });
         } else {
-          console.error('Failed to load admin Score Machine Elite agreements:', tsmEliteAgreementsRes.reason);
+          console.error('Failed to load admin Fread App Elite agreements:', tsmEliteAgreementsRes.reason);
           setTsmEliteAgreements([]);
           setSelectedTsmEliteAgreement(null);
         }
@@ -379,7 +379,7 @@ export default function AdminDetails() {
       <Tabs value={activeAgreementTab} onValueChange={(value) => setActiveAgreementTab(value as AgreementHistoryTab)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="admin-contracts">Admin Contracts</TabsTrigger>
-          <TabsTrigger value="score-machine-elite">Score Machine Elite</TabsTrigger>
+          <TabsTrigger value="score-machine-elite">Fread App Elite</TabsTrigger>
         </TabsList>
 
         <TabsContent value="admin-contracts" className="space-y-3">
@@ -418,7 +418,7 @@ export default function AdminDetails() {
             >
               <div className="space-y-2">
                 <div className="font-semibold">{agreement.title}</div>
-                <div className="text-gray-600 text-sm line-clamp-2 max-w-xl">{agreement.content || 'No agreement content stored for this Score Machine Elite template.'}</div>
+                <div className="text-gray-600 text-sm line-clamp-2 max-w-xl">{agreement.content || 'No agreement content stored for this Fread App Elite template.'}</div>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Badge variant="outline" className="capitalize">{getAgreementStatusLabel(agreement.status)}</Badge>
                   <span>{getAgreementTimestampLabel(agreement)}</span>

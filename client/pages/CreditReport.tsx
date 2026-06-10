@@ -8325,7 +8325,7 @@ export default function CreditReport() {
             </p>
             <p>This content is provided for educational purposes only.</p>
             <p>
-              Score Machine does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
+              Fread App does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
               of Law Engine outputs.
             </p>
           </div>
@@ -20463,7 +20463,7 @@ export default function CreditReport() {
                     verified with the credit bureaus.
                   </p>
                   <div>
-                    <p className="font-medium text-foreground dark:text-white">Score Machine provides two tools to help you take action:</p>
+                    <p className="font-medium text-foreground dark:text-white">Fread App provides two tools to help you take action:</p>
                     <ul className="mt-2 space-y-2 list-disc list-inside">
                       <li>Phone guidance to contact the credit bureaus and request verification of the inquiry.</li>
                       <li>
@@ -20483,7 +20483,7 @@ export default function CreditReport() {
                     on your report and simplify later steps in your credit analysis process.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Score Machine provides educational tools only. All disputes and communications with credit bureaus are
+                    Fread App provides educational tools only. All disputes and communications with credit bureaus are
                     performed directly by the consumer.
                   </p>
                 </div>
@@ -20636,7 +20636,7 @@ export default function CreditReport() {
                     affect how lenders evaluate your credit profile.
                   </p>
                   <p>
-                    Score Machine organizes this process using principles similar to the M2 framework, which
+                    Fread App organizes this process using principles similar to the M2 framework, which
                     analyzes how different credit report factors may influence risk assessment and credit scoring
                     behavior. By identifying and categorizing negative items, users can better understand which areas of
                     their credit file may require attention.
@@ -20654,7 +20654,7 @@ export default function CreditReport() {
                   </div>
                   <p>
                     Users are free to manage this process using their own credit repair platform, dispute method, or
-                    professional service if they already have one in place. Score Machine simply provides the analysis
+                    professional service if they already have one in place. Fread App simply provides the analysis
                     and organization tools needed to identify and review negative items so users can take the next steps
                     that best fit their situation.
                   </p>

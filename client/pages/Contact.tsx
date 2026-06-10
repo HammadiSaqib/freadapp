@@ -273,8 +273,8 @@ export default function Contact({ embed = false }: ContactProps) {
   return (
     <div className={embed ? "relative overflow-hidden bg-transparent py-4" : "min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20"}>
       <Helmet>
-        <title>{embed ? "Contact Embed - Score Machine" : "Contact Us - Score Machine | Support & Inquiries"}</title>
-        <meta name="description" content="Contact Score Machine for support, account assistance, or platform guidance. Our team provides help with onboarding, technical questions, and feature navigation. Typical responses within business hours." />
+        <title>{embed ? "Contact Embed - Fread App" : "Contact Us - Fread App | Support & Inquiries"}</title>
+        <meta name="description" content="Contact Fread App for support, account assistance, or platform guidance. Our team provides help with onboarding, technical questions, and feature navigation. Typical responses within business hours." />
         <link rel="canonical" href="https://scoremachine.com/contact" />
         {embed && <meta name="robots" content="noindex,nofollow" />}
       </Helmet>
@@ -363,7 +363,7 @@ export default function Contact({ embed = false }: ContactProps) {
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-gray-900 leading-tight">Email Support</p>
-                      <p className="text-sm text-gray-600 leading-tight">support@thescoremachine.com</p>
+                      <p className="text-sm text-gray-600 leading-tight">Use the contact form below</p>
                       <p className="text-xs text-green-600 font-medium leading-tight">Fast response times</p>
                     </div>
                   </div>
@@ -639,7 +639,7 @@ export default function Contact({ embed = false }: ContactProps) {
                   Frequently Asked Questions
                 </h2>
                 <p className="text-lg text-gray-600 leading-relaxed">
-                  Answers to common questions about Score Machine and your account.
+                  Answers to common questions about Fread App and your account.
                 </p>
               </div>
               
@@ -739,7 +739,7 @@ export default function Contact({ embed = false }: ContactProps) {
       
       <div className="bg-gray-900 text-gray-400 py-8 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center">
-           <p className="text-xs">Score Machine is a software platform. We do not provide financial advice or guarantee credit score improvements.</p>
+           <p className="text-xs">Fread App is a software platform. We do not provide financial advice or guarantee credit score improvements.</p>
         </div>
       </div>
       <Footer />

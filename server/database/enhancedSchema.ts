@@ -433,7 +433,7 @@ async function seedDatabase(): Promise<void> {
         hashedPassword,
         'Demo',
         'Admin',
-        'Score Machine',
+        'Fread App',
         'admin',
         'active',
         1,

@@ -54,6 +54,7 @@ export default function DashboardLayout({
   const [eliteTransitionPhase, setEliteTransitionPhase] = useState<'idle' | 'blackout' | 'dissolve' | 'flash' | 'logo' | 'particles' | 'reveal' | 'welcome' | 'done'>('idle');
   const [eliteZoomIn, setEliteZoomIn] = useState(false);
   const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
+  const usesAdminPurpleTheme = userProfile?.role === 'admin' && !isEliteActive && !isBasicAdminPortalUser;
 
   // Listen for live elite activation after agreement is signed.
   useEffect(() => {
@@ -189,7 +190,7 @@ export default function DashboardLayout({
           : isBasicAdminPortalUser
             ? 'bg-[linear-gradient(135deg,#f7fbff_0%,#eef7f3_52%,#f8fafc_100%)] dark:bg-slate-950'
             : 'bg-gradient-to-br from-slate-50 via-white to-slate-50/80 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900'
-      }`}
+      } ${usesAdminPurpleTheme ? 'admin-purple-theme' : ''}`}
       initial={false}
       animate={
         eliteZoomIn
@@ -264,7 +265,7 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 flex-nowrap sm:flex-wrap w-full sm:w-auto ml-auto justify-end">
-              {/* Score Machine Elite notification bar */}
+              {/* Fread App Elite notification bar */}
               {shouldShowEliteNotification && (
                 <button
                   onClick={() => setIsElitePromptOpen(true)}
@@ -482,7 +483,7 @@ export default function DashboardLayout({
         <main className={`flex-1 overflow-auto ${isEliteActive ? 'elite-page-bg p-6' : isBasicAdminPortalUser ? 'p-4 sm:p-6' : 'p-6'}`}>{children}</main>
       </div>
 
-      {/* Score Machine Elite agreement prompt (moved from sidebar) */}
+      {/* Fread App Elite agreement prompt (moved from sidebar) */}
       <ScoreMachineElitePrompt
         open={isElitePromptOpen}
         onOpenChange={setIsElitePromptOpen}
@@ -665,7 +666,7 @@ export default function DashboardLayout({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      SCORE MACHINE
+                      FREAD APP
                     </motion.div>
                     <motion.div className="text-6xl sm:text-9xl font-black tracking-[0.2em] mt-2 relative"
                       style={{ background: 'linear-gradient(135deg, #00d4ff 0%, #00ffcc 30%, #7000ff 60%, #ff00ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 50px rgba(0,212,255,0.4)) drop-shadow(0 0 100px rgba(112,0,255,0.3))' }}
@@ -759,7 +760,7 @@ export default function DashboardLayout({
                       ✦ ACTIVATED ✦
                     </div>
                     <div className="mt-2 text-sm text-cyan-300/70 tracking-widest">
-                      Score Machine Elite is now live
+                      Fread App Elite is now live
                     </div>
                   </div>
                 </motion.div>
@@ -812,7 +813,7 @@ export default function DashboardLayout({
                     <div className="text-xl sm:text-2xl font-black tracking-wide"
                       style={{ background: 'linear-gradient(135deg, #00d4ff, #7000ff, #ff00ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
                     >
-                      🎉 Welcome to Score Machine Elite!
+                      🎉 Welcome to Fread App Elite!
                     </div>
                     <div className="mt-1 text-sm text-cyan-300/70">
                       Your dashboard has been upgraded with premium features

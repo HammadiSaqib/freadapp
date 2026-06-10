@@ -507,8 +507,8 @@ export default function Pricing({ embed = false }: PricingProps) {
   return (
     <div className={rootClassName}>
       <Helmet>
-        <title>{embed ? 'Pricing Embed - Score Machine' : 'Pricing Plans - Score Machine | Professional Credit Analysis Tools'}</title>
-        <meta name="description" content="Explore transparent pricing for Score Machine’s AI-powered credit analysis tools. Access automated workflows, progress tracking, client dashboards, report summaries, and secure credit data organization. No credit improvement or funding outcomes are implied or guaranteed." />
+        <title>{embed ? 'Pricing Embed - Fread App' : 'Pricing Plans - Fread App | Professional Credit Analysis Tools'}</title>
+        <meta name="description" content="Explore transparent pricing for Fread App’s AI-powered credit analysis tools. Access automated workflows, progress tracking, client dashboards, report summaries, and secure credit data organization. No credit improvement or funding outcomes are implied or guaranteed." />
         {embed ? (
           <>
             <meta name="robots" content="noindex,nofollow" />
@@ -828,7 +828,7 @@ export default function Pricing({ embed = false }: PricingProps) {
           <div className="text-center mb-12">
             <h2 className="whitespace-nowrap text-[clamp(1.75rem,3.5vw,2.5rem)] font-bold mb-4 text-slate-900 tracking-tight">Trusted by Industry Leaders</h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              See what top professionals are saying about their experience with Score Machine Pro.
+              See what top professionals are saying about their experience with Fread App Pro.
             </p>
           </div>
 
@@ -1038,7 +1038,7 @@ export default function Pricing({ embed = false }: PricingProps) {
       {!embed && (
        <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          Score Machine provides tools for organizing and reviewing credit report information. It does not guarantee credit improvement, funding approval, or specific financial outcomes. All insights are for informational purposes only.
+          Fread App provides tools for organizing and reviewing credit report information. It does not guarantee credit improvement, funding approval, or specific financial outcomes. All insights are for informational purposes only.
         </p>
        </div>
       )}

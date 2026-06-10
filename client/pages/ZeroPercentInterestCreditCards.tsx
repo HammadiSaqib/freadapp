@@ -11,10 +11,10 @@ export default function ZeroPercentInterestCreditCards() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>0% Interest Credit Cards: Promotional APRs & Readiness | Score Machine</title>
+        <title>0% Interest Credit Cards: Promotional APRs & Readiness | Fread App</title>
         <meta
           name="description"
-          content="Learn about 0% interest credit cards and promotional APR offers for purchases or balance transfers. Use Score Machine to organize credit insights and create summaries for responsible reviews. No outcomes or approvals are guaranteed."
+          content="Learn about 0% interest credit cards and promotional APR offers for purchases or balance transfers. Use Fread App to organize credit insights and create summaries for responsible reviews. No outcomes or approvals are guaranteed."
         />
         <link rel="canonical" href="https://scoremachine.com/0-percent-interest-credit-cards" />
       </Helmet>
@@ -32,7 +32,7 @@ export default function ZeroPercentInterestCreditCards() {
               Promotional APRs and Credit Readiness
             </h1>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Understand promotional APR offers for purchases and balance transfers. Score Machine helps organize credit data and export summaries for responsible reviews. Tools are informational and do not guarantee approvals or outcomes.
+              Understand promotional APR offers for purchases and balance transfers. Fread App helps organize credit data and export summaries for responsible reviews. Tools are informational and do not guarantee approvals or outcomes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
@@ -57,7 +57,7 @@ export default function ZeroPercentInterestCreditCards() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">What Are 0% Interest Credit Cards?</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Some credit cards offer promotional APRs with 0% interest for a limited time. Offers may apply to purchases, balance transfers, or both. Terms vary by issuer and are subject to change. Score Machine helps organize credit insights used in responsible reviews. Tools are informational and do not guarantee approvals or specific outcomes.
+              Some credit cards offer promotional APRs with 0% interest for a limited time. Offers may apply to purchases, balance transfers, or both. Terms vary by issuer and are subject to change. Fread App helps organize credit insights used in responsible reviews. Tools are informational and do not guarantee approvals or specific outcomes.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -150,7 +150,7 @@ export default function ZeroPercentInterestCreditCards() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
-                  <Link to="/register">Sign Up for Score Machine</Link>
+                  <Link to="/register">Sign Up for Fread App</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="border-blue-600 text-blue-600" asChild>
                   <Link to="/pricing">See Plans</Link>
@@ -166,7 +166,7 @@ export default function ZeroPercentInterestCreditCards() {
 
       <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          Score Machine provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, approvals, or specific financial outcomes.
+          Fread App provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, approvals, or specific financial outcomes.
         </p>
       </div>
 

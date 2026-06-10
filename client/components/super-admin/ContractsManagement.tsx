@@ -53,11 +53,11 @@ const ADMIN_STATUS_OPTIONS: TemplateStatus[] = ["draft", "active", "archived"];
 const TSM_ELITE_STATUS_OPTIONS: Array<Extract<TemplateStatus, "draft" | "active">> = ["active", "draft"];
 
 const getHeading = (tab: ContractsTab) =>
-  tab === "tsm-elite" ? "Score Machine Elite" : "Admin Contracts";
+  tab === "tsm-elite" ? "Fread App Elite" : "Admin Contracts";
 
 const getDescription = (tab: ContractsTab) =>
   tab === "tsm-elite"
-    ? "Create and edit Score Machine Elite contract templates"
+    ? "Create and edit Fread App Elite contract templates"
     : "Create and edit contract templates for admins";
 
 const getCreateButtonLabel = (tab: ContractsTab) =>
@@ -68,7 +68,7 @@ const getTableTitle = (tab: ContractsTab) =>
 
 const getTableDescription = (tab: ContractsTab) =>
   tab === "tsm-elite"
-    ? "Manage reusable Score Machine Elite contract templates"
+    ? "Manage reusable Fread App Elite contract templates"
     : "Manage reusable admin contract templates";
 
 const getTemplateStatusOptions = (tab: ContractsTab) =>
@@ -289,7 +289,7 @@ export default function ContractsManagement() {
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="admin">Admin Contracts</TabsTrigger>
-          <TabsTrigger value="tsm-elite">Score Machine Elite</TabsTrigger>
+          <TabsTrigger value="tsm-elite">Fread App Elite</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="space-y-6 mt-6">
@@ -299,7 +299,7 @@ export default function ContractsManagement() {
               <CardTitle>Filters</CardTitle>
               <CardDescription>
                 {activeTab === "tsm-elite"
-                  ? "Search and filter Score Machine Elite templates"
+                  ? "Search and filter Fread App Elite templates"
                   : "Search and filter templates"}
               </CardDescription>
             </CardHeader>

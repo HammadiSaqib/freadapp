@@ -258,7 +258,7 @@ const NotFound = () => {
       className="min-h-screen bg-slate-50 font-sans text-slate-600 flex flex-col"
     >
       <Helmet>
-        <title>Page Not Found - Score Machine</title>
+        <title>Page Not Found - Fread App</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 

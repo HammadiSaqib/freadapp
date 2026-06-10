@@ -408,8 +408,8 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
   return (
     <div className={embed ? 'min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/20 font-sans py-8' : 'min-h-screen bg-white'}>
       <Helmet>
-        <title>{embed ? 'Affiliate Registration Embed - Score Machine' : 'Affiliate Program - Score Machine | Partner & Earn'}</title>
-        <meta name="description" content="Join Score Machine’s Affiliate and Partner Programs. Earn recurring commissions by promoting a professional, AI-based credit analysis platform. Access training, analytics, tracking tools, and compliance-ready marketing resources." />
+        <title>{embed ? 'Affiliate Registration Embed - Fread App' : 'Affiliate Program - Fread App | Partner & Earn'}</title>
+        <meta name="description" content="Join Fread App’s Affiliate and Partner Programs. Earn recurring commissions by promoting a professional, AI-based credit analysis platform. Access training, analytics, tracking tools, and compliance-ready marketing resources." />
         {embed ? (
           <>
             <meta name="robots" content="noindex,nofollow" />
@@ -442,7 +442,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
             <div className="inline-flex items-center gap-2 bg-gradient-to-r from-ocean-blue/10 to-sea-green/10 backdrop-blur-sm border border-ocean-blue/20 rounded-full px-6 py-3 mb-8 shadow-lg">
               <div className="w-2 h-2 bg-gradient-to-r from-ocean-blue to-sea-green rounded-full animate-pulse"></div>
               <Sparkles className="w-4 h-4 text-ocean-blue" />
-              <span className="text-ocean-blue font-semibold">Earn with Score Machine</span>
+              <span className="text-ocean-blue font-semibold">Earn with Fread App</span>
               <div className="w-2 h-2 bg-gradient-to-r from-sea-green to-ocean-blue rounded-full animate-pulse"></div>
             </div>
 
@@ -575,7 +575,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
               Choose Your Success Path
             </h2>
             <p className="text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
-              Start free as an Affiliate, grow with Partner tiers, or build your own brand with <span className="font-semibold text-orange-600">White Label (Coming Soon)</span>—powered by Score Machine's comprehensive funding platform.
+              Start free as an Affiliate, grow with Partner tiers, or build your own brand with <span className="font-semibold text-orange-600">White Label (Coming Soon)</span>—powered by Fread App's comprehensive funding platform.
             </p>
           </div>
 
@@ -935,7 +935,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
               How It Works
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Four simple steps to start earning with Score Machine's comprehensive funding platform.
+              Four simple steps to start earning with Fread App's comprehensive funding platform.
             </p>
           </div>
           
@@ -1072,7 +1072,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
                 Start Your Success Journey
               </h2>
               <p className="text-xl text-gray-600 leading-relaxed">
-                Complete the form to join our Affiliate or Partner network and start promoting Score Machine's industry-leading funding platform.
+                Complete the form to join our Affiliate or Partner network and start promoting Fread App's industry-leading funding platform.
               </p>
             </div>
             
@@ -1093,7 +1093,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
                   Affiliate & Partner Registration
                 </CardTitle>
                 <CardDescription className="text-center text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-                  Join thousands earning with Score Machine by promoting a comprehensive credit analysis platform with verified results.
+                  Join thousands earning with Fread App by promoting a comprehensive credit analysis platform with verified results.
                 </CardDescription>
               </CardHeader>
               

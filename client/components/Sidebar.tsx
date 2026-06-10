@@ -982,10 +982,10 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <img src="/image.png" alt="Score Machine" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
+              <img src="/company-logo.svg" alt="Fread App" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
               <div className="min-w-0">
                 <span className={`block truncate text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : isBasicAdminPortalUser ? 'text-slate-900 dark:text-white' : 'gradient-text-primary'}`}>
-                  Score Machine
+                  Fread App
                 </span>
                 {isBasicAdminPortalUser && (
                   <span className="block text-xs font-medium text-sky-600 dark:text-sky-300">

@@ -185,7 +185,7 @@ const eliteDashboardOverviewAnimatedUsers = new Set<string>();
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Active":
-      return "bg-blue-100 text-blue-800 border-blue-200";
+      return "bg-indigo-100 text-indigo-800 border-indigo-200";
     case "New":
       return "bg-green-100 text-green-800 border-green-200";
     case "In Progress":
@@ -202,7 +202,7 @@ const getProgressIcon = (progress: string) => {
     case "improving":
       return <TrendingUp className="h-4 w-4 text-green-600" />;
     case "stable":
-      return <CheckCircle className="h-4 w-4 text-blue-600" />;
+      return <CheckCircle className="h-4 w-4 text-indigo-600" />;
     case "new":
       return <Clock className="h-4 w-4 text-yellow-600" />;
     case "improved":
@@ -355,7 +355,7 @@ export default function Dashboard() {
     ? "Scan the code below, open the referral page, or download the QR image to share it."
     : "Scan the code below, open the registration page, or download the QR image to share it.";
   const qrModalAlt = qrModalType === "referral" ? "Referral link QR code" : "Credit report registration QR code";
-  const qrLogoPath = "/image.png";
+  const qrLogoPath = "/company-logo.svg";
   const basicDashboardClient = useMemo(() => {
     if (!isBasicAdminPortalUser) {
       return null;
@@ -1562,7 +1562,7 @@ export default function Dashboard() {
             <Button
               onClick={handleSavePhone}
               disabled={isSavingPhone}
-              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-500/90 hover:to-teal-500/90 text-white"
+              className="bg-gradient-to-r from-violet-600 to-indigo-900 hover:from-violet-600/90 hover:to-indigo-900/90 text-white"
             >
               {isSavingPhone ? (
                 <div className="flex items-center gap-2">
@@ -1584,14 +1584,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Elite Dashboard (Score Machine Elite + Agreement Signed) ── */}
+      {/* ── Elite Dashboard (Fread App Elite + Agreement Signed) ── */}
       {isBasicAdminPortalUser ? (
         <div className="space-y-6">
           <section className="overflow-hidden rounded-lg border border-sky-100 bg-white shadow-sm shadow-sky-100/70 dark:border-slate-800 dark:bg-slate-950 dark:shadow-none">
             <div className="flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl space-y-3">
                 <Badge className="border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
-                  Score Machine Basic
+                  Fread App Basic
                 </Badge>
                 <div>
                   <h2 className="text-2xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-3xl">
@@ -1800,7 +1800,7 @@ export default function Dashboard() {
       {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mb-8">
         <Card
-          className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
+          className="border-0 shadow-lg bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
           onClick={() => navigate("/clients")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
@@ -1826,7 +1826,7 @@ export default function Dashboard() {
               width="80"
               height="40"
               viewBox="0 0 80 40"
-              className="text-blue-500"
+              className="text-indigo-500"
             >
               <path
                 d="M0,35 Q10,25 20,30 T40,20 T60,15 T80,10"
@@ -2039,19 +2039,19 @@ export default function Dashboard() {
         </Card>
 
         <Card
-          className="border-0 shadow-lg bg-gradient-to-br from-white to-teal-50/50 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
+          className="border-0 shadow-lg bg-gradient-to-br from-white to-indigo-50/60 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
           
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
             <CardTitle className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Total Products
             </CardTitle>
-            <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-2 rounded-lg">
+            <div className="bg-gradient-to-br from-violet-600 to-indigo-900 p-2 rounded-lg">
               <CreditCard className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">
+            <div className="text-3xl font-bold text-indigo-700 dark:text-indigo-300">
               {loading ? "--" : (stats.totalCards || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -2059,7 +2059,7 @@ export default function Dashboard() {
             </p>
           </CardContent>
           <div className="absolute bottom-0 right-0 opacity-20">
-            <svg width="60" height="60" viewBox="0 0 60 60" className="text-teal-500">
+            <svg width="60" height="60" viewBox="0 0 60 60" className="text-indigo-500">
               <circle cx="30" cy="30" r="20" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
               <circle cx="30" cy="30" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
             </svg>
@@ -2067,7 +2067,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2092,7 +2092,7 @@ export default function Dashboard() {
                   Register Now
                 </Button>
               </div>
-              <div className="flex flex-col items-center gap-3 p-4 bg-white/80 dark:bg-slate-800/70 rounded-xl border border-blue-100/80 dark:border-slate-700/80 shadow-sm min-w-[160px]">
+              <div className="flex flex-col items-center gap-3 p-4 bg-white/80 dark:bg-slate-800/70 rounded-xl border border-violet-100/80 dark:border-slate-700/80 shadow-sm min-w-[160px]">
                 <button
                   type="button"
                   onClick={() => openQrModal("credit-report")}
@@ -2109,7 +2109,7 @@ export default function Dashboard() {
                     <div className="h-8 w-8 rounded-full bg-white/90 backdrop-blur border border-slate-200 shadow-sm flex items-center justify-center">
                       <img
                         src={qrLogoPath}
-                        alt="Score Machine logo"
+                        alt="Fread App logo"
                         className="h-5 w-5 object-contain"
                       />
                     </div>
@@ -2123,7 +2123,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-indigo-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2147,7 +2147,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2187,7 +2187,7 @@ export default function Dashboard() {
                   <Button
                     onClick={handleGenerateClientIntakeLink}
                     disabled={isGeneratingIntakeLink}
-                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-500/90 hover:to-teal-500/90"
+                    className="bg-gradient-to-r from-violet-600 to-indigo-900 hover:from-violet-600/90 hover:to-indigo-900/90"
                   >
                     {isGeneratingIntakeLink ? "Generating..." : "Generate Onboarding Link"}
                   </Button>
@@ -2508,7 +2508,7 @@ export default function Dashboard() {
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-violet-100 bg-violet-50/70 p-3 dark:border-violet-900/40 dark:bg-violet-950/20">
                         <div>
                           <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Referral QR</div>
                           <div className="text-xs text-muted-foreground">Open the referral QR preview and download it.</div>
@@ -2517,7 +2517,7 @@ export default function Dashboard() {
                           type="button"
                           onClick={() => openQrModal("referral")}
                           disabled={!referralQrCodeUrl}
-                          className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-emerald-200 bg-white p-0.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50"
+                          className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-violet-200 bg-white p-0.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900/50"
                           aria-label="Open referral QR code"
                         >
                           <img
@@ -2530,7 +2530,7 @@ export default function Dashboard() {
                             <div className="h-5 w-5 rounded-full bg-white/90 backdrop-blur border border-slate-200 shadow-sm flex items-center justify-center">
                               <img
                                 src={qrLogoPath}
-                                alt="Score Machine logo"
+                                alt="Fread App logo"
                                 className="h-3 w-3 object-contain"
                               />
                             </div>
@@ -2594,7 +2594,7 @@ export default function Dashboard() {
                           activity.status === "success"
                             ? "bg-green-500"
                             : activity.status === "info"
-                              ? "bg-blue-500"
+                              ? "bg-indigo-600"
                               : "bg-yellow-500"
                         }`}
                       />
@@ -2665,12 +2665,12 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <DollarSign className="h-4 w-4 text-emerald-600" />
+                  <DollarSign className="h-4 w-4 text-indigo-700 dark:text-indigo-300" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Funding Invoice Paid
                   </span>
                 </div>
-                <span className="text-sm font-bold text-emerald-600">
+                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
                   {loading ? "--" : (stats.fundingInvoicesPaid || 0)}
                 </span>
               </div>
@@ -2699,7 +2699,7 @@ export default function Dashboard() {
                 <div className="h-16 w-16 rounded-full bg-white/95 backdrop-blur border border-slate-200 shadow flex items-center justify-center">
                   <img
                     src={qrLogoPath}
-                    alt="Score Machine logo"
+                    alt="Fread App logo"
                     className="h-12 w-12 object-contain"
                   />
                 </div>
@@ -2994,7 +2994,7 @@ export default function Dashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.45, duration: 0.5 }}
                 >
-                  Your dashboard has been upgraded with premium Score Machine Elite features. Enjoy the enhanced experience!
+                  Your dashboard has been upgraded with premium Fread App Elite features. Enjoy the enhanced experience!
                 </motion.p>
 
                 {/* Feature highlights */}

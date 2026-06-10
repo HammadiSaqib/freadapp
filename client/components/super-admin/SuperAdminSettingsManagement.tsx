@@ -610,7 +610,7 @@ const SuperAdminSettingsManagement: React.FC = () => {
                   </h3>
                   <p className="text-muted-foreground">Super Administrator</p>
                   <p className="text-sm text-muted-foreground">
-                    The Score Machine
+                    Fread App
                   </p>
                 </div>
               </div>

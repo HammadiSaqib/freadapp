@@ -85,7 +85,7 @@ class EmailService {
   }
 
   // Enhanced email template with admin dashboard color scheme
-  private getEmailTemplate(content: string, title: string = 'Score Machine'): string {
+  private getEmailTemplate(content: string, title: string = 'Fread App'): string {
     const baseUrl = this.getFrontendBaseUrl();
     const logoUrl = process.env.EMAIL_LOGO_URL || 'https://thescoremachine.com/image.png';
     return `
@@ -433,14 +433,14 @@ class EmailService {
             <div class="logo">
               <img src="${logoUrl}" alt="" style="height: 80px; width: auto; display: block;" onerror="this.style.display='none'" />
               <div>
-                <h1>The Score Machine</h1>
+                <h1>Fread App</h1>
                 <p>Professional Credit Management Platform</p>
               </div>
             </div>
           </div>
           ${content}
           <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} Score Machine. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Fread App. All rights reserved.</p>
             <p>
               <a href="#">Privacy Policy</a> | 
               <a href="#">Terms of Service</a> | 
@@ -482,7 +482,7 @@ class EmailService {
     try {
       const transporter = this.initializeTransporter();
       const mailOptions = {
-        from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine Support'}" <${process.env.EMAIL_FROM_ADDRESS || 'support@thescoremachine.com' || process.env.EMAIL_USER}>`,
+        from: `"${process.env.EMAIL_FROM_NAME || 'Fread App Support'}" <${process.env.EMAIL_FROM_ADDRESS || 'support@thescoremachine.com' || process.env.EMAIL_USER}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -513,7 +513,7 @@ class EmailService {
             },
           });
           const mailOptions = {
-            from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || testAccount.user}>`,
+            from: `"${process.env.EMAIL_FROM_NAME || 'Fread App'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || testAccount.user}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
@@ -548,7 +548,7 @@ class EmailService {
     // Generate role-specific content
     const roleInfo = this.getRoleInfo(type);
     
-    const subject = `Invitation to Join Score Machine as ${roleInfo.title}`;
+    const subject = `Invitation to Join Fread App as ${roleInfo.title}`;
     
     const html = this.generateInvitationHTML({
       recipientName: name || email,
@@ -630,7 +630,7 @@ class EmailService {
       default:
         return {
           title: 'User',
-          description: 'Access to the Score Machine platform.',
+          description: 'Access to the Fread App platform.',
           permissions: ['Access to platform features']
         };
     }
@@ -653,7 +653,7 @@ class EmailService {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invitation to Score Machine</title>
+    <title>Invitation to Fread App</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -810,13 +810,13 @@ class EmailService {
         <div class="header">
             <div class="logo">CR</div>
             <h1>You're Invited!</h1>
-            <p>Join Score Machine</p>
+            <p>Join Fread App</p>
         </div>
         
         <div class="content">
             <h2 class="greeting">Hello ${data.recipientName}!</h2>
             
-            <p>You have been invited to join <strong>Score Machine</strong> as a <span class="role-badge">${data.roleTitle}</span></p>
+            <p>You have been invited to join <strong>Fread App</strong> as a <span class="role-badge">${data.roleTitle}</span></p>
             
             <p>${data.roleDescription}</p>
             
@@ -850,7 +850,7 @@ class EmailService {
         </div>
         
         <div class="footer">
-            <p><strong>Score Machine</strong></p>
+            <p><strong>Fread App</strong></p>
             <p>Professional Funding Management System</p>
             <p>If you have any questions, please contact our support team.</p>
         </div>
@@ -869,7 +869,7 @@ class EmailService {
     return `
 Hello ${data.recipientName}!
 
-You have been invited to join Score Machine as a ${data.roleTitle}.
+You have been invited to join Fread App as a ${data.roleTitle}.
 
 To accept this invitation and set up your account, please visit:
 ${data.invitationUrl}
@@ -879,12 +879,12 @@ This invitation expires in ${data.expiresIn}.
 If you didn't expect this invitation, please ignore this email.
 
 Best regards,
-Score Machine Team
+Fread App Team
     `.trim();
   }
 
   async sendVerificationCode(email: string, code: string, firstName?: string): Promise<boolean> {
-    const subject = 'Email Verification Code - Score Machine';
+    const subject = 'Email Verification Code - Fread App';
     
     const html = this.getEmailTemplate(`
       <div style="text-align: center; margin-bottom: 30px;">
@@ -904,7 +904,7 @@ Score Machine Team
           ${firstName ? `Welcome ${firstName}!` : 'Welcome!'}
         </h2>
         <p style="color: #475569; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
-          Thank you for joining Score Machine as an affiliate partner. Please enter the verification code below to activate your account:
+          Thank you for joining Fread App as an affiliate partner. Please enter the verification code below to activate your account:
         </p>
         
         <div class="code-box" style="background: white; border: 3px solid #0ea5e9; border-radius: 12px; padding: 25px; margin: 25px 0; box-shadow: 0 4px 20px rgba(14, 165, 233, 0.15);">
@@ -936,14 +936,14 @@ Score Machine Team
           If you didn't request this verification, please ignore this email.
         </p>
       </div>
-    `, 'Email Verification - Score Machine');
+    `, 'Email Verification - Fread App');
 
     const text = `
-      Score Machine - Email Verification
+      Fread App - Email Verification
       
       ${firstName ? `Welcome ${firstName}!` : 'Welcome!'}
       
-      Thank you for joining Score Machine as an affiliate partner!
+      Thank you for joining Fread App as an affiliate partner!
       
       Your verification code is: ${code}
       
@@ -952,7 +952,7 @@ Score Machine Team
       If you didn't request this verification, please ignore this email.
       
       Best regards,
-      Score Machine Team
+      Fread App Team
     `;
 
     return await this.sendEmail({
@@ -1051,7 +1051,7 @@ Score Machine Team
   }
 
   async sendPasswordResetCode(email: string, code: string, firstName?: string): Promise<boolean> {
-    const subject = 'Password Reset Code - Score Machine';
+    const subject = 'Password Reset Code - Fread App';
     
     const html = this.getEmailTemplate(`
       <div style="text-align: center; margin-bottom: 30px;">
@@ -1071,7 +1071,7 @@ Score Machine Team
           ${firstName ? `Hello ${firstName}!` : 'Hello!'}
         </h2>
         <p style="color: #475569; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
-          We received a request to reset your password for your Score Machine account. Please enter the verification code below to proceed:
+          We received a request to reset your password for your Fread App account. Please enter the verification code below to proceed:
         </p>
         
         <div class="code-box" style="background: white; border: 3px solid #dc2626; border-radius: 12px; padding: 25px; margin: 25px 0; box-shadow: 0 4px 20px rgba(220, 38, 38, 0.15);">
@@ -1103,14 +1103,14 @@ Score Machine Team
           If you continue to have problems, please contact our support team.
         </p>
       </div>
-    `, 'Password Reset - Score Machine');
+    `, 'Password Reset - Fread App');
 
     const text = `
-      Score Machine - Password Reset
+      Fread App - Password Reset
       
       ${firstName ? `Hello ${firstName}!` : 'Hello!'}
       
-      We received a request to reset your password for your Score Machine account.
+      We received a request to reset your password for your Fread App account.
       
       Your verification code is: ${code}
       
@@ -1119,7 +1119,7 @@ Score Machine Team
       If you didn't request this password reset, please ignore this email.
       
       Best regards,
-      Score Machine Team
+      Fread App Team
     `;
 
     return await this.sendEmail({
@@ -1144,19 +1144,19 @@ Score Machine Team
                 </td>
               </tr>
             </table>
-            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">Welcome to The Score Machine</h2>
+            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">Welcome to Fread App</h2>
           </div>
 
           <div class="details-card" style="background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #10b981;">
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">${firstNameLine}</p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
-              First off — thank you for signing up for The Score Machine. We truly appreciate you trusting us and becoming part of the ecosystem. You just made a powerful decision toward better clarity, smarter positioning, and stronger funding strategy. We’re excited to have you inside.
+              First off — thank you for signing up for Fread App. We truly appreciate you trusting us and becoming part of the ecosystem. You just made a powerful decision toward better clarity, smarter positioning, and stronger funding strategy. We’re excited to have you inside.
             </p>
 
             <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 24px 0;">
               <h3 style="color: #047857; font-size: 18px; font-weight: 600; margin-bottom: 12px;">🎉 Exclusive Bonus for You</h3>
               <p style="color: #065f46; font-size: 15px; line-height: 1.6; margin-bottom: 16px;">
-                We also have a private community called <strong>Paid In Full</strong>. Normally, access to this community is paid — but since you are now a member of The Score Machine, you get access completely free. Inside the community, we:
+                We also have a private community called <strong>Paid In Full</strong>. Normally, access to this community is paid — but since you are now a member of Fread App, you get access completely free. Inside the community, we:
               </p>
               <ul style="color: #065f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px 20px; padding: 0;">
                 <li>Share live sessions and updates</li>
@@ -1172,9 +1172,9 @@ Score Machine Team
               We’re grateful to have you with us and look forward to helping you win. If you need anything at all, just reply to this email — we’re here to support you.
             </p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
-              Welcome to The Score Machine family.<br /><br />
+              Welcome to Fread App family.<br /><br />
               Best regards,<br />
-              <strong>Score Machine Support</strong>
+              <strong>Fread App Support</strong>
             </p>
           </div>
         </div>
@@ -1182,8 +1182,8 @@ Score Machine Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: `🎉 Welcome to The Score Machine`,
-        html: this.getEmailTemplate(content, 'Welcome to The Score Machine')
+        subject: `🎉 Welcome to Fread App`,
+        html: this.getEmailTemplate(content, 'Welcome to Fread App')
       });
     } catch (error) {
       console.error('Failed to send welcome email:', error);
@@ -1213,7 +1213,7 @@ Score Machine Team
               We just wanted to take a quick moment to say thank you.
             </p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
-              Thank you for being part of The Score Machine. Thank you for trusting us. Thank you for building with us. We truly appreciate every member inside our ecosystem, and we don’t take that lightly.
+              Thank you for being part of Fread App. Thank you for trusting us. Thank you for building with us. We truly appreciate every member inside our ecosystem, and we don’t take that lightly.
             </p>
 
             <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 24px 0;">
@@ -1237,7 +1237,7 @@ Score Machine Team
 
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
               Best regards,<br />
-              <strong>Score Machine Support</strong>
+              <strong>Fread App Support</strong>
             </p>
           </div>
         </div>
@@ -1245,7 +1245,7 @@ Score Machine Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: 'Thank You from The Score Machine',
+        subject: 'Thank You from Fread App',
         html: this.getEmailTemplate(content, 'Thank You')
       });
     } catch (error) {
@@ -1309,9 +1309,9 @@ Score Machine Team
             </p>
 
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
-              We appreciate you being part of the Score Machine ecosystem and look forward to continuing to support you.<br /><br />
+              We appreciate you being part of the Fread App ecosystem and look forward to continuing to support you.<br /><br />
               Best regards,<br />
-              <strong>Score Machine Support</strong>
+              <strong>Fread App Support</strong>
             </p>
           </div>
         </div>
@@ -1319,7 +1319,7 @@ Score Machine Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: 'Upcoming Payment Reminder - Score Machine',
+        subject: 'Upcoming Payment Reminder - Fread App',
         html: this.getEmailTemplate(content, 'Upcoming Payment')
       });
     } catch (error) {
@@ -1450,7 +1450,7 @@ Score Machine Team
       
       <p>Hi ${data.firstName},</p>
       
-      <p><strong>${data.adminName}</strong> has invited you to join their team on The Score Machine.</p>
+      <p><strong>${data.adminName}</strong> has invited you to join their team on Fread App.</p>
       
       ${passwordSection}
       
@@ -1462,12 +1462,12 @@ Score Machine Team
       
       <p>If you have any questions, please reach out to your administrator.</p>
       
-      <p style="margin-bottom: 30px;">Best regards,<br>The Score Machine Team</p>
+      <p style="margin-bottom: 30px;">Best regards,<br>Fread App Team</p>
     `;
 
     return await this.sendEmail({
       to: data.email,
-      subject: `You've been invited to join The Score Machine`,
+      subject: `You've been invited to join Fread App`,
       html: this.getEmailTemplate(content, 'Welcome to the Team')
     });
   }

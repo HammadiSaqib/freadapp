@@ -57,8 +57,8 @@ const ReferralFooter: React.FC<{ affiliate: AffiliateData }> = ({ affiliate }) =
           {/* Brand Column */}
           <div className="max-w-sm space-y-4">
             <div className="flex items-center space-x-2">
-              <img src="/image.png" alt="Score Machine" className="w-20 h-14" />
-              <span className="text-xl font-bold text-white">Score Machine</span>
+              <img src="/image.png" alt="Fread App" className="w-20 h-14" />
+              <span className="text-xl font-bold text-white">Fread App</span>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed">
               Empowering financial futures through AI-driven credit intelligence and professional management tools.
@@ -72,9 +72,9 @@ const ReferralFooter: React.FC<{ affiliate: AffiliateData }> = ({ affiliate }) =
                 <Phone className="w-4 h-4" />
               </a>
               <a
-                href="mailto:support@thescoremachine.com"
+                href="/contact"
                 className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800"
-                aria-label="Email support@thescoremachine.com"
+                aria-label="Contact Fread App support"
               >
                 <Mail className="w-4 h-4" />
               </a>
@@ -106,7 +106,7 @@ const ReferralFooter: React.FC<{ affiliate: AffiliateData }> = ({ affiliate }) =
 
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-slate-500 text-sm">
-            © {new Date().getFullYear()} Score Machine. All rights reserved.
+            © {new Date().getFullYear()} Fread App. All rights reserved.
           </p>
         </div>
       </div>
@@ -303,21 +303,21 @@ const ReferralLandingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white overflow-x-hidden font-sans selection:bg-teal-400/20 text-slate-600">
       <Helmet>
-        <title>Score Machine - Referred by {affiliate.firstName}</title>
-        <meta name="description" content={`Special offer from ${affiliate.name} to join Score Machine.`} />
+        <title>Fread App - Referred by {affiliate.firstName}</title>
+        <meta name="description" content={`Special offer from ${affiliate.name} to join Fread App.`} />
       </Helmet>
 
       <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
         <DialogContent className="w-[98vw] sm:w-[96vw] lg:w-[92vw] xl:w-[88vw] 2xl:w-[85vw] max-w-none m-0 p-0 overflow-hidden bg-white rounded-xl">
           <DialogHeader className="px-4 py-3 border-b border-slate-100 hidden sm:flex">
-            <DialogTitle>Score Machine Demo</DialogTitle>
+            <DialogTitle>Fread App Demo</DialogTitle>
           </DialogHeader>
           <div className="w-full bg-black h-[88dvh] sm:h-auto sm:aspect-video sm:max-h-[92vh]">
             {demoOpen && (
               <iframe
                 className="w-full h-full"
                 src="https://www.youtube.com/embed/4KwPYMarpbo?autoplay=1&rel=0"
-                title="Score Machine Pro Full Walkthrough"
+                title="Fread App Pro Full Walkthrough"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
               />
@@ -361,7 +361,7 @@ const ReferralLandingPage: React.FC = () => {
                 {affiliate.firstName}&apos;s Referral Link Has Two Landing Pages
               </h2>
               <p className="mt-3 text-base text-slate-600 md:text-lg">
-                Pick the experience you want to open: the current Score Machine Pro landing page, or the new Score Machine Elite landing page.
+                Pick the experience you want to open: the current Fread App Pro landing page, or the new Fread App Elite landing page.
               </p>
             </div>
 
@@ -372,7 +372,7 @@ const ReferralLandingPage: React.FC = () => {
                 className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-[0_20px_45px_rgba(20,184,166,0.18)]"
               >
                 <div className="border-b border-slate-200 bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 p-6 text-white">
-                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-white/80">Score Machine Pro</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-white/80">Fread App Pro</div>
                   <div className="mt-3 text-3xl font-black tracking-tight">Current Landing Page</div>
                   <div className="mt-2 max-w-sm text-sm text-white/90">
                     Keep the referral experience exactly as it works today.
@@ -408,7 +408,7 @@ const ReferralLandingPage: React.FC = () => {
                 className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_20px_45px_rgba(139,92,246,0.2)]"
               >
                 <div className="border-b border-slate-200 bg-[#0f172a] p-6 text-white">
-                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-violet-200">Score Machine Elite</div>
+                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-violet-200">Fread App Elite</div>
                   <div className="mt-3 bg-gradient-to-r from-violet-300 via-fuchsia-300 to-orange-300 bg-clip-text text-3xl font-black tracking-tight text-transparent">
                     New Elite Landing Page
                   </div>
@@ -467,9 +467,9 @@ const ReferralLandingPage: React.FC = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
              {/* Logo */}
-             <img src="/image.png" alt="Score Machine" className="w-20 h-14" />
+             <img src="/image.png" alt="Fread App" className="w-20 h-14" />
             <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-              Score Machine
+              Fread App
             </span>
           </div>
 
@@ -501,8 +501,8 @@ const ReferralLandingPage: React.FC = () => {
                 <SheetHeader>
                   <SheetTitle>
                      <div className="flex items-center space-x-2">
-                        <img src="/image.png" alt="Score Machine" className="w-16 h-10" />
-                        <span className="font-bold text-slate-900">Score Machine</span>
+                        <img src="/image.png" alt="Fread App" className="w-16 h-10" />
+                        <span className="font-bold text-slate-900">Fread App</span>
                      </div>
                   </SheetTitle>
                 </SheetHeader>
@@ -551,7 +551,7 @@ const ReferralLandingPage: React.FC = () => {
 
               <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 shadow-sm max-w-xl mx-auto lg:mx-0">
                   <p className="text-lg text-slate-700 mb-2">
-                    <span className="font-semibold text-teal-700">{affiliate.firstName}</span> has invited you to experience Score Machine.
+                    <span className="font-semibold text-teal-700">{affiliate.firstName}</span> has invited you to experience Fread App.
                   </p>
                   <p className="text-slate-600 leading-relaxed">
                      Access advanced credit insights, automated dispute tools, and professional-grade monitoring.
@@ -598,7 +598,7 @@ const ReferralLandingPage: React.FC = () => {
               </div>
               
               <p className="text-xs text-slate-500 italic max-w-md mx-auto lg:mx-0 leading-relaxed">
-                Join other users who were referred by {affiliate.firstName} and chose to explore Score Machine. No credit card required for signup.
+                Join other users who were referred by {affiliate.firstName} and chose to explore Fread App. No credit card required for signup.
               </p>
             </div>
 
@@ -658,7 +658,7 @@ const ReferralLandingPage: React.FC = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="text-center mb-24 max-w-3xl mx-auto">
             <Badge variant="outline" className="mb-6 border-teal-200 text-teal-700 bg-teal-50/50 px-4 py-1 text-sm font-medium rounded-full">
-              Why Choose Score Machine
+              Why Choose Fread App
             </Badge>
             <h2 className="text-4xl md:text-5xl font-bold mb-8 text-slate-900 tracking-tight leading-tight">
               Complete
@@ -861,12 +861,12 @@ const ReferralLandingPage: React.FC = () => {
             <h2 className="cta-content text-5xl md:text-7xl font-bold mb-8 tracking-tight text-white leading-tight">
               Start Your Journey <br />
               <span className="text-white">
-                With Score Machine
+                With Fread App
               </span>
             </h2>
             
             <p className="cta-content text-xl md:text-2xl text-slate-200 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
-              Join <span className="text-white font-medium">{affiliate.firstName}</span> and others who are working to improve their credit management using Score Machine tools. Outcomes vary and are not guaranteed.
+              Join <span className="text-white font-medium">{affiliate.firstName}</span> and others who are working to improve their credit management using Fread App tools. Outcomes vary and are not guaranteed.
             </p>
 
             <div className="cta-content flex flex-col sm:flex-row items-center justify-center gap-6">

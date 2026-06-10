@@ -1970,7 +1970,7 @@ export default function School() {
           <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="gradient-text-primary">
-                About Score Machine Academy
+                About Fread App Academy
               </CardTitle>
               <CardDescription>
                 Empowering professionals with knowledge and expertise
@@ -2203,7 +2203,7 @@ export default function School() {
   if (isEliteActive) {
     return (
       <DashboardLayout
-        title="Score Machine Academy"
+        title="Fread App Academy"
         description="Learn, grow, and earn points in our gamified learning platform"
         onAddClient={() => setShowAddClient(true)}
       >
@@ -2231,7 +2231,7 @@ export default function School() {
 
   return (
     <DashboardLayout
-      title="Score Machine Academy"
+      title="Fread App Academy"
       description="Learn, grow, and earn points in our gamified learning platform"
       onAddClient={() => setShowAddClient(true)}
     >
@@ -3192,7 +3192,7 @@ export default function School() {
               <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="gradient-text-primary">
-                    About Score Machine Academy
+                    About Fread App Academy
                   </CardTitle>
                   <CardDescription>
                     Empowering professionals with knowledge and expertise
@@ -3291,7 +3291,7 @@ export default function School() {
                     <Mail className="h-4 w-4 text-ocean-blue" />
                     <div>
                       <div className="text-sm font-medium">Email</div>
-                      <div className="text-xs text-muted-foreground">support@thescoremachine.com</div>
+                      <div className="text-xs text-muted-foreground">Use the contact form for support</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">

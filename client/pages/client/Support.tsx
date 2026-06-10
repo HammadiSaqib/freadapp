@@ -169,8 +169,8 @@ const Support = () => {
               <h3 className="font-semibold mb-2">Email Support</h3>
               <p className="text-sm text-gray-600 mb-3">Send us an email</p>
               <Button variant="outline" asChild>
-                <a href="mailto:support@thescoremachine.com">
-                  Send Email
+                <a href="/contact">
+                  Contact Support
                 </a>
               </Button>
             </CardContent>

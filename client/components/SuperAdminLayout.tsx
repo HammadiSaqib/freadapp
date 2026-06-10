@@ -126,7 +126,7 @@ export default function SuperAdminLayout({
   ];
 
   return (
-    <div className="flex h-screen bg-gradient-light dark:bg-slate-950">
+    <div className="admin-purple-theme flex h-screen bg-gradient-light dark:bg-slate-950">
       {/* Sidebar */}
       <SuperAdminSidebar className="hidden lg:flex" />
 
