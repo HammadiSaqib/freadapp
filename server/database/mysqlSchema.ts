@@ -466,6 +466,54 @@ export async function initializeMySQLDatabase(): Promise<void> {
     
     await createMySQLTables();
 
+    // Legacy imports can predate core auth columns used by current signup flows.
+    try {
+      const cols = await executeQuery(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
+      );
+      const existing = new Set((cols as any[]).map((r: any) => r.COLUMN_NAME));
+      const alters: string[] = [];
+      let backfillEmailVerified = false;
+      let backfillPasswordChangedAt = false;
+
+      if (!existing.has('email_verified')) {
+        alters.push('ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE');
+        backfillEmailVerified = true;
+      }
+      if (!existing.has('failed_login_attempts')) alters.push('ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0');
+      if (!existing.has('locked_until')) alters.push('ADD COLUMN locked_until DATETIME NULL');
+      if (!existing.has('last_login_ip')) alters.push('ADD COLUMN last_login_ip VARCHAR(45) NULL');
+      if (!existing.has('last_login_user_agent')) alters.push('ADD COLUMN last_login_user_agent TEXT NULL');
+      if (!existing.has('password_changed_at')) {
+        alters.push('ADD COLUMN password_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
+        backfillPasswordChangedAt = true;
+      }
+
+      if (alters.length > 0) {
+        await executeQuery(`ALTER TABLE users ${alters.join(', ')}`);
+      }
+
+      if (backfillEmailVerified) {
+        await executeQuery(`
+          UPDATE users
+          SET email_verified = CASE
+            WHEN status = 'pending' THEN FALSE
+            ELSE TRUE
+          END
+        `);
+      }
+
+      if (backfillPasswordChangedAt) {
+        await executeQuery(`
+          UPDATE users
+          SET password_changed_at = COALESCE(updated_at, created_at, NOW())
+          WHERE password_changed_at IS NULL
+        `);
+      }
+    } catch (e) {
+      console.error('Failed to update users auth schema:', e);
+    }
+
     try {
       const cols = await executeQuery(
         `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clients'`
