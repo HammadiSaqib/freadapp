@@ -144,7 +144,7 @@ const InvoiceView: React.FC = () => {
   const brand = useMemo(() => {
     const name = (invoice?.sender?.company_name || invoice?.from_company_name || 'The Capsol').trim();
     const email = (invoice?.sender?.email || invoice?.from_email || '').trim();
-    const logo = invoice?.sender?.logo_url || invoice?.from_logo_url || '/company-logo.svg';
+    const logo = invoice?.sender?.logo_url || invoice?.from_logo_url || '/image.png';
     return { name, email, logo };
   }, [invoice?.sender, invoice?.from_company_name, invoice?.from_email, invoice?.from_logo_url]);
 

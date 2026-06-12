@@ -576,10 +576,10 @@ export default function Settings() {
       try {
         return URL.createObjectURL(fundingSettings.gatewayLogoFile);
       } catch {
-        return (userProfile as any)?.nmi_gateway_logo || "/company-logo.svg";
+        return (userProfile as any)?.nmi_gateway_logo || "/image.png";
       }
     }
-    return (userProfile as any)?.nmi_gateway_logo || "/company-logo.svg";
+    return (userProfile as any)?.nmi_gateway_logo || "/image.png";
   }, [fundingSettings.gatewayLogoFile, userProfile]);
 
   // Revoke object URL when file changes/unmount to prevent memory leaks

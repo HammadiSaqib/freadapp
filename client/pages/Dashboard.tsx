@@ -355,7 +355,7 @@ export default function Dashboard() {
     ? "Scan the code below, open the referral page, or download the QR image to share it."
     : "Scan the code below, open the registration page, or download the QR image to share it.";
   const qrModalAlt = qrModalType === "referral" ? "Referral link QR code" : "Credit report registration QR code";
-  const qrLogoPath = "/company-logo.svg";
+  const qrLogoPath = "/image.png";
   const basicDashboardClient = useMemo(() => {
     if (!isBasicAdminPortalUser) {
       return null;

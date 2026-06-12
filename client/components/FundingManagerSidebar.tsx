@@ -121,7 +121,7 @@ export default function FundingManagerSidebar({ className = "" }: FundingManager
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/funding-manager" className="flex items-center space-x-2">
-               <img src="/company-logo.svg" alt="The Capsol" className="w-20 h-14" />
+               <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
               <span className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
                 Funding Manager
               </span>

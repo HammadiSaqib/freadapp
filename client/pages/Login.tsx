@@ -925,7 +925,7 @@ export default function Login() {
             {/* Header */}
             <div>
               <Link to="/" className="flex items-center space-x-3 mb-12">
-                <img src="/company-logo.svg" alt="The Capsol" className="w-20 h-14" />
+                <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
                 <div>
                   <span className="text-3xl font-bold">The Capsol</span>
                   <div className="text-white/80 text-sm">

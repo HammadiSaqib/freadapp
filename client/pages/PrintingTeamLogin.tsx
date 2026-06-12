@@ -148,7 +148,7 @@ export default function PrintingTeamLogin() {
         <motion.div variants={itemVariants} className="text-center">
           <div className="mx-auto w-20 h-20 bg-white p-3 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-slate-100 mb-6 flex items-center justify-center relative">
             <div className="absolute inset-0 bg-gradient-to-br from-[#00d4ff]/10 to-[#7000ff]/10 rounded-3xl"></div>
-            <img src="/company-logo.svg" alt="The Capsol" className="w-full h-full object-contain relative z-10" />
+            <img src="/image.png" alt="The Capsol" className="w-full h-full object-contain relative z-10" />
           </div>
           <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-[#7000ff] to-[#00d4ff] tracking-tight">
             The Capsol

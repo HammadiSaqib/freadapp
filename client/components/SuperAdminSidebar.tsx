@@ -221,7 +221,7 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/super-admin/overview" className="flex items-center space-x-2">
-               <img src="/company-logo.svg" alt="The Capsol" className="w-20 h-14" />
+               <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
               <span className="text-lg font-bold gradient-text-primary">
                 Super Admin
               </span>

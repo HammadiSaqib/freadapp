@@ -982,7 +982,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <img src="/company-logo.svg" alt="The Capsol" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
+              <img src="/image.png" alt="The Capsol" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
               <div className="min-w-0">
                 <span className={`block truncate text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : isBasicAdminPortalUser ? 'text-slate-900 dark:text-white' : 'gradient-text-primary'}`}>
                   The Capsol

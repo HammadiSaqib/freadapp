@@ -50,7 +50,7 @@ const LoadingScreen = ({ message = "Loading The Capsol..." }: LoadingScreenProps
           />
           
           <img
-            src="/company-logo.svg"
+            src="/image.png"
             alt="The Capsol Logo"
             className="w-32 h-32 md:w-40 md:h-40 object-contain relative z-10"
           />
