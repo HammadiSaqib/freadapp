@@ -477,7 +477,7 @@ export class AuthController {
       }
       
       // Check if user is active (database stores as 1 for active, 0 for inactive)
-      if (!user.is_active || user.is_active === 0) {
+      if (!isUserActive(user)) {
         return res.status(401).json({ error: 'Support team account is deactivated' });
       }
       
@@ -541,7 +541,7 @@ export class AuthController {
         return res.status(403).json({ error: 'Access denied. Only printing team members can log in here.' });
       }
 
-      if (!user.is_active || user.is_active === 0) {
+      if (!isUserActive(user)) {
         return res.status(401).json({ error: 'Printing team account is deactivated' });
       }
 
@@ -691,7 +691,7 @@ export class AuthController {
       }
       
       // Check if target admin is active
-      if (!targetAdmin.is_active) {
+      if (!isUserActive(targetAdmin)) {
         return res.status(400).json({ error: 'Target admin account is deactivated' });
       }
       
@@ -813,7 +813,7 @@ export class AuthController {
       }
       
       // Check if user is active
-      if (!supportUser.is_active || supportUser.is_active === 0) {
+      if (!isUserActive(supportUser)) {
         return res.status(403).json({ error: 'Support user account is deactivated' });
       }
       
@@ -1117,7 +1117,7 @@ export class AuthController {
       }
       
       // Check if user is active
-      if (!user.is_active) {
+      if (!isUserActive(user)) {
         return res.status(401).json({ error: 'Account is deactivated' });
       }
       

@@ -394,10 +394,10 @@ export default function Login() {
 
       console.log("Login response:", response);
 
-      if (response.error) {
+      if (response.data?.error) {
         toast({
           title: "Login Failed",
-          description: response.error,
+          description: response.data.error,
           variant: "destructive",
         });
         return;
@@ -408,11 +408,17 @@ export default function Login() {
         "Welcome back!",
         "Successfully logged in to your dashboard.",
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "An unexpected error occurred. Please try again.";
+
       toast({
         title: "Login Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
