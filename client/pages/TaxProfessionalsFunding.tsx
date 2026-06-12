@@ -11,10 +11,10 @@ export default function TaxProfessionalsFunding() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Tax Professionals Funding: Lines of Credit, Working Capital & Readiness | Fread App</title>
+        <title>Tax Professionals Funding: Lines of Credit, Working Capital & Readiness | The Capsol</title>
         <meta
           name="description"
-          content="Explore funding options for tax professionals and small firms. Fread App organizes credit insights and creates summaries to support responsible reviews. No approvals or outcomes are guaranteed."
+          content="Explore funding options for tax professionals and small firms. The Capsol organizes credit insights and creates summaries to support responsible reviews. No approvals or outcomes are guaranteed."
         />
         <link rel="canonical" href="https://scoremachine.com/tax-professionals-funding" />
       </Helmet>
@@ -32,7 +32,7 @@ export default function TaxProfessionalsFunding() {
               Funding Options and Credit Readiness for Tax Pros
             </h1>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Lines of credit, working capital, equipment financing, and SBA microloans may be used by tax professionals and small firms. Fread App helps organize credit insights, summarize information, and support responsible reviews. Tools are informational and do not guarantee approvals or outcomes.
+              Lines of credit, working capital, equipment financing, and SBA microloans may be used by tax professionals and small firms. The Capsol helps organize credit insights, summarize information, and support responsible reviews. Tools are informational and do not guarantee approvals or outcomes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
@@ -61,7 +61,7 @@ export default function TaxProfessionalsFunding() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">Funding Options for Tax Professionals</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Options vary by program and lender. Evaluate total costs, eligibility, and documentation requirements. Fread App helps present organized credit summaries for internal review and collaboration.
+              Options vary by program and lender. Evaluate total costs, eligibility, and documentation requirements. The Capsol helps present organized credit summaries for internal review and collaboration.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -92,7 +92,7 @@ export default function TaxProfessionalsFunding() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <Layers className="h-6 w-6 text-purple-600" />
-                <CardTitle>How Fread App Helps</CardTitle>
+                <CardTitle>How The Capsol Helps</CardTitle>
               </div>
               <CardDescription>
                 Organize credit report data, highlight general indicators, and export clean summaries.
@@ -150,7 +150,7 @@ export default function TaxProfessionalsFunding() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
-                  <Link to="/register">Sign Up for Fread App</Link>
+                  <Link to="/register">Sign Up for The Capsol</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="border-blue-600 text-blue-600" asChild>
                   <Link to="/pricing">See Plans</Link>
@@ -166,7 +166,7 @@ export default function TaxProfessionalsFunding() {
 
       <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          Fread App provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, approvals, or specific financial outcomes.
+          The Capsol provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, approvals, or specific financial outcomes.
         </p>
       </div>
 

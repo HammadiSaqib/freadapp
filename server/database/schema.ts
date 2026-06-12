@@ -961,7 +961,7 @@ async function seedDatabase() {
       demoPasswordHash,
       "John",
       "Doe",
-      "Fread App",
+      "The Capsol",
       "admin",
       1,
     ],

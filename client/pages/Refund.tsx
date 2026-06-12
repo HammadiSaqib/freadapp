@@ -26,7 +26,7 @@ const Refund: React.FC = () => {
                 Refund Policy
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                ADR Wealth Advisors LLC, d/b/a Fread App
+                ADR Wealth Advisors LLC, d/b/a The Capsol
               </p>
             </div>
 
@@ -40,7 +40,7 @@ const Refund: React.FC = () => {
                     <strong>Effective Date:</strong> {new Date().toLocaleDateString()}
                   </p>
                   <p className="text-sm text-slate-500 mt-2">
-                    This Refund Policy governs all fees, charges, and payments related to the use of Fread App software platform and associated services (the "Services"). This Policy is part of and incorporated into the FREAD APP MASTER SOFTWARE & SERVICES AGREEMENT (the "Agreement").
+                    This Refund Policy governs all fees, charges, and payments related to the use of The Capsol software platform and associated services (the "Services"). This Policy is part of and incorporated into the master agreement titled "THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT" (the "Agreement").
                   </p>
                 </div>
 
@@ -127,7 +127,7 @@ const Refund: React.FC = () => {
                 </p>
                 
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                  <p className="font-bold text-slate-900 mb-1">ADR Wealth Advisors LLC d/b/a Fread App</p>
+                  <p className="font-bold text-slate-900 mb-1">ADR Wealth Advisors LLC d/b/a The Capsol</p>
                   <p className="text-slate-600 mb-4">Attn: Legal Department<br/>5830 E 2ND ST, STE 7000 #24151<br/>Casper, Wyoming 82609</p>
                   
                   <div className="flex items-center gap-2 text-slate-600">

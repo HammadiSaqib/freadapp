@@ -290,7 +290,7 @@ export default function Index() {
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "Fread App is an AI-powered credit analysis and reporting platform designed for professionals and businesses. Access structured insights, automated workflows, client management tools, and secure credit file organization—all built with compliance, accuracy, and clarity in mind.",
+    "description": "The Capsol is an AI-powered credit analysis and reporting platform designed for professionals and businesses. Access structured insights, automated workflows, client management tools, and secure credit file organization—all built with compliance, accuracy, and clarity in mind.",
     "featureList": "AI-assisted credit file organization, Structured report summaries, Progress tracking and score timelines, Automated dispute letter generation, Professional client dashboard, Multi-client management tools, Secure data encryption (SOC 2 standards), White-label and branding options, Automated workflows for credit professionals, Real-time analytics and report insights, PDF export and summary tools, Compliance-focused credit data handling, Team and employee management, API access"
   };
 
@@ -504,23 +504,23 @@ export default function Index() {
   return (
     <div ref={containerRef} className="min-h-screen bg-white overflow-x-hidden font-sans selection:bg-teal-400/20 text-slate-600">
       <Helmet>
-        <title>Fread App – AI-Powered Credit Analysis Platform</title>
-        <meta name="description" content="Fread App is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
+        <title>The Capsol – AI-Powered Credit Analysis Platform</title>
+        <meta name="description" content="The Capsol is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
         <meta name="keywords" content="AI credit analysis tools, credit reporting software, credit file organization, credit industry platform, professional credit analytics, credit workflow automation, secure credit software, free credit score, AI-driven credit intelligence for lenders, credit card recommendations, Professional funding CRM software, how to fix credit report, FCRA compliant credit dispute system, VantageScore vs FICO, Underwriting Blueprint analysis for business funding, personal loan comparison, Automated fundability score check" />
         <link rel="canonical" href="https://scoremachine.com/" />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://scoremachine.com/" />
-        <meta property="og:title" content="Fread App – AI-Powered Credit Analysis Platform" />
-        <meta property="og:description" content="Fread App is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
+        <meta property="og:title" content="The Capsol – AI-Powered Credit Analysis Platform" />
+        <meta property="og:description" content="The Capsol is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
         <meta property="og:image" content="https://scoremachine.com/site-image.png" />
 
         {/* Twitter */}
         <meta property="twitter:card" content="summary_large_image" />
         <meta property="twitter:url" content="https://scoremachine.com/" />
-        <meta property="twitter:title" content="Fread App – AI-Powered Credit Analysis Platform" />
-        <meta property="twitter:description" content="Fread App is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
+        <meta property="twitter:title" content="The Capsol – AI-Powered Credit Analysis Platform" />
+        <meta property="twitter:description" content="The Capsol is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely." />
         <meta property="twitter:image" content="https://scoremachine.com/site-image.png" />
 
         <script type="application/ld+json">
@@ -535,7 +535,7 @@ export default function Index() {
               "price": "0",
               "priceCurrency": "USD"
             },
-            "description": "Fread App is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely.",
+            "description": "The Capsol is the AI-powered credit analysis platform for professionals. Automate workflows, get structured insights, and manage clients securely.",
             "featureList": "AI-assisted credit file organization, Structured report summaries, Progress tracking and score timelines, Automated dispute letter generation, Professional client dashboard, Multi-client management tools, Secure data encryption (SOC 2 standards), White-label and branding options, Automated workflows for credit professionals, Real-time analytics and report insights, PDF export and summary tools, Compliance-focused credit data handling, Team and employee management, API access"
           })}
         </script>
@@ -580,7 +580,7 @@ export default function Index() {
             <div className="space-y-8 text-center lg:text-left">
               <div className="hero-text-item inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 border border-slate-200 backdrop-blur-md shadow-sm">
                 <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-sm font-medium text-slate-700">Fread App</span>
+                <span className="text-sm font-medium text-slate-700">The Capsol</span>
               </div>
 
               <h1 className="hero-text-item text-5xl lg:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
@@ -592,7 +592,7 @@ export default function Index() {
               </h1>
 
               <p className="hero-text-item text-xl text-slate-600 leading-relaxed max-w-xl mx-auto lg:mx-0">
-                Built for credit experts, funding consultants, and financial service providers who demand accuracy, clarity, and modern tools. Fread App delivers advanced credit insights through structured analytics and innovative AI technology.
+                Built for credit experts, funding consultants, and financial service providers who demand accuracy, clarity, and modern tools. The Capsol delivers advanced credit insights through structured analytics and innovative AI technology.
               </p>
 
                 <div className="flex flex-col gap-2">
@@ -627,7 +627,7 @@ export default function Index() {
                 <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-teal-500/20 via-emerald-500/10 to-transparent blur-2xl" />
                 <img
                   src="/frame_chrome_mac_dark.png"
-                  alt="Fread App dashboard preview"
+                  alt="The Capsol dashboard preview"
                   loading="lazy"
                   decoding="async"
                   className="relative w-full max-w-[720px] rounded-3xl shadow-2xl border border-slate-200"
@@ -766,7 +766,7 @@ export default function Index() {
             <h2 className="text-4xl font-bold text-slate-900">
               Transform the Way You <span className="text-teal-600">Understand Credit</span>
             </h2>
-            <p className="text-slate-500 mt-4 text-lg">Fread App streamlines the entire process of reviewing and organizing credit information.</p>
+            <p className="text-slate-500 mt-4 text-lg">The Capsol streamlines the entire process of reviewing and organizing credit information.</p>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -812,7 +812,7 @@ export default function Index() {
                             src="https://img.youtube.com/vi/4KwPYMarpbo/maxresdefault.jpg"
                             srcSet="https://img.youtube.com/vi/4KwPYMarpbo/mqdefault.jpg 320w, https://img.youtube.com/vi/4KwPYMarpbo/hqdefault.jpg 480w, https://img.youtube.com/vi/4KwPYMarpbo/sddefault.jpg 640w, https://img.youtube.com/vi/4KwPYMarpbo/maxresdefault.jpg 1280w"
                             sizes="(max-width: 640px) 100vw, 600px"
-                            alt="Fread App Pro Full Walkthrough (2025)"
+                            alt="The Capsol Pro Full Walkthrough (2025)"
                             loading="lazy"
                             decoding="async"
                             width="1280"
@@ -830,7 +830,7 @@ export default function Index() {
                          width="100%" 
                          height="100%" 
                          src="https://www.youtube.com/embed/4KwPYMarpbo?autoplay=1&rel=0" 
-                         title="Fread App Pro Full Walkthrough (2025)" 
+                         title="The Capsol Pro Full Walkthrough (2025)" 
                          frameBorder="0" 
                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                          allowFullScreen
@@ -865,7 +865,7 @@ export default function Index() {
               Trusted by Industry Leaders
             </h2>
             <p className="text-slate-600 text-lg max-w-2xl mx-auto">
-              See what top professionals are saying about their experience with Fread App Pro.
+              See what top professionals are saying about their experience with The Capsol Pro.
             </p>
           </div>
 
@@ -1012,7 +1012,7 @@ export default function Index() {
         <div className="container mx-auto px-4 text-center max-w-4xl">
            <h2 className="about-item text-3xl lg:text-4xl font-bold mb-6 text-slate-900">Built for Professional Accuracy and Compliance</h2>
            <p className="about-item text-lg text-slate-600 mb-10">
-             Fread App is designed to meet the needs of modern financial professionals. Our system is built with:
+             The Capsol is designed to meet the needs of modern financial professionals. Our system is built with:
            </p>
            
            <div className="about-item flex flex-wrap justify-center gap-4 mb-12">
@@ -1056,7 +1056,7 @@ export default function Index() {
           </h2>
           
           <p className="affiliate-anim text-xl text-slate-300 max-w-3xl mx-auto mb-12 leading-relaxed">
-            Earn recurring commissions by referring professionals to Fread App.
+            Earn recurring commissions by referring professionals to The Capsol.
           </p>
           
           <div className="affiliate-anim grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">

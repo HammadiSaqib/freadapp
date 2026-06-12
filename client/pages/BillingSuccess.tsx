@@ -149,7 +149,7 @@ const BillingSuccess = () => {
                   <Users className="h-6 w-6 text-emerald-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-2xl">Welcome to the Fread App Family</CardTitle>
+                  <CardTitle className="text-2xl">Welcome to The Capsol Family</CardTitle>
                   <CardDescription>Everything you need to get started</CardDescription>
                 </div>
               </div>

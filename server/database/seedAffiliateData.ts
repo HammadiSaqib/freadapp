@@ -93,7 +93,7 @@ export async function seedAffiliateCommissions(): Promise<void> {
         commission_amount: 59.99,
         status: 'paid',
         tier: 'Silver',
-        product: 'Fread App - Monthly',
+        product: 'The Capsol - Monthly',
         order_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
         payment_date: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000), // 25 days ago
         commission_type: 'signup',

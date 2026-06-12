@@ -2347,7 +2347,7 @@ router.get('/admins/:id/tsm-elite-agreements', authenticateToken, requireSuperAd
 
       return {
         id: row.template_id,
-        title: row.name || 'Fread App Elite Agreement',
+        title: row.name || 'The Capsol Elite Agreement',
         description: row.description ?? null,
         content,
         status: normalizedStatus,
@@ -2362,8 +2362,8 @@ router.get('/admins/:id/tsm-elite-agreements', authenticateToken, requireSuperAd
 
     res.json({ success: true, data: agreements });
   } catch (error) {
-    console.error('Error fetching admin Fread App Elite agreements:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch admin Fread App Elite agreements' });
+    console.error('Error fetching admin The Capsol Elite agreements:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch admin The Capsol Elite agreements' });
   }
 });
 
@@ -2401,7 +2401,7 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
           );
 
       if (!template) {
-        return res.status(404).json({ success: false, error: 'No Fread App Elite agreement found' });
+        return res.status(404).json({ success: false, error: 'No The Capsol Elite agreement found' });
       }
 
       const signatureRow = await db.getQuery(
@@ -2440,12 +2440,12 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
 
       const adminName = [adminUser.first_name, adminUser.last_name].filter(Boolean).join(' ').trim();
 
-      doc.fontSize(20).text('Fread App Elite Agreement', { align: 'center' });
+      doc.fontSize(20).text('The Capsol Elite Agreement', { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(11);
       doc.text(`Admin: ${adminName || adminUser.email || `#${adminId}`}`);
       if (adminUser.email) doc.text(`Email: ${adminUser.email}`);
-      doc.text(`Template: ${template.name || 'Fread App Elite Agreement'}`);
+      doc.text(`Template: ${template.name || 'The Capsol Elite Agreement'}`);
       doc.text(`Status: ${templateStatus}`);
       if (template.created_at) doc.text(`Created: ${new Date(template.created_at).toISOString()}`);
       if (signatureSignedAt) doc.text(`Signed At: ${new Date(signatureSignedAt).toISOString()}`);
@@ -2647,13 +2647,13 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
   }
 });
 
-const DEFAULT_TEMPLATE_NAME = 'FREAD APP MASTER SOFTWARE & SERVICES AGREEMENT';
+const DEFAULT_TEMPLATE_NAME = 'THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT';
 const DEFAULT_TEMPLATE_DESCRIPTION = 'Default master agreement template';
-const DEFAULT_TEMPLATE_CONTENT = `<h1>FREAD APP MASTER SOFTWARE & SERVICES AGREEMENT</h1>
-<p>This Master Software &amp; Services Agreement (this “Agreement”) is a binding legal contract entered into by and between ADR Wealth Advisors LLC, doing business as Fread App (hereinafter referred to as the “Company”), and the individual or legal entity that (a) creates a user account on the Platform, (b) executes or accepts this Agreement in connection with the use of the Platform or Services, or (c) otherwise accesses, interacts with, or utilizes any functionality, component, or feature of the Fread App software platform.</p>
+const DEFAULT_TEMPLATE_CONTENT = `<h1>THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT</h1>
+<p>This Master Software &amp; Services Agreement (this “Agreement”) is a binding legal contract entered into by and between ADR Wealth Advisors LLC, doing business as The Capsol (hereinafter referred to as the “Company”), and the individual or legal entity that (a) creates a user account on the Platform, (b) executes or accepts this Agreement in connection with the use of the Platform or Services, or (c) otherwise accesses, interacts with, or utilizes any functionality, component, or feature of The Capsol software platform.</p>
 <p>This Agreement shall be effective as of the date on which User signifies assent by clicking an acceptance button, checking an acknowledgment box, executing an electronic or handwritten signature, or otherwise performing any affirmative act evidencing acceptance of this Agreement, including by accessing or using the Platform or any portion thereof (the “Effective Date”).</p>
 <h2>RECITALS</h2>
-<p>A. The Company has conceived, designed, engineered, developed, authored, and currently owns and operates a proprietary and confidential suite of integrated software systems, databases, source and object code, proprietary algorithms, models, user interfaces, dashboards, application-programming interfaces (“APIs”), analytic engines, data integrations, documentation, and related technological and functional assets (collectively referred to as the “Platform,” and marketed as “Fread App”).</p>
+<p>A. The Company has conceived, designed, engineered, developed, authored, and currently owns and operates a proprietary and confidential suite of integrated software systems, databases, source and object code, proprietary algorithms, models, user interfaces, dashboards, application-programming interfaces (“APIs”), analytic engines, data integrations, documentation, and related technological and functional assets (collectively referred to as the “Platform,” and marketed as “The Capsol”).</p>
 <p>B. The Platform presently integrates, and is expressly designed to integrate and interoperate in the future, with a variety of third-party credit-data providers, financial-information repositories, and ancillary data-aggregation services (including, without limitation, MyFreeScoreNow®, MyScoreIQ®, IdentityIQ®, and any successor, replacement, licensed, or proprietary data providers collectively referred to herein as the “Third-Party Data Providers”).</p>
 <p>C. The User desires to obtain access to and utilize the Platform and the Services for the User’s own legitimate internal purposes and, in consideration of such access, expressly agrees to be bound by all terms, conditions, restrictions, and limitations set forth in this Agreement.</p>
 <h2>ARTICLE I — GRANT OF LICENSE; SCOPE OF SERVICES; ACCESS; THIRD-PARTY SOURCES</h2>`;

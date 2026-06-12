@@ -84,7 +84,7 @@ const getActivePlanPermissionSets = async (effectiveAdminUserId: number): Promis
       ...activeSubscriptions.map((subscription) => parseStringArray(subscription?.page_permissions))
     );
   } catch (subscriptionError) {
-    console.warn('Failed to read subscriptions while checking Fread App portal access:', subscriptionError);
+    console.warn('Failed to read subscriptions while checking The Capsol portal access:', subscriptionError);
   }
 
   try {
@@ -102,7 +102,7 @@ const getActivePlanPermissionSets = async (effectiveAdminUserId: number): Promis
       ...adminSubscriptions.map((subscription) => parseStringArray(subscription?.page_permissions))
     );
   } catch (adminSubscriptionError) {
-    console.warn('Failed to read admin_subscriptions while checking Fread App portal access:', adminSubscriptionError);
+    console.warn('Failed to read admin_subscriptions while checking The Capsol portal access:', adminSubscriptionError);
   }
 
   return permissionSets;

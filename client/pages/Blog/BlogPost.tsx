@@ -124,7 +124,7 @@ const BlogPost = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       <Helmet>
-        <title>{post.seo_title || post.title} | Fread App Blog</title>
+        <title>{post.seo_title || post.title} | The Capsol Blog</title>
         <meta name="description" content={post.seo_description || post.excerpt} />
         {post.seo_keywords && <meta name="keywords" content={post.seo_keywords} />}
         {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
@@ -153,7 +153,7 @@ const BlogPost = () => {
             datePublished: post.published_at,
             author: {
               "@type": "Person",
-              name: `${post.author_first_name || ""} ${post.author_last_name || ""}`.trim() || "Fread App"
+              name: `${post.author_first_name || ""} ${post.author_last_name || ""}`.trim() || "The Capsol"
             },
             mainEntityOfPage: canonicalUrl || undefined
           })}

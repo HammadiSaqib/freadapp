@@ -583,7 +583,7 @@ export default function Login() {
         
         toast({
           title: "Account Created!",
-          description: "Welcome to Fread App. Your account has been created successfully.",
+          description: "Welcome to The Capsol. Your account has been created successfully.",
         });
         
         // Navigate to admin dashboard after successful verification and auto-login
@@ -796,7 +796,7 @@ export default function Login() {
     {
       icon: Users,
       title: "Client Management",
-      description: "Complete CRM for funding professionals with Fread App",
+      description: "Complete CRM for funding professionals with The Capsol",
     },
     {
       icon: BarChart3,
@@ -809,7 +809,7 @@ export default function Login() {
     {
       name: "Sarah Rodriguez",
       company: "Credit Solutions Inc.",
-      text: "Fread App improved our workflow efficiency significantly.",
+      text: "The Capsol improved our workflow efficiency significantly.",
       rating: 5,
     },
     {
@@ -925,9 +925,9 @@ export default function Login() {
             {/* Header */}
             <div>
               <Link to="/" className="flex items-center space-x-3 mb-12">
-                <img src="/company-logo.svg" alt="Fread App" className="w-20 h-14" />
+                <img src="/company-logo.svg" alt="The Capsol" className="w-20 h-14" />
                 <div>
-                  <span className="text-3xl font-bold">Fread App</span>
+                  <span className="text-3xl font-bold">The Capsol</span>
                   <div className="text-white/80 text-sm">
                     AI-Powered Credit Solutions
                   </div>
@@ -1014,7 +1014,7 @@ export default function Login() {
                 </div>
                 <div>
                   <span className="text-2xl font-bold bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent">
-                    Fread App
+                    The Capsol
                   </span>
                   <div className="text-muted-foreground text-sm">
                     AI-Powered Platform

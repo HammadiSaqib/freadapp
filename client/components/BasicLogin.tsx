@@ -58,7 +58,7 @@ export default function BasicLogin({
           <div className="w-10 h-10 bg-black flex items-center justify-center">
             <Shield className="h-6 w-6 text-white" />
           </div>
-          <span className="text-2xl font-bold uppercase tracking-wider text-black">Fread App</span>
+          <span className="text-2xl font-bold uppercase tracking-wider text-black">The Capsol</span>
         </Link>
         <p className="mt-2 text-sm text-gray-600 uppercase font-semibold tracking-wide">Standard Access Portal</p>
       </div>
@@ -342,7 +342,7 @@ export default function BasicLogin({
       </div>
 
       <div className="mt-8 text-center text-xs text-gray-500 uppercase font-semibold tracking-wide">
-        &copy; {new Date().getFullYear()} Fread App. All rights reserved.
+        &copy; {new Date().getFullYear()} The Capsol. All rights reserved.
       </div>
     </div>
   );

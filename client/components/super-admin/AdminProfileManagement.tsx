@@ -106,7 +106,7 @@ const SCORE_MACHINE_PORTAL_PERMISSION_IDS = [
     { id: 'analytics_view', label: 'Analytics View', category: 'Reports' },
     { id: 'system_settings', label: 'System Settings', category: 'System' },
     { id: 'admin_management', label: 'Admin Management', category: 'Admin' },
-    { id: 'score_machine_elite', label: 'Allow Fread App Elite', category: 'Admin' },
+    { id: 'score_machine_elite', label: 'Allow The Capsol Elite', category: 'Admin' },
     { id: 'score_machine_basic', label: 'Allow Basic Only', category: 'Admin' },
     { id: 'unlimited_ai_tokens', label: 'Unlimited AI Tokens (no AI-Matched limit)', category: 'Admin' },
     { id: 'unlimited_openai_prompts', label: 'Unlimited Open AI Prompt', category: 'Admin' },
@@ -388,7 +388,7 @@ const AdminForm = React.memo(({
               {category === 'Admin' && (
                 <div className="space-y-3 rounded-lg border border-gray-200 p-3">
                   <p className="text-sm font-medium text-gray-700">
-                    Allow Fread App Elite | Allow Basic Only
+                    Allow The Capsol Elite | Allow Basic Only
                   </p>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {portalPermissions.map((permission) => (

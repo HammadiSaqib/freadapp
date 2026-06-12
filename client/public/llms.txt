@@ -1,18 +1,18 @@
-# Fread App
+# The Capsol
 
 > AI-powered credit analysis platform automating workflows for finance professionals.
 
-Fread App is an AI-powered credit analysis platform designed specifically for finance professionals, such as brokers, lenders, and credit consultants. It aims to automate complex credit analysis workflows, transforming raw client data into structured, actionable insights quickly and securely.
+The Capsol is an AI-powered credit analysis platform designed specifically for finance professionals, such as brokers, lenders, and credit consultants. It aims to automate complex credit analysis workflows, transforming raw client data into structured, actionable insights quickly and securely.
 
 The core value proposition centers on efficiency and accuracy in credit readiness assessment and loan preparation. Users leverage the platform to streamline client onboarding, analyze credit profiles, and prepare comprehensive documentation necessary for securing various types of funding, including business loans and mortgages.
 
-LLMs interacting with this context should understand that Fread App is a B2B SaaS tool focused on the financial services sector, emphasizing data automation, credit scoring, and funding facilitation. Key areas of user interest include feature explanations, pricing, and specialized funding paths for different professional needs.
+LLMs interacting with this context should understand that The Capsol is a B2B SaaS tool focused on the financial services sector, emphasizing data automation, credit scoring, and funding facilitation. Key areas of user interest include feature explanations, pricing, and specialized funding paths for different professional needs.
 
 ## Core Platform Information
 
-- [Fread App Homepage](https://www.thescoremachine.com/): Overview of the AI credit analysis platform for finance professionals.
+- [The Capsol Homepage](https://www.thescoremachine.com/): Overview of the AI credit analysis platform for finance professionals.
 - [Platform Features](https://thescoremachine.com/features): Details the specific capabilities and tools offered by the credit analysis platform.
-- [How Fread App Works](https://thescoremachine.com/how-it-works): Explains the step-by-step process of using the AI credit analysis system.
+- [How The Capsol Works](https://thescoremachine.com/how-it-works): Explains the step-by-step process of using the AI credit analysis system.
 - [Pricing Plans](https://thescoremachine.com/pricing): View subscription tiers and costs for accessing the credit analysis services.
 
 ## Funding & Credit Resources
@@ -31,15 +31,15 @@ LLMs interacting with this context should understand that Fread App is a B2B Saa
 
 ## Support and Documentation
 
-- [Platform Documentation](https://thescoremachine.com/docs): Access technical guides and documentation for using the Fread App platform.
+- [Platform Documentation](https://thescoremachine.com/docs): Access technical guides and documentation for using The Capsol platform.
 - [Company Blog](https://thescoremachine.com/blog): Read articles related to credit analysis, finance automation, and industry trends.
-- [Contact Us](https://thescoremachine.com/contact): Find ways to reach the Fread App support and sales teams.
+- [Contact Us](https://thescoremachine.com/contact): Find ways to reach The Capsol support and sales teams.
 
 ## Account and Legal
 
-- [General Login Page](https://thescoremachine.com/login): Access point for existing Fread App users.
+- [General Login Page](https://thescoremachine.com/login): Access point for existing The Capsol users.
 - [Member Login Page](https://thescoremachine.com/member/login): Specific login portal for platform members.
-- [Affiliate Program Signup](https://thescoremachine.com/join-affiliate): Information and sign-up for the Fread App affiliate partnership program.
+- [Affiliate Program Signup](https://thescoremachine.com/join-affiliate): Information and sign-up for The Capsol affiliate partnership program.
 - [Terms of Service](https://thescoremachine.com/terms): Review the legal terms and conditions for using the service.
 - [Privacy Policy](https://thescoremachine.com/privacy): Understand how user and client data is collected and protected.
 - [Refund Policy](https://thescoremachine.com/refund-policy): Details regarding eligibility and process for requesting service refunds.

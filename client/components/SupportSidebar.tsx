@@ -170,7 +170,7 @@ export default function SupportSidebar({ className }: SupportSidebarProps) {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/support/dashboard" className="flex items-center space-x-2">
-              <img src="/company-logo.svg" alt="Fread App" className="w-20 h-14" loading="lazy" />
+              <img src="/company-logo.svg" alt="The Capsol" className="w-20 h-14" loading="lazy" />
               <span className="text-lg font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
                 Support Portal
               </span>

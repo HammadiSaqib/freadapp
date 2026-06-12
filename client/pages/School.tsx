@@ -1970,7 +1970,7 @@ export default function School() {
           <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="gradient-text-primary">
-                About Fread App Academy
+                About The Capsol Academy
               </CardTitle>
               <CardDescription>
                 Empowering professionals with knowledge and expertise
@@ -2203,7 +2203,7 @@ export default function School() {
   if (isEliteActive) {
     return (
       <DashboardLayout
-        title="Fread App Academy"
+        title="The Capsol Academy"
         description="Learn, grow, and earn points in our gamified learning platform"
         onAddClient={() => setShowAddClient(true)}
       >
@@ -2231,7 +2231,7 @@ export default function School() {
 
   return (
     <DashboardLayout
-      title="Fread App Academy"
+      title="The Capsol Academy"
       description="Learn, grow, and earn points in our gamified learning platform"
       onAddClient={() => setShowAddClient(true)}
     >
@@ -3192,7 +3192,7 @@ export default function School() {
               <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="gradient-text-primary">
-                    About Fread App Academy
+                    About The Capsol Academy
                   </CardTitle>
                   <CardDescription>
                     Empowering professionals with knowledge and expertise

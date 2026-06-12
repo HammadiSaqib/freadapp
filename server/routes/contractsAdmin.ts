@@ -219,12 +219,12 @@ router.get('/tsm-elite/latest', async (req: Request, res: Response) => {
 
     const eligibility = await getScoreMachineEliteAccessStatus(Number(user.id));
     if (!eligibility.hasAccess) {
-      return res.status(403).json({ success: false, error: 'Fread App Elite is not enabled for this account' });
+      return res.status(403).json({ success: false, error: 'The Capsol Elite is not enabled for this account' });
     }
 
     const template = await getLatestActiveTsmEliteTemplate();
     if (!template) {
-      return res.status(404).json({ success: false, error: 'No active Fread App Elite agreement found' });
+      return res.status(404).json({ success: false, error: 'No active The Capsol Elite agreement found' });
     }
 
     const adapter = getDatabaseAdapter();
@@ -245,15 +245,15 @@ router.get('/tsm-elite/latest', async (req: Request, res: Response) => {
         id: template.id,
         template_id: template.id,
         status: signature?.signature_image_url ? 'signed' : 'pending_signature',
-        title: 'Fread App Elite Agreement',
+        title: 'The Capsol Elite Agreement',
         content,
         signature_image_url: signature?.signature_image_url ?? null,
         can_sign: user?.role === 'admin',
       }
     });
   } catch (error) {
-    console.error('Error fetching latest Fread App Elite agreement:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch Fread App Elite agreement' });
+    console.error('Error fetching latest The Capsol Elite agreement:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch The Capsol Elite agreement' });
   }
 });
 
@@ -261,18 +261,18 @@ router.post('/tsm-elite/latest/sign', requireRole('admin', 'super_admin'), async
   try {
     const user = (req as any).user;
     if (user?.role !== 'admin') {
-      return res.status(403).json({ success: false, error: 'Only admins can sign Fread App Elite agreements' });
+      return res.status(403).json({ success: false, error: 'Only admins can sign The Capsol Elite agreements' });
     }
 
     const eligibility = await getScoreMachineEliteAccessStatus(Number(user.id));
     if (!eligibility.hasAccess) {
-      return res.status(403).json({ success: false, error: 'Fread App Elite is not enabled for this admin' });
+      return res.status(403).json({ success: false, error: 'The Capsol Elite is not enabled for this admin' });
     }
 
     const payload = tsmEliteSignSchema.parse(req.body);
     const template = await getLatestActiveTsmEliteTemplate();
     if (!template) {
-      return res.status(404).json({ success: false, error: 'No active Fread App Elite agreement found' });
+      return res.status(404).json({ success: false, error: 'No active The Capsol Elite agreement found' });
     }
 
     const adapter = getDatabaseAdapter();
@@ -299,13 +299,13 @@ router.post('/tsm-elite/latest/sign', requireRole('admin', 'super_admin'), async
       );
     }
 
-    res.status(201).json({ success: true, message: 'Fread App Elite agreement signed' });
+    res.status(201).json({ success: true, message: 'The Capsol Elite agreement signed' });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: 'Validation error', details: error.errors });
     }
-    console.error('Error signing latest Fread App Elite agreement:', error);
-    res.status(500).json({ success: false, error: 'Failed to sign Fread App Elite agreement' });
+    console.error('Error signing latest The Capsol Elite agreement:', error);
+    res.status(500).json({ success: false, error: 'Failed to sign The Capsol Elite agreement' });
   }
 });
 

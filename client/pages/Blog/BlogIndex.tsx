@@ -62,8 +62,8 @@ const BlogIndex = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       <Helmet>
-        <title>Blog - Fread App | Credit Repair Insights & Updates</title>
-        <meta name="description" content="Latest news, updates, and expert insights on credit repair, financial freedom, and Fread App platform features." />
+        <title>Blog - The Capsol | Credit Repair Insights & Updates</title>
+        <meta name="description" content="Latest news, updates, and expert insights on credit repair, financial freedom, and The Capsol platform features." />
       </Helmet>
 
       <SiteHeader />
@@ -77,7 +77,7 @@ const BlogIndex = () => {
               Insights & <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-400">Resources</span>
             </h1>
             <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-              Discover the latest strategies for credit repair, business growth, and getting the most out of Fread App.
+              Discover the latest strategies for credit repair, business growth, and getting the most out of The Capsol.
             </p>
             
             <div className="max-w-xl mx-auto relative">

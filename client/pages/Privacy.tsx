@@ -25,7 +25,7 @@ const Privacy: React.FC = () => {
                 Privacy Policy
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Privacy Policy for FREAD APP MASTER SOFTWARE & SERVICES
+                Privacy Policy for THE CAPSOL MASTER SOFTWARE & SERVICES
               </p>
             </div>
 
@@ -39,11 +39,11 @@ const Privacy: React.FC = () => {
                 </div>
 
                 <p className="text-slate-600 leading-relaxed">
-                  This Privacy Policy describes how ADR Wealth Advisors LLC, doing business as Fread App (the "Company," "we," "us," or "our"), collects, uses, processes, and protects the information we obtain in connection with your use of our proprietary software platform and services (collectively, the "Platform" or "Services").
+                  This Privacy Policy describes how ADR Wealth Advisors LLC, doing business as The Capsol (the "Company," "we," "us," or "our"), collects, uses, processes, and protects the information we obtain in connection with your use of our proprietary software platform and services (collectively, the "Platform" or "Services").
                 </p>
 
                 <p className="text-slate-600 leading-relaxed">
-                  This Privacy Policy is an integral part of and is subject to the FREAD APP MASTER SOFTWARE & SERVICES AGREEMENT (the "Agreement"). All capitalized terms not defined herein have the meanings set forth in the Agreement.
+                  This Privacy Policy is an integral part of and is subject to the master agreement titled "THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT" (the "Agreement"). All capitalized terms not defined herein have the meanings set forth in the Agreement.
                 </p>
 
                 <hr className="my-8 border-slate-200" />
@@ -221,7 +221,7 @@ const Privacy: React.FC = () => {
                   If you have questions about this Privacy Policy or our data handling practices, please contact us at:
                 </p>
                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                  <p className="text-slate-800 font-semibold">ADR Wealth Advisors LLC d/b/a Fread App</p>
+                  <p className="text-slate-800 font-semibold">ADR Wealth Advisors LLC d/b/a The Capsol</p>
                   <p className="text-slate-600">Attn: Legal Department</p>
                   <p className="text-slate-600">5830 E 2ND ST, STE 7000 #24151</p>
                   <p className="text-slate-600 mb-2">Casper, Wyoming 82609</p>

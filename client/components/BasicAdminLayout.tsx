@@ -314,7 +314,7 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-300 flex flex-col shrink-0">
         <div className="h-14 border-b border-gray-300 flex items-center px-4">
-          <span className="font-bold text-lg uppercase tracking-wider">Fread App</span>
+          <span className="font-bold text-lg uppercase tracking-wider">The Capsol</span>
         </div>
         
         <div className="p-4 border-b border-gray-300 bg-gray-50">

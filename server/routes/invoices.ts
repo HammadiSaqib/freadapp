@@ -431,7 +431,7 @@ router.post('/public/:token/send-email', async (req: Request, res: Response) => 
     }
 
     const publicUrl = `${ENV_CONFIG.FRONTEND_URL.replace(/\/$/, '')}/invoice/${invoice.public_token}`;
-    const subject = `Invoice ${invoice.invoice_number} from Fread App`;
+    const subject = `Invoice ${invoice.invoice_number} from The Capsol`;
     const html = `
       <div style="font-family: Inter, Arial, sans-serif; line-height: 1.6; color: #1e293b;">
         <h2 style="margin: 0 0 12px;">Your Funding Invoice</h2>

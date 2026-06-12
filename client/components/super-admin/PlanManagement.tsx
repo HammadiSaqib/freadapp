@@ -31,8 +31,8 @@ const ADMIN_PAGES = [
   { id: 'ai-coach', name: 'AI Coach', path: '/ai-coach', description: 'AI coaching features' },
   { id: 'school', name: 'School', path: '/school', description: 'Educational content' },
   { id: 'analytics', name: 'Analytics', path: '/analytics', description: 'Analytics and insights' },
-  { id: 'score-machine-elite', name: 'Fread App Elite', path: '/score-machine-elite', description: 'Fread App Elite access' },
-  { id: 'score-machine-basic', name: 'Fread App Basic', path: '/score-machine-basic', description: 'Fread App Basic access' },
+  { id: 'score-machine-elite', name: 'The Capsol Elite', path: '/score-machine-elite', description: 'The Capsol Elite access' },
+  { id: 'score-machine-basic', name: 'The Capsol Basic', path: '/score-machine-basic', description: 'The Capsol Basic access' },
   { id: 'affiliate', name: 'Affiliate', path: '/affiliate', description: 'Affiliate program management' },
   { id: 'support', name: 'Support', path: '/support', description: 'Customer support and help desk' },
   { id: 'settings', name: 'Settings', path: '/settings', description: 'Account and system settings' }
@@ -765,7 +765,7 @@ export default function PlanManagement() {
                     </p>
                     <div className="mb-4 space-y-3 rounded-lg border p-3">
                       <p className="text-sm font-medium">
-                        Fread App Elite | Fread App Basic
+                        The Capsol Elite | The Capsol Basic
                       </p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {ADMIN_PAGES.filter((page) => SCORE_MACHINE_PORTAL_PAGE_IDS.includes(page.id as (typeof SCORE_MACHINE_PORTAL_PAGE_IDS)[number])).map((page) => (

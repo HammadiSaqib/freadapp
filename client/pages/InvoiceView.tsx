@@ -142,7 +142,7 @@ const InvoiceView: React.FC = () => {
 
   // Branding derived from server response with sensible fallbacks
   const brand = useMemo(() => {
-    const name = (invoice?.sender?.company_name || invoice?.from_company_name || 'Fread App').trim();
+    const name = (invoice?.sender?.company_name || invoice?.from_company_name || 'The Capsol').trim();
     const email = (invoice?.sender?.email || invoice?.from_email || '').trim();
     const logo = invoice?.sender?.logo_url || invoice?.from_logo_url || '/company-logo.svg';
     return { name, email, logo };

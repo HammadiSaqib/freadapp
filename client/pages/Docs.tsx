@@ -25,7 +25,7 @@ const Docs: React.FC = () => {
                 Platform Documentation & User Guide
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                Fread App: Comprehensive guide to platform capabilities, requirements, and policies.
+                The Capsol: Comprehensive guide to platform capabilities, requirements, and policies.
               </p>
             </div>
 
@@ -38,7 +38,7 @@ const Docs: React.FC = () => {
                   <span className="text-violet-600">1.</span> Introduction to the Platform
                 </h2>
                 <p className="text-slate-600 leading-relaxed mb-6">
-                  Fread App is a proprietary, cloud-based Software-as-a-Service (SaaS) solution designed for sophisticated financial assessment. It utilizes proprietary algorithms, AI, and integrated data sources to retrieve, normalize, and analyze consumer and commercial credit-related data, delivering highly detailed Derivative Outputs (reports, analyses, scores, and recommendations).
+                  The Capsol is a proprietary, cloud-based Software-as-a-Service (SaaS) solution designed for sophisticated financial assessment. It utilizes proprietary algorithms, AI, and integrated data sources to retrieve, normalize, and analyze consumer and commercial credit-related data, delivering highly detailed Derivative Outputs (reports, analyses, scores, and recommendations).
                 </p>
 
                 <h3 className="text-xl font-semibold text-slate-800 mt-6 mb-4">1.1 Core Components of the Platform</h3>

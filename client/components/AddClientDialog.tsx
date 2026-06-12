@@ -722,37 +722,40 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
             }
             .elite-nested-wrapper input:focus, .elite-nested-wrapper select:focus, .elite-nested-wrapper [role="combobox"]:focus {
               background-color: #ffffff !important;
-              border-color: #00d4ff !important;
-              box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2) !important;
+              border-color: #d1a505 !important;
+              box-shadow: 0 0 0 2px rgba(209, 165, 5, 0.2) !important;
             }
             .dark .elite-nested-wrapper input:focus,
             .dark .elite-nested-wrapper select:focus,
             .dark .elite-nested-wrapper [role="combobox"]:focus {
               background-color: #020617 !important;
-              border-color: #22d3ee !important;
-              box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.25) !important;
+              border-color: #d1a505 !important;
+              box-shadow: 0 0 0 2px rgba(209, 165, 5, 0.25) !important;
             }
             .elite-nested-wrapper .elite-btn-primary {
-              background: linear-gradient(to right, #0f172a, #1e293b) !important;
+              background: linear-gradient(to right, #06362d, #155332, #d1a505) !important;
               border-radius: 1rem !important;
               color: white !important;
               font-weight: 700 !important;
               height: 3rem !important;
             }
             .dark .elite-nested-wrapper .elite-btn-primary {
-              background: linear-gradient(to right, #06b6d4, #7c3aed) !important;
+              background: linear-gradient(to right, #155332, #d1a505, #ffb500) !important;
               color: #f8fafc !important;
-              box-shadow: 0 0 24px rgba(34, 211, 238, 0.25) !important;
+              box-shadow: 0 0 24px rgba(209, 165, 5, 0.25) !important;
             }
             .elite-nested-wrapper .elite-btn-outline {
               border-radius: 1rem !important;
               height: 3rem !important;
               font-weight: 700 !important;
+              border: 1px solid rgba(21, 83, 50, 0.18) !important;
+              color: #155332 !important;
+              background: rgba(246, 247, 233, 0.82) !important;
             }
             .dark .elite-nested-wrapper .elite-btn-outline {
-              border: 1px solid #334155 !important;
-              background: #020617 !important;
-              color: #e2e8f0 !important;
+              border: 1px solid rgba(222, 226, 177, 0.18) !important;
+              background: #06362d !important;
+              color: #dee2b1 !important;
             }
             .dark .elite-nested-wrapper .dark\\:bg-slate-900 {
               background-color: #020617 !important;
@@ -767,15 +770,15 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         )}
         {isEliteActive && (
           <>
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#00d4ff] to-[#7000ff] z-50"></div>
-            <div className="absolute top-0 left-1/4 w-64 h-64 bg-[#00d4ff]/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl pointer-events-none"></div>
-            <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#7000ff]/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl pointer-events-none"></div>
+            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#06362d] via-[#155332] to-[#d1a505] z-50"></div>
+            <div className="absolute top-0 left-1/4 w-64 h-64 bg-[#d1a505]/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl pointer-events-none"></div>
+            <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-[#155332]/10 rounded-full mix-blend-multiply dark:mix-blend-screen filter blur-3xl pointer-events-none"></div>
           </>
         )}
         
         <div className={isEliteActive ? "p-6 relative z-10" : ""}>
           <DialogHeader>
-            <DialogTitle className={isEliteActive ? "text-2xl font-black text bg-clip-text bg-gradient-to-r from-slate-900 via-[#7000ff] to-[#00d4ff] tracking-tight" : "gradient-text-primary"}>
+            <DialogTitle className={isEliteActive ? "text-2xl font-black text bg-clip-text bg-gradient-to-r from-slate-900 via-[#d1a505] to-[#155332] tracking-tight" : "gradient-text-primary"}>
               Add New Client
             </DialogTitle>
             {mode === "scrape" ? (

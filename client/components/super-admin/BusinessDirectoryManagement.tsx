@@ -239,7 +239,7 @@ export default function BusinessDirectoryManagement() {
               Business Directory
             </CardTitle>
             <CardDescription>
-              Create, edit, and manage the directory entries that appear in Fread App Academy.
+              Create, edit, and manage the directory entries that appear in The Capsol Academy.
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">

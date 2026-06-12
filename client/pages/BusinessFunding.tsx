@@ -11,10 +11,10 @@ export default function BusinessFunding() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Business Funding Insights & Credit Analysis Tools | Fread App</title>
+        <title>Business Funding Insights & Credit Analysis Tools | The Capsol</title>
         <meta
           name="description"
-          content="Explore business funding readiness with structured credit analysis. Fread App organizes credit insights, summaries, and underwriting overviews to support funding reviews. No funding approval or outcomes are guaranteed."
+          content="Explore business funding readiness with structured credit analysis. The Capsol organizes credit insights, summaries, and underwriting overviews to support funding reviews. No funding approval or outcomes are guaranteed."
         />
         <link rel="canonical" href="https://scoremachine.com/business-funding" />
       </Helmet>
@@ -62,7 +62,7 @@ export default function BusinessFunding() {
             <CardHeader>
               <div className="flex items-center gap-3">
                 <TrendingUp className="h-6 w-6 text-blue-600" />
-                <CardTitle>How Fread App Helps with Funding Reviews</CardTitle>
+                <CardTitle>How The Capsol Helps with Funding Reviews</CardTitle>
               </div>
               <CardDescription>
                 Organize credit report information, identify general signals, and export clean summaries to support professional reviews.
@@ -130,7 +130,7 @@ export default function BusinessFunding() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">What Is Business Funding?</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Business funding refers to financing options such as working capital, term loans, lines of credit, SBA programs, equipment financing, and invoice financing. Lenders and partners typically review credit profiles, income documentation, and overall risk indicators. Fread App helps organize credit insights that support responsible reviews. Tools are informational and cannot guarantee approvals or specific outcomes.
+              Business funding refers to financing options such as working capital, term loans, lines of credit, SBA programs, equipment financing, and invoice financing. Lenders and partners typically review credit profiles, income documentation, and overall risk indicators. The Capsol helps organize credit insights that support responsible reviews. Tools are informational and cannot guarantee approvals or specific outcomes.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -160,7 +160,7 @@ export default function BusinessFunding() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Answers to common questions about business funding and how Fread App supports organized reviews.
+              Answers to common questions about business funding and how The Capsol supports organized reviews.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
@@ -171,24 +171,24 @@ export default function BusinessFunding() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700">
-                  Fread App structures credit data into categories commonly referenced by professionals. The Toolkit includes Progress Report and Score Timeline, Full Credit File Analysis, and a Client Summary PDF export to help present information clearly. Tools are informational and do not guarantee any funding decisions.
+                  The Capsol structures credit data into categories commonly referenced by professionals. The Toolkit includes Progress Report and Score Timeline, Full Credit File Analysis, and a Client Summary PDF export to help present information clearly. Tools are informational and do not guarantee any funding decisions.
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Does Fread App guarantee funding approvals?</CardTitle>
+                <CardTitle>Does The Capsol guarantee funding approvals?</CardTitle>
                 <CardDescription>No promises or guarantees</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700">
-                  No. Fread App is software for organizing and reviewing credit report information. Lenders make independent decisions based on their criteria. We do not guarantee approvals, outcomes, or changes to credit performance.
+                  No. The Capsol is software for organizing and reviewing credit report information. Lenders make independent decisions based on their criteria. We do not guarantee approvals, outcomes, or changes to credit performance.
                 </p>
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Who benefits from using Fread App?</CardTitle>
+                <CardTitle>Who benefits from using The Capsol?</CardTitle>
                 <CardDescription>Professionals, teams, and individuals</CardDescription>
               </CardHeader>
               <CardContent>
@@ -230,7 +230,7 @@ export default function BusinessFunding() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
-                  <Link to="/register">Sign Up for Fread App</Link>
+                  <Link to="/register">Sign Up for The Capsol</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="border-blue-600 text-blue-600" asChild>
                   <Link to="/pricing">See Plans</Link>
@@ -246,7 +246,7 @@ export default function BusinessFunding() {
 
       <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          Fread App provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
+          The Capsol provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
         </p>
       </div>
 

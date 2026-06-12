@@ -70,7 +70,7 @@ async function addSampleCommissionData() {
         commission_amount: 59.98,
         status: 'paid',
         tier: 'Silver',
-        product: 'Fread App',
+        product: 'The Capsol',
         commission_type: 'signup',
         order_date: '2024-01-15 10:30:00',
         payment_date: '2024-01-30 14:00:00'
@@ -137,7 +137,7 @@ async function addSampleCommissionData() {
         commission_amount: 59.98,
         status: 'pending',
         tier: 'Silver',
-        product: 'Fread App',
+        product: 'The Capsol',
         commission_type: 'signup',
         order_date: '2024-02-18 13:45:00'
       },

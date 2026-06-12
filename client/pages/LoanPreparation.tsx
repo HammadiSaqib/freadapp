@@ -11,10 +11,10 @@ export default function LoanPreparation() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Loan Preparation Guide: Documents & Credit Review | Fread App</title>
+        <title>Loan Preparation Guide: Documents & Credit Review | The Capsol</title>
         <meta
           name="description"
-          content="Prepare for loan reviews with organized documentation and structured credit insights. Fread App helps create summaries and highlight general indicators. No approval or outcomes are guaranteed."
+          content="Prepare for loan reviews with organized documentation and structured credit insights. The Capsol helps create summaries and highlight general indicators. No approval or outcomes are guaranteed."
         />
         <link rel="canonical" href="https://scoremachine.com/loan-preparation" />
       </Helmet>
@@ -119,7 +119,7 @@ export default function LoanPreparation() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">What Is Loan Preparation?</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Loan preparation involves organizing required documents, clarifying financial information, and structuring credit insights for responsible reviews. Teams often gather IDs, registration details, bank statements, tax returns, and a clean credit summary. Fread App helps produce concise summaries and organize indicators in the credit file. Tools are informational and do not guarantee approvals or outcomes.
+              Loan preparation involves organizing required documents, clarifying financial information, and structuring credit insights for responsible reviews. Teams often gather IDs, registration details, bank statements, tax returns, and a clean credit summary. The Capsol helps produce concise summaries and organize indicators in the credit file. Tools are informational and do not guarantee approvals or outcomes.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -149,18 +149,18 @@ export default function LoanPreparation() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Answers to common questions about loan preparation and Fread App’s Toolkit.
+              Answers to common questions about loan preparation and The Capsol’s Toolkit.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Does Fread App guarantee loan approvals?</CardTitle>
+                <CardTitle>Does The Capsol guarantee loan approvals?</CardTitle>
                 <CardDescription>No promises or guarantees</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700">
-                  No. Fread App provides organizational tools and summaries to help teams prepare loan packages. Approval decisions are made by lenders and depend on program criteria, documentation, and risk assessment.
+                  No. The Capsol provides organizational tools and summaries to help teams prepare loan packages. Approval decisions are made by lenders and depend on program criteria, documentation, and risk assessment.
                 </p>
               </CardContent>
             </Card>
@@ -208,7 +208,7 @@ export default function LoanPreparation() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
-                  <Link to="/register">Sign Up for Fread App</Link>
+                  <Link to="/register">Sign Up for The Capsol</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="border-blue-600 text-blue-600" asChild>
                   <Link to="/pricing">See Plans</Link>
@@ -224,7 +224,7 @@ export default function LoanPreparation() {
 
       <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          Fread App provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
+          The Capsol provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
         </p>
       </div>
 

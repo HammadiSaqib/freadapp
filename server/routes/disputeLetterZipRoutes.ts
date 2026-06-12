@@ -1164,7 +1164,7 @@ export async function sendForPrinting(req: AuthRequest, res: Response) {
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-      <title>Print Request - Fread App Elite</title>
+      <title>Print Request - The Capsol Elite</title>
       <!--[if mso]>
       <style type="text/css">
         table { border-collapse: collapse; }
@@ -1185,10 +1185,10 @@ export async function sendForPrinting(req: AuthRequest, res: Response) {
                   <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                     <tr>
                       <td align="center" valign="middle" style="padding-right:16px;">
-                        <img src="cid:company-logo" alt="Fread App Elite" width="60" height="60" style="display:block;width:60px;height:60px;border-radius:12px;background-color:#ffffff;object-fit:contain;" />
+                        <img src="cid:company-logo" alt="The Capsol Elite" width="60" height="60" style="display:block;width:60px;height:60px;border-radius:12px;background-color:#ffffff;object-fit:contain;" />
                       </td>
                       <td align="left" valign="middle">
-                        <div style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;line-height:1.2;">Fread App Elite</div>
+                        <div style="color:#ffffff;font-size:26px;font-weight:800;letter-spacing:-0.5px;line-height:1.2;">The Capsol Elite</div>
                         <div style="color:rgba(255,255,255,0.85);font-size:13px;font-weight:400;margin-top:4px;">Professional Credit Management Platform</div>
                       </td>
                     </tr>
@@ -1335,9 +1335,9 @@ export async function sendForPrinting(req: AuthRequest, res: Response) {
               <!-- Footer -->
               <tr>
                 <td align="center" style="background-color:#f8fafc;padding:32px 40px;border-top:1px solid #e2e8f0;">
-                  <div style="font-size:16px;font-weight:700;color:#0c4a6e;margin-bottom:4px;">Fread App Elite</div>
+                  <div style="font-size:16px;font-weight:700;color:#0c4a6e;margin-bottom:4px;">The Capsol Elite</div>
                   <div style="font-size:13px;color:#64748b;margin-bottom:16px;">Professional Credit Management Platform</div>
-                  <div style="font-size:12px;color:#94a3b8;">&copy; ${new Date().getFullYear()} Fread App Elite. All rights reserved.</div>
+                  <div style="font-size:12px;color:#94a3b8;">&copy; ${new Date().getFullYear()} The Capsol Elite. All rights reserved.</div>
                 </td>
               </tr>
             </table>
@@ -1484,7 +1484,7 @@ export async function sendForPrinting(req: AuthRequest, res: Response) {
 
     const emailSent = await emailService.sendEmail({
       to: 'sales@totalpostnprint.com',
-      subject: `Print Request — ${clientFullName} — ${letterCount} Dispute Letter${letterCount > 1 ? 's' : ''} | Fread App Elite`,
+      subject: `Print Request — ${clientFullName} — ${letterCount} Dispute Letter${letterCount > 1 ? 's' : ''} | The Capsol Elite`,
       html: emailHtml,
       attachments: emailAttachments,
     });

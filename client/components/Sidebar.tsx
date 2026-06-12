@@ -762,7 +762,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
   const visibilityClass = isSmallScreen ? (isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none') : 'opacity-100';
   const basicSidebarSurface = isBasicAdminPortalUser
     ? 'bg-white/96 dark:bg-slate-950 border-r border-sky-100/80 dark:border-slate-800 shadow-xl shadow-sky-100/70 dark:shadow-none'
-    : 'bg-white dark:bg-slate-900 border-r border-border/40 dark:border-slate-700';
+    : 'admin-portal-sidebar';
 
   // Extra items specifically for mobile bottom navigation
   const mobileNavExtras = [
@@ -836,8 +836,8 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
             disabled
               ? "text-slate-400 dark:text-slate-600"
               : active
-              ? (isEliteActive ? "text-[#7000ff]" : isBasicAdminPortalUser ? "text-sky-700 dark:text-sky-300" : "text-white")
-              : (isEliteActive ? "text-slate-500 group-hover:text-[#7000ff]" : isBasicAdminPortalUser ? "text-slate-500 group-hover:text-sky-700 dark:text-slate-400 dark:group-hover:text-sky-300" : "text-slate-600 dark:text-slate-400 group-hover:text-ocean-blue")
+              ? (isEliteActive ? "text-[#d1a505]" : isBasicAdminPortalUser ? "text-sky-700 dark:text-sky-300" : "text-white")
+              : (isEliteActive ? "text-slate-500 group-hover:text-[#d1a505]" : isBasicAdminPortalUser ? "text-slate-500 group-hover:text-sky-700 dark:text-slate-400 dark:group-hover:text-sky-300" : "text-[#155332] dark:text-[#dee2b1] group-hover:text-[#d1a505]")
           }`}
         />
         {!collapsed && (
@@ -858,7 +858,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                       ? "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300"
                       : item.name === 'Subscription' && item.badge === 'Payment Required'
                       ? "bg-yellow-100 text-yellow-800 border-yellow-200"
-                      : (isEliteActive ? "border-[#7000ff]/20 text-[#7000ff]" : "border-ocean-blue/20 text-ocean-blue")
+                      : (isEliteActive ? "border-[#d1a505]/25 text-[#d1a505]" : "border-ocean-blue/20 text-ocean-blue")
                   }`}
                 >
                   {item.badge}
@@ -894,7 +894,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         className={`flex items-center py-2.5 transition-all duration-200 group ${isCollapsed ? 'justify-center px-2' : 'space-x-3 px-3'} ${
           active
             ? (isEliteActive ? "elite-sidebar-item-active" : isBasicAdminPortalUser ? "rounded-lg border border-sky-100 bg-sky-50 text-sky-800 shadow-sm dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300" : "gradient-primary text-white shadow-lg rounded-lg")
-            : (isEliteActive ? "elite-sidebar-item" : isBasicAdminPortalUser ? "rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white" : "rounded-lg text-slate-600 dark:text-slate-400 hover:bg-gradient-soft hover:text-foreground")
+            : (isEliteActive ? "elite-sidebar-item" : isBasicAdminPortalUser ? "rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-white" : "rounded-lg text-[#155332] dark:text-[#dee2b1] hover:bg-gradient-soft hover:text-[#06362d] dark:hover:text-[#ffb500]")
         }`}
       >
         {content}
@@ -982,10 +982,10 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <img src="/company-logo.svg" alt="Fread App" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
+              <img src="/company-logo.svg" alt="The Capsol" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
               <div className="min-w-0">
                 <span className={`block truncate text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : isBasicAdminPortalUser ? 'text-slate-900 dark:text-white' : 'gradient-text-primary'}`}>
-                  Fread App
+                  The Capsol
                 </span>
                 {isBasicAdminPortalUser && (
                   <span className="block text-xs font-medium text-sky-600 dark:text-sky-300">
@@ -996,7 +996,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
             </Link>
           )}
           {collapsed && (
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-lg mx-auto ${isEliteActive ? 'bg-gradient-to-br from-[#00d4ff] to-[#7000ff]' : 'gradient-primary'}`}>
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-lg mx-auto ${isEliteActive ? 'bg-gradient-to-br from-[#06362d] to-[#d1a505]' : 'gradient-primary'}`}>
               <CreditCard className="h-5 w-5 text-white" />
             </div>
           )}
@@ -1010,7 +1010,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 setCollapsed(!collapsed);
               }
             }}
-            className={isEliteActive ? 'hover:bg-blue-50' : isBasicAdminPortalUser ? 'hover:bg-sky-50 dark:hover:bg-slate-800' : 'hover:bg-gradient-soft'}
+            className={isEliteActive ? 'hover:bg-[#dee2b1]/40 dark:hover:bg-[#155332]/30' : isBasicAdminPortalUser ? 'hover:bg-sky-50 dark:hover:bg-slate-800' : 'hover:bg-gradient-soft'}
             aria-label={isSmallScreen ? 'Close sidebar' : (collapsed ? 'Expand sidebar' : 'Collapse sidebar')}
           >
             {isSmallScreen ? (
@@ -1028,7 +1028,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       {!collapsed && (
         <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'}`}>
           <div className="relative">
-            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isEliteActive ? 'text-cyan-500' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-slate-600 dark:text-slate-400'}`} />
+            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${isEliteActive ? 'text-[#d1a505] dark:text-[#dee2b1]' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-[#155332] dark:text-[#dee2b1]'}`} />
             <input
               type="text"
               placeholder="Search..."
@@ -1036,10 +1036,10 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
               onChange={(event) => setSearchQuery(event.target.value)}
               className={
                 isEliteActive
-                  ? 'w-full pl-10 pr-4 py-2 text-sm border border-slate-100 rounded-lg bg-slate-50 text-slate-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400'
+                  ? 'w-full pl-10 pr-4 py-2 text-sm border border-[#155332]/12 rounded-lg bg-[#f6f7e9]/80 text-[#06362d] shadow-inner focus:outline-none focus:ring-2 focus:ring-[#d1a505]/25 focus:border-[#d1a505]/50 transition-all placeholder:text-[#155332]/55 dark:border-[#dee2b1]/12 dark:bg-[#06362d] dark:text-[#dee2b1] dark:placeholder:text-[#dee2b1]/50 dark:shadow-none'
                   : isBasicAdminPortalUser
                     ? 'w-full pl-10 pr-4 py-2 text-sm border border-sky-100 dark:border-slate-800 rounded-lg bg-sky-50/55 dark:bg-slate-900 text-slate-700 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300'
-                    : 'w-full pl-10 pr-4 py-2 text-sm border border-border/40 dark:border-slate-700 rounded-lg bg-gradient-light focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'
+                    : 'admin-portal-search w-full pl-10 pr-4 py-2 text-sm'
               }
             />
           </div>
@@ -1167,7 +1167,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                   className={`w-full justify-start relative group ${
                     !hasPermission('clients')
                       ? "border-slate-200 text-slate-400 cursor-not-allowed opacity-40 hover:opacity-60"
-                      : isEliteActive ? "bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 border-0 font-bold shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] hover:opacity-90" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
+                        : isEliteActive ? "bg-gradient-to-r from-[#06362d] via-[#155332] to-[#d1a505] text-white border-0 font-bold shadow-[0_0_15px_rgba(209,165,5,0.28)] hover:shadow-[0_0_25px_rgba(209,165,5,0.36)] hover:opacity-95" : "border-ocean-blue/20 text-ocean-blue hover:ocean-blue"
                   }`}
                   title={!hasPermission('clients') ? "Upgrade your subscription to access this feature" : ""}
                 >
@@ -1186,7 +1186,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                 onClick={() => navigate("/invoices")}
                 variant="outline"
                 size="sm"
-                className={`w-full justify-start ${isEliteActive ? 'bg-slate-50 text-slate-700 border border-slate-100 font-bold hover:bg-purple-50 hover:text-[#7000ff] transition-all' : isBasicAdminPortalUser ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800' : 'border-slate-300/60 text-slate-700 hover:bg-opacity-90'}`}
+                className={`w-full justify-start ${isEliteActive ? 'bg-[#f6f7e9] text-[#155332] border border-[#155332]/12 font-bold hover:bg-[#dee2b1]/50 hover:text-[#06362d] dark:bg-[#06362d] dark:text-[#dee2b1] dark:border-[#dee2b1]/12 dark:hover:bg-[#155332]/60 dark:hover:text-[#ffb500] transition-all' : isBasicAdminPortalUser ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800' : 'border-[#155332]/20 text-[#155332] hover:bg-[#dee2b1]/40 dark:border-[#dee2b1]/20 dark:text-[#dee2b1] dark:hover:bg-[#155332]/30'}`}
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Invoices
@@ -1216,9 +1216,9 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
         {/* Compact Admin Status for small screens */}
         {!collapsed && isSmallScreen && (
-          <div className="mt-2 p-3 rounded-lg border border-cyan-200/60 dark:border-cyan-600/40 bg-white dark:bg-slate-900 flex items-center justify-between gap-2">
+          <div className="mt-2 p-3 rounded-lg border border-[#155332]/15 dark:border-[#dee2b1]/15 bg-[#f6f7e9] dark:bg-[#06362d] flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+              <Shield className="h-4 w-4 text-[#155332] dark:text-[#dee2b1]" />
               <span className="text-xs font-medium">
                 {subscriptionStatus.planName ? `${subscriptionStatus.planName} Plan` : 'No Active Plan'} {subscriptionStatus.hasActiveSubscription ? 'Active' : 'Inactive'}
               </span>
@@ -1236,20 +1236,20 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
         {/* Full Admin Status for larger screens */}
         {!collapsed && !isSmallScreen && (
-          <div className={`mt-3 p-4 rounded-xl shadow-lg ${isBasicAdminPortalUser ? 'bg-slate-50 border border-sky-100 dark:bg-slate-900 dark:border-slate-800' : 'bg-gradient-to-br from-cyan-50 via-teal-50 to-emerald-50 dark:from-slate-800/50 dark:via-slate-700/50 dark:to-slate-800/50 border-2 border-cyan-200/60 dark:border-cyan-600/40'}`}>
+          <div className={`mt-3 p-4 rounded-xl shadow-lg ${isBasicAdminPortalUser ? 'bg-slate-50 border border-sky-100 dark:bg-slate-900 dark:border-slate-800' : 'bg-gradient-to-br from-[#f6f7e9] via-white to-[#dee2b1] dark:from-[#06362d]/70 dark:via-[#155332]/60 dark:to-[#06362d]/75 border-2 border-[#155332]/15 dark:border-[#dee2b1]/15'}`}>
             <div className="flex items-center space-x-2 mb-3">
-              <div className={`${isBasicAdminPortalUser ? 'p-1 bg-white border border-sky-100 dark:bg-slate-800 dark:border-slate-700' : 'p-1 bg-gradient-to-r from-cyan-100 to-teal-100 dark:from-cyan-800/80 dark:to-teal-800/80'} rounded-full`}>
-                <Shield className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+              <div className={`${isBasicAdminPortalUser ? 'p-1 bg-white border border-sky-100 dark:bg-slate-800 dark:border-slate-700' : 'p-1 bg-gradient-to-r from-[#dee2b1] to-[#d1a505] dark:from-[#155332] dark:to-[#d1a505]'} rounded-full`}>
+                <Shield className="h-4 w-4 text-[#155332] dark:text-[#dee2b1]" />
               </div>
               <span className={`text-sm font-bold ${isBasicAdminPortalUser ? 'text-slate-800 dark:text-slate-100' : 'gradient-text-primary'}`}>
                 {isBasicAdminPortalUser ? 'Basic Access' : 'Admin Status'}
               </span>
             </div>
             <div className="mb-3">
-              <div className="text-sm font-medium text-cyan-800 dark:text-cyan-200">
+              <div className="text-sm font-medium text-[#155332] dark:text-[#dee2b1]">
                 {subscriptionStatus.planName ? `${subscriptionStatus.planName} Plan` : 'No Active Plan'} {subscriptionStatus.hasActiveSubscription ? 'Active' : 'Inactive'}
               </div>
-              <div className="text-xs text-teal-600 dark:text-teal-400 mt-1">
+              <div className="text-xs text-[#155332]/70 dark:text-[#dee2b1]/70 mt-1">
                 {isBasicAdminPortalUser ? 'Profile and Work Area access enabled' : subscriptionStatus.hasActiveSubscription ? 'Admin dashboard access enabled' : 'Limited access until activation'}
               </div>
             </div>
@@ -1268,32 +1268,32 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
 
         {/* Partner Program Upgrade Section (hide on small screens for space) */}
         {!collapsed && !isSmallScreen && userProfile?.role === 'admin' && !subscriptionStatus.hasActiveSubscription && (
-          <div className="mt-3 p-4 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-900/30 dark:via-indigo-900/30 dark:to-blue-900/30 rounded-xl border-2 border-purple-200 dark:border-purple-600 shadow-lg">
+          <div className="mt-3 p-4 bg-gradient-to-br from-[#f6f7e9] via-[#dee2b1]/70 to-white dark:from-[#06362d]/70 dark:via-[#155332]/65 dark:to-[#031b17]/85 rounded-xl border-2 border-[#d1a505]/25 dark:border-[#dee2b1]/15 shadow-lg">
             <div className="flex items-center space-x-2 mb-3">
-              <div className="p-1 bg-purple-100 dark:bg-purple-800 rounded-full">
-                <Crown className="h-4 w-4 text-purple-600 dark:text-purple-300" />
+              <div className="p-1 bg-[#dee2b1] dark:bg-[#155332] rounded-full">
+                <Crown className="h-4 w-4 text-[#d1a505] dark:text-[#ffb500]" />
               </div>
-              <span className="text-sm font-bold text-purple-700 dark:text-purple-300">
+              <span className="text-sm font-bold text-[#155332] dark:text-[#dee2b1]">
                 Upgrade to Partner Program
               </span>
             </div>
             <div className="space-y-2 mb-3">
-              <div className="flex items-center text-xs text-purple-600 dark:text-purple-400">
+              <div className="flex items-center text-xs text-[#155332] dark:text-[#dee2b1]">
                 <DollarSign className="h-3 w-3 mr-1" />
                 <span>20-25% commission rates</span>
               </div>
-              <div className="flex items-center text-xs text-purple-600 dark:text-purple-400">
+              <div className="flex items-center text-xs text-[#155332] dark:text-[#dee2b1]">
                 <Sparkles className="h-3 w-3 mr-1" />
                 <span>Premium marketing materials</span>
               </div>
-              <div className="flex items-center text-xs text-purple-600 dark:text-purple-400">
+              <div className="flex items-center text-xs text-[#155332] dark:text-[#dee2b1]">
                 <Shield className="h-3 w-3 mr-1" />
                 <span>Priority support & training</span>
               </div>
             </div>
             <Button
               size="sm"
-              className="w-full bg-gradient-to-r from-purple-500 via-purple-600 to-indigo-600 hover:from-purple-600 hover:via-purple-700 hover:to-indigo-700 text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+              className="w-full bg-gradient-to-r from-[#06362d] via-[#155332] to-[#d1a505] hover:from-[#031b17] hover:via-[#06362d] hover:to-[#ffb500] text-white text-xs font-semibold shadow-md hover:shadow-lg transition-all duration-200"
               onClick={() => navigate('/subscription')}
             >
               <Crown className="h-3 w-3 mr-1" />
@@ -1311,7 +1311,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
               {userProfile?.avatar && (
                 <AvatarImage src={userProfile.avatar} alt="Profile" />
               )}
-              <AvatarFallback className={`text-white text-sm font-bold ${isEliteActive ? 'bg-gradient-to-br from-[#00d4ff] to-[#7000ff]' : isBasicAdminPortalUser ? 'bg-slate-900 dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary'}`}>
+              <AvatarFallback className={`text-white text-sm font-bold ${isEliteActive ? 'bg-gradient-to-br from-[#06362d] to-[#d1a505]' : isBasicAdminPortalUser ? 'bg-slate-900 dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary'}`}>
                 {userProfile ? 
                   `${userProfile.first_name?.charAt(0) || ''}${userProfile.last_name?.charAt(0) || ''}` 
                   : 'U'
@@ -1325,7 +1325,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
                   : 'Loading...'
                 }
               </div>
-              <div className={`text-xs truncate ${isEliteActive ? 'text-[#7000ff] font-semibold tracking-wide' : 'text-slate-600 dark:text-slate-400'}`}>
+              <div className={`text-xs truncate ${isEliteActive ? 'text-[#d1a505] font-semibold tracking-wide' : 'text-slate-600 dark:text-slate-400'}`}>
                 {(() => {
                   if (userProfile?.role === 'super_admin') return 'Super Admin Account';
                   if (userProfile?.role === 'admin') {
@@ -1339,7 +1339,7 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
               </div>
             </div>
             <div className="flex items-center space-x-1 shrink-0">
-              <Button variant="ghost" size="icon" onClick={handleLogout} className={isEliteActive ? 'text-slate-400 hover:text-rose-500 hover:bg-rose-50' : ''}>
+              <Button variant="ghost" size="icon" onClick={handleLogout} className={isEliteActive ? 'text-slate-400 hover:text-[#d1a505] hover:bg-[#dee2b1]/40 dark:hover:bg-[#155332]/30' : ''}>
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>

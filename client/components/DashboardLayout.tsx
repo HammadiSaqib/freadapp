@@ -54,7 +54,7 @@ export default function DashboardLayout({
   const [eliteTransitionPhase, setEliteTransitionPhase] = useState<'idle' | 'blackout' | 'dissolve' | 'flash' | 'logo' | 'particles' | 'reveal' | 'welcome' | 'done'>('idle');
   const [eliteZoomIn, setEliteZoomIn] = useState(false);
   const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
-  const usesAdminPurpleTheme = userProfile?.role === 'admin' && !isEliteActive && !isBasicAdminPortalUser;
+  const usesAdminPortalTheme = userProfile?.role === 'admin' && !isBasicAdminPortalUser;
 
   // Listen for live elite activation after agreement is signed.
   useEffect(() => {
@@ -138,6 +138,20 @@ export default function DashboardLayout({
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  useEffect(() => {
+    const body = window.document.body;
+
+    if (usesAdminPortalTheme) {
+      body.classList.add("admin-portal-theme-active");
+    } else {
+      body.classList.remove("admin-portal-theme-active");
+    }
+
+    return () => {
+      body.classList.remove("admin-portal-theme-active");
+    };
+  }, [usesAdminPortalTheme]);
+
   // Listen for system theme changes when in system mode
   useEffect(() => {
     if (theme === "system") {
@@ -186,11 +200,11 @@ export default function DashboardLayout({
     <motion.div
       className={`min-h-screen flex ${
         isEliteActive
-          ? 'elite-theme'
+          ? 'elite-theme admin-portal-shell'
           : isBasicAdminPortalUser
             ? 'bg-[linear-gradient(135deg,#f7fbff_0%,#eef7f3_52%,#f8fafc_100%)] dark:bg-slate-950'
-            : 'bg-gradient-to-br from-slate-50 via-white to-slate-50/80 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900'
-      } ${usesAdminPurpleTheme ? 'admin-purple-theme' : ''}`}
+            : 'admin-portal-shell'
+      }`}
       initial={false}
       animate={
         eliteZoomIn
@@ -231,7 +245,7 @@ export default function DashboardLayout({
             ? 'elite-navbar'
             : isBasicAdminPortalUser
               ? 'bg-white/88 dark:bg-slate-950/88 backdrop-blur-xl border-b border-sky-100/80 dark:border-slate-800 shadow-sm shadow-sky-100/60 dark:shadow-none'
-              : 'bg-slate-50 dark:bg-slate-800/50/80 dark:bg-slate-800/80 dark:bg-slate-800/80 backdrop-blur-sm border-b border-border/40'
+              : 'admin-portal-header'
         }`}>
           {isEliteActive && <div className="elite-neon-line-thick w-full" />}
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 sm:px-6">
@@ -265,11 +279,11 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4 flex-nowrap sm:flex-wrap w-full sm:w-auto ml-auto justify-end">
-              {/* Fread App Elite notification bar */}
+              {/* The Capsol Elite notification bar */}
               {shouldShowEliteNotification && (
                 <button
                   onClick={() => setIsElitePromptOpen(true)}
-                  className="hidden sm:flex items-center gap-3 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 hover:from-amber-600 hover:via-orange-600 hover:to-rose-600 shadow-lg hover:shadow-xl hover:shadow-amber-500/25 transition-all duration-300 cursor-pointer group border border-amber-400/30 hover:scale-105"
+                  className="hidden sm:flex items-center gap-3 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#155332] via-[#d1a505] to-[#ffb500] hover:from-[#06362d] hover:via-[#155332] hover:to-[#d1a505] shadow-lg hover:shadow-xl hover:shadow-[#d1a505]/25 transition-all duration-300 cursor-pointer group border border-[#d1a505]/30 hover:scale-105"
                 >
                   <span className="relative flex h-3 w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white dark:bg-slate-900 opacity-75" />
@@ -282,14 +296,14 @@ export default function DashboardLayout({
                   <span className="bg-white dark:bg-slate-900/25 text-white text-xs font-bold px-2 py-0.5 rounded-full">
                     Active
                   </span>
-                  <Sparkles className="h-4 w-4 text-yellow-200 group-hover:text-white" />
+                  <Sparkles className="h-4 w-4 text-[#dee2b1] group-hover:text-white" />
                 </button>
               )}
               {/* Mobile Elite notification */}
               {shouldShowEliteNotification && (
                 <button
                   onClick={() => setIsElitePromptOpen(true)}
-                  className="sm:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 shadow-lg transition-all duration-300 hover:scale-105"
+                  className="sm:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-[#155332] via-[#d1a505] to-[#ffb500] shadow-lg transition-all duration-300 hover:scale-105"
                 >
                   <Crown className="h-4 w-4 text-white" />
                   <span className="text-xs font-bold text-white whitespace-nowrap">Elite</span>
@@ -303,7 +317,7 @@ export default function DashboardLayout({
               {/* Search */}
               <div className="hidden md:block relative">
                 <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 ${
-                  isEliteActive ? 'text-cyan-500' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-muted-foreground'
+                  isEliteActive ? 'text-[#155332] dark:text-[#dee2b1]' : isBasicAdminPortalUser ? 'text-sky-500' : 'text-muted-foreground'
                 }`} />
                 <input
                   type="text"
@@ -313,7 +327,7 @@ export default function DashboardLayout({
                       ? 'elite-navbar-search pl-10 pr-4 py-2 w-80 text-sm focus:outline-none'
                       : isBasicAdminPortalUser
                         ? 'pl-10 pr-4 py-2 w-72 text-sm border border-sky-100 rounded-lg bg-white/85 text-slate-700 placeholder:text-slate-400 shadow-inner shadow-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:border-sky-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:shadow-none'
-                        : 'pl-10 pr-4 py-2 w-80 text-sm border border-border/40 rounded-lg bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-ocean-blue/20 focus:border-ocean-blue/40'
+                        : 'admin-portal-search pl-10 pr-4 py-2 w-80 text-sm'
                   }
                 />
               </div>
@@ -393,12 +407,12 @@ export default function DashboardLayout({
                       size="sm"
                       className={isEliteActive ? 'elite-navbar-btn' : 'hover:bg-gradient-soft text-slate-700 dark:text-slate-300 dark:text-slate-200 hover:text-slate-900 dark:text-white dark:hover:text-white'}
                     >
-                      <Crown className="h-4 w-4 text-purple-600" />
+                      <Crown className="h-4 w-4 text-[#d1a505]" />
                     </Button>
                   </HoverCardTrigger>
                   <HoverCardContent align="end" className="w-80">
                     <div className="flex items-start space-x-3">
-                      <Crown className="h-5 w-5 text-purple-600 mt-0.5" />
+                      <Crown className="h-5 w-5 text-[#d1a505] mt-0.5" />
                       <div className="space-y-2">
                         <div className="text-sm font-semibold">Upgrade to Pro</div>
                         <p className="text-xs text-muted-foreground">Unlock premium benefits:</p>
@@ -411,7 +425,7 @@ export default function DashboardLayout({
                         <Link to="/subscription" className="block">
                           <Button
                             size="sm"
-                            className="mt-2 w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white"
+                            className="mt-2 w-full bg-gradient-to-r from-[#155332] to-[#d1a505] hover:from-[#06362d] hover:to-[#ffb500] text-white"
                           >
                             Upgrade Now
                           </Button>
@@ -466,7 +480,7 @@ export default function DashboardLayout({
                     {userProfile?.avatar && (
                       <AvatarImage src={userProfile.avatar} alt="Profile" />
                     )}
-                    <AvatarFallback className={isEliteActive ? 'bg-gradient-to-br from-cyan-500 to-violet-600 text-white' : isBasicAdminPortalUser ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary text-white'}>
+                    <AvatarFallback className={isEliteActive ? 'bg-gradient-to-br from-[#06362d] to-[#d1a505] text-white' : isBasicAdminPortalUser ? 'bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950' : 'gradient-primary text-white'}>
                       {userProfile ?
                         `${userProfile.first_name?.[0] || ''}${userProfile.last_name?.[0] || ''}` :
                         'U'
@@ -483,7 +497,7 @@ export default function DashboardLayout({
         <main className={`flex-1 overflow-auto ${isEliteActive ? 'elite-page-bg p-6' : isBasicAdminPortalUser ? 'p-4 sm:p-6' : 'p-6'}`}>{children}</main>
       </div>
 
-      {/* Fread App Elite agreement prompt (moved from sidebar) */}
+      {/* The Capsol Elite agreement prompt (moved from sidebar) */}
       <ScoreMachineElitePrompt
         open={isElitePromptOpen}
         onOpenChange={setIsElitePromptOpen}
@@ -509,20 +523,20 @@ export default function DashboardLayout({
             exit={{ opacity: 0, transition: { duration: 1.0 } }}
           >
             {eliteTransitionPhase === 'blackout' && (
-              <motion.div className="absolute inset-0 bg-[#050510]"
+              <motion.div className="absolute inset-0 bg-[#031b17]"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 1.0, ease: 'easeInOut' }}
               >
                 <motion.div className="absolute inset-0" style={{
-                  backgroundImage: 'linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px)',
+                  backgroundImage: 'linear-gradient(rgba(209,165,5,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(21,83,50,0.04) 1px, transparent 1px)',
                   backgroundSize: '40px 40px'
                 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.7 }} />
                 <motion.div className="absolute inset-0 flex items-center justify-center"
                   initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 1, 0] }}
                   transition={{ duration: 1.2, times: [0, 0.3, 0.7, 1] }}
                 >
-                  <span className="text-xs font-mono tracking-[0.3em] uppercase text-cyan-500/60">
+                  <span className="text-xs font-mono tracking-[0.3em] uppercase text-[#d1a505]/70">
                     Initializing Elite Protocol...
                   </span>
                 </motion.div>
@@ -530,13 +544,13 @@ export default function DashboardLayout({
             )}
 
             {eliteTransitionPhase === 'dissolve' && (
-              <motion.div className="absolute inset-0 bg-[#050510]">
+              <motion.div className="absolute inset-0 bg-[#031b17]">
                 {Array.from({ length: 12 }).map((_, index) => (
                   <motion.div key={`glitch-${index}`} className="absolute left-0 right-0"
                     style={{
                       height: 2 + Math.random() * 8,
                       top: `${(index / 12) * 100}%`,
-                      background: `linear-gradient(90deg, transparent ${Math.random() * 30}%, rgba(0,212,255,${0.1 + Math.random() * 0.3}) ${30 + Math.random() * 40}%, rgba(112,0,255,${0.1 + Math.random() * 0.2}) ${70 + Math.random() * 20}%, transparent 100%)`,
+                      background: `linear-gradient(90deg, transparent ${Math.random() * 30}%, rgba(209,165,5,${0.1 + Math.random() * 0.3}) ${30 + Math.random() * 40}%, rgba(21,83,50,${0.1 + Math.random() * 0.2}) ${70 + Math.random() * 20}%, transparent 100%)`,
                     }}
                     initial={{ x: 0, opacity: 0 }}
                     animate={{ x: [-200, 200, -100, 150, 0], opacity: [0, 1, 1, 0.5, 0] }}
@@ -550,7 +564,7 @@ export default function DashboardLayout({
                       height: 4 + Math.random() * 20,
                       left: `${Math.random() * 90}%`,
                       top: `${Math.random() * 90}%`,
-                      background: ['rgba(0,212,255,0.15)', 'rgba(112,0,255,0.15)', 'rgba(255,0,255,0.1)'][index % 3],
+                      background: ['rgba(209,165,5,0.18)', 'rgba(21,83,50,0.16)', 'rgba(222,226,177,0.12)'][index % 3],
                     }}
                     initial={{ opacity: 0, scaleX: 0 }}
                     animate={{ opacity: [0, 1, 0], scaleX: [0, 1, 0] }}
@@ -561,14 +575,14 @@ export default function DashboardLayout({
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.5 }}
                 >
                   <div className="text-center">
-                    <motion.div className="text-lg font-mono tracking-[0.2em] uppercase text-cyan-400/80"
+                    <motion.div className="text-lg font-mono tracking-[0.2em] uppercase text-[#dee2b1]/80"
                       animate={{ opacity: [1, 0.3, 1, 0.5, 1] }}
                       transition={{ duration: 1.0, repeat: 1 }}
                     >
                       ⚡ System Upgrading ⚡
                     </motion.div>
                     <motion.div className="mt-3 h-1 w-48 mx-auto rounded-full overflow-hidden bg-slate-800">
-                      <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #00d4ff, #7000ff, #ff00ff)' }}
+                      <motion.div className="h-full rounded-full" style={{ background: 'linear-gradient(90deg, #155332, #d1a505, #ffb500)' }}
                         initial={{ width: '0%' }}
                         animate={{ width: '100%' }}
                         transition={{ duration: 1.4, ease: 'easeInOut' }}
@@ -580,13 +594,13 @@ export default function DashboardLayout({
             )}
 
             {eliteTransitionPhase === 'flash' && (
-              <motion.div className="absolute inset-0 bg-[#050510]">
+              <motion.div className="absolute inset-0 bg-[#031b17]">
                 {[0, 0.3, 0.7].map((delay, index) => (
                   <motion.div key={`scan-${index}`} className="absolute left-0 right-0"
                     style={{
                       height: index === 1 ? 3 : 2,
-                      background: ['linear-gradient(90deg, #00d4ff, #7000ff, #ff00ff, #00d4ff)', 'linear-gradient(90deg, #ff00ff, #00ffcc, #7000ff)', 'linear-gradient(90deg, #00ffcc, #00d4ff, #ff00ff)'][index],
-                      boxShadow: `0 0 20px ${['#00d4ff', '#ff00ff', '#00ffcc'][index]}`,
+                      background: ['linear-gradient(90deg, #dee2b1, #d1a505, #155332, #dee2b1)', 'linear-gradient(90deg, #ffb500, #d1a505, #155332)', 'linear-gradient(90deg, #dee2b1, #155332, #d1a505)'][index],
+                      boxShadow: `0 0 20px ${['#d1a505', '#155332', '#dee2b1'][index]}`,
                     }}
                     initial={{ top: '-4px', opacity: 0.9 }}
                     animate={{ top: '100vh', opacity: [0.9, 1, 1, 0.5] }}
@@ -595,7 +609,7 @@ export default function DashboardLayout({
                 ))}
                 {[0, 0.3, 0.7].map((delay, index) => (
                   <motion.div key={`glow-${index}`} className="absolute left-0 right-0 h-60"
-                    style={{ background: `linear-gradient(180deg, ${['rgba(0,212,255,0.2)', 'rgba(255,0,255,0.15)', 'rgba(0,255,204,0.15)'][index]} 0%, transparent 100%)` }}
+                    style={{ background: `linear-gradient(180deg, ${['rgba(209,165,5,0.2)', 'rgba(21,83,50,0.16)', 'rgba(222,226,177,0.14)'][index]} 0%, transparent 100%)` }}
                     initial={{ top: '-240px' }}
                     animate={{ top: '100vh' }}
                     transition={{ delay, duration: 1.2, ease: 'easeIn' }}
@@ -605,7 +619,7 @@ export default function DashboardLayout({
                   <motion.div key={`rain-${index}`} className="absolute text-[10px] font-mono leading-tight"
                     style={{
                       left: `${(index / 30) * 100}%`,
-                      color: ['#00d4ff40', '#7000ff30', '#ff00ff25', '#00ffcc30'][index % 4],
+                      color: ['#d1a50540', '#15533235', '#ffb50030', '#dee2b130'][index % 4],
                       writingMode: 'vertical-rl',
                     }}
                     initial={{ top: -200, opacity: 0 }}
@@ -617,13 +631,13 @@ export default function DashboardLayout({
                 ))}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <motion.div className="w-32 h-32 rounded-full border-2"
-                    style={{ borderColor: 'rgba(0,212,255,0.4)', boxShadow: '0 0 60px rgba(0,212,255,0.3), inset 0 0 30px rgba(112,0,255,0.2)' }}
+                    style={{ borderColor: 'rgba(209,165,5,0.4)', boxShadow: '0 0 60px rgba(209,165,5,0.28), inset 0 0 30px rgba(21,83,50,0.18)' }}
                     initial={{ scale: 0, opacity: 0 }}
                     animate={{ scale: [0, 1.5, 1], opacity: [0, 1, 0.6] }}
                     transition={{ delay: 0.8, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
                   />
                   <motion.div className="absolute w-20 h-20 rounded-full border"
-                    style={{ borderColor: 'rgba(112,0,255,0.5)', boxShadow: '0 0 40px rgba(112,0,255,0.4)' }}
+                    style={{ borderColor: 'rgba(21,83,50,0.5)', boxShadow: '0 0 40px rgba(21,83,50,0.35)' }}
                     initial={{ scale: 0, opacity: 0, rotate: 0 }}
                     animate={{ scale: [0, 1.2, 1], opacity: [0, 1, 0.8], rotate: 180 }}
                     transition={{ delay: 1.0, duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
@@ -633,7 +647,7 @@ export default function DashboardLayout({
             )}
 
             {eliteTransitionPhase === 'logo' && (
-              <motion.div className="absolute inset-0 bg-[#050510]"
+              <motion.div className="absolute inset-0 bg-[#031b17]"
                 initial={{ opacity: 1 }} animate={{ opacity: 1 }}
               >
                 {Array.from({ length: 60 }).map((_, index) => (
@@ -643,7 +657,7 @@ export default function DashboardLayout({
                       height: 1 + Math.random() * 3,
                       left: `${Math.random() * 100}%`,
                       top: `${Math.random() * 100}%`,
-                      background: ['#00d4ff', '#7000ff', '#ff00ff', '#00ffcc'][index % 4],
+                      background: ['#d1a505', '#155332', '#ffb500', '#dee2b1'][index % 4],
                     }}
                     animate={{ opacity: [0, 0.6, 0], scale: [0, 1, 0] }}
                     transition={{ delay: Math.random() * 2.5, duration: 1 + Math.random() * 1.5, repeat: 1, repeatType: 'loop' }}
@@ -656,20 +670,20 @@ export default function DashboardLayout({
                 >
                   <div className="text-center relative">
                     <motion.div className="absolute -inset-20 rounded-full"
-                      style={{ background: 'radial-gradient(circle, rgba(0,212,255,0.15) 0%, rgba(112,0,255,0.08) 40%, transparent 70%)' }}
+                      style={{ background: 'radial-gradient(circle, rgba(209,165,5,0.18) 0%, rgba(21,83,50,0.1) 40%, transparent 70%)' }}
                       animate={{ scale: [0.8, 1.1, 0.9, 1.05, 1], opacity: [0, 1, 0.8, 1, 0.9] }}
                       transition={{ duration: 2.5, ease: 'easeInOut' }}
                     />
                     <motion.div className="text-4xl sm:text-6xl font-black tracking-tight relative"
-                      style={{ background: 'linear-gradient(135deg, #00d4ff 0%, #7000ff 50%, #ff00ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 30px rgba(0,212,255,0.5))' }}
+                      style={{ background: 'linear-gradient(135deg, #dee2b1 0%, #d1a505 50%, #155332 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 30px rgba(209,165,5,0.38))' }}
                       initial={{ opacity: 0, y: 40 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 1.0, ease: [0.16, 1, 0.3, 1] }}
                     >
-                      FREAD APP
+                      THE CAPSOL
                     </motion.div>
                     <motion.div className="text-6xl sm:text-9xl font-black tracking-[0.2em] mt-2 relative"
-                      style={{ background: 'linear-gradient(135deg, #00d4ff 0%, #00ffcc 30%, #7000ff 60%, #ff00ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 50px rgba(0,212,255,0.4)) drop-shadow(0 0 100px rgba(112,0,255,0.3))' }}
+                      style={{ background: 'linear-gradient(135deg, #dee2b1 0%, #ffb500 30%, #d1a505 60%, #155332 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 50px rgba(209,165,5,0.32)) drop-shadow(0 0 100px rgba(21,83,50,0.22))' }}
                       initial={{ opacity: 0, scale: 0.5, letterSpacing: '0em' }}
                       animate={{ opacity: 1, scale: 1, letterSpacing: '0.2em' }}
                       transition={{ delay: 0.5, duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
@@ -677,19 +691,19 @@ export default function DashboardLayout({
                       ELITE
                     </motion.div>
                     <motion.div className="mt-6 h-1 mx-auto rounded-full"
-                      style={{ background: 'linear-gradient(90deg, transparent, #00d4ff, #7000ff, #ff00ff, #00ffcc, transparent)', boxShadow: '0 0 20px rgba(0,212,255,0.5)' }}
+                      style={{ background: 'linear-gradient(90deg, transparent, #dee2b1, #d1a505, #ffb500, #155332, transparent)', boxShadow: '0 0 20px rgba(209,165,5,0.45)' }}
                       initial={{ width: 0, opacity: 0 }}
                       animate={{ width: 400, opacity: 1 }}
                       transition={{ delay: 1.2, duration: 0.8 }}
                     />
-                    <motion.p className="mt-6 text-base sm:text-lg font-medium text-cyan-300/90 tracking-[0.3em] uppercase"
+                    <motion.p className="mt-6 text-base sm:text-lg font-medium text-[#dee2b1]/90 tracking-[0.3em] uppercase"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 1.6, duration: 0.6 }}
                     >
                       ✦ Welcome to the Elite ✦
                     </motion.p>
-                    <motion.p className="mt-2 text-sm text-purple-300/60 tracking-widest"
+                    <motion.p className="mt-2 text-sm text-[#d1a505]/60 tracking-widest"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 2.0, duration: 0.5 }}
@@ -702,12 +716,12 @@ export default function DashboardLayout({
             )}
 
             {eliteTransitionPhase === 'particles' && (
-              <motion.div className="absolute inset-0 bg-[#050510]"
+              <motion.div className="absolute inset-0 bg-[#031b17]"
                 initial={{ opacity: 1 }} animate={{ opacity: 1 }}
               >
                 <motion.div className="absolute inset-0 flex items-center justify-center">
                   <motion.div className="w-4 h-4 rounded-full bg-white dark:bg-slate-900"
-                    style={{ boxShadow: '0 0 100px 60px rgba(255,255,255,0.8), 0 0 200px 120px rgba(0,212,255,0.4)' }}
+                    style={{ boxShadow: '0 0 100px 60px rgba(255,255,255,0.75), 0 0 200px 120px rgba(209,165,5,0.35)' }}
                     initial={{ scale: 0, opacity: 1 }}
                     animate={{ scale: [0, 8, 30], opacity: [1, 0.8, 0] }}
                     transition={{ duration: 1.5, ease: 'easeOut' }}
@@ -717,7 +731,7 @@ export default function DashboardLayout({
                   const angle = (index / 80) * Math.PI * 2;
                   const distance = 300 + Math.random() * 400;
                   const size = 2 + Math.random() * 6;
-                  const color = ['#00d4ff', '#7000ff', '#ff00ff', '#00ffcc', '#ffffff'][index % 5];
+                  const themedColor = ['#d1a505', '#155332', '#ffb500', '#dee2b1', '#ffffff'][index % 5];
                   return (
                     <motion.div key={`burst-${index}`} className="absolute rounded-full"
                       style={{
@@ -725,8 +739,8 @@ export default function DashboardLayout({
                         height: size,
                         left: '50%',
                         top: '50%',
-                        background: color,
-                        boxShadow: `0 0 ${6 + Math.random() * 12}px ${color}`,
+                        background: themedColor,
+                        boxShadow: `0 0 ${6 + Math.random() * 12}px ${themedColor}`,
                       }}
                       initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
                       animate={{
@@ -742,7 +756,7 @@ export default function DashboardLayout({
                 {[0, 0.2, 0.5].map((delay, index) => (
                   <motion.div key={`shock-${index}`}
                     className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
-                    style={{ borderColor: ['rgba(0,212,255,0.6)', 'rgba(112,0,255,0.5)', 'rgba(255,0,255,0.4)'][index] }}
+                    style={{ borderColor: ['rgba(209,165,5,0.6)', 'rgba(21,83,50,0.45)', 'rgba(222,226,177,0.35)'][index] }}
                     initial={{ width: 0, height: 0, opacity: 1 }}
                     animate={{ width: [0, 800], height: [0, 800], opacity: [1, 0] }}
                     transition={{ delay, duration: 1.5, ease: 'easeOut' }}
@@ -755,12 +769,12 @@ export default function DashboardLayout({
                 >
                   <div className="text-center">
                     <div className="text-3xl sm:text-5xl font-black tracking-[0.3em] uppercase"
-                      style={{ background: 'linear-gradient(135deg, #00d4ff, #00ffcc, #ffffff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 20px rgba(0,212,255,0.6))' }}
+                      style={{ background: 'linear-gradient(135deg, #dee2b1, #d1a505, #ffffff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', filter: 'drop-shadow(0 0 20px rgba(209,165,5,0.45))' }}
                     >
                       ✦ ACTIVATED ✦
                     </div>
-                    <div className="mt-2 text-sm text-cyan-300/70 tracking-widest">
-                      Fread App Elite is now live
+                    <div className="mt-2 text-sm text-[#dee2b1]/70 tracking-widest">
+                      The Capsol Elite is now live
                     </div>
                   </div>
                 </motion.div>
@@ -783,8 +797,8 @@ export default function DashboardLayout({
                       height: 2 + Math.random() * 4,
                       left: `${Math.random() * 100}%`,
                       top: `${Math.random() * 100}%`,
-                      background: ['#00d4ff', '#7000ff', '#ff00ff', '#00ffcc'][index % 4],
-                      boxShadow: `0 0 ${6 + Math.random() * 10}px ${['#00d4ff', '#7000ff', '#ff00ff', '#00ffcc'][index % 4]}`,
+                      background: ['#d1a505', '#155332', '#ffb500', '#dee2b1'][index % 4],
+                      boxShadow: `0 0 ${6 + Math.random() * 10}px ${['#d1a505', '#155332', '#ffb500', '#dee2b1'][index % 4]}`,
                     }}
                     initial={{ opacity: 0, scale: 0 }}
                     animate={{ opacity: [0, 1, 0], scale: [0, 2, 0], y: -40 - Math.random() * 80 }}
@@ -792,7 +806,7 @@ export default function DashboardLayout({
                   />
                 ))}
                 <motion.div className="absolute inset-3 rounded-2xl"
-                  style={{ boxShadow: '0 0 60px rgba(0,212,255,0.5), inset 0 0 60px rgba(112,0,255,0.25), 0 0 120px rgba(255,0,255,0.2)', border: '2px solid rgba(0,212,255,0.6)' }}
+                  style={{ boxShadow: '0 0 60px rgba(209,165,5,0.38), inset 0 0 60px rgba(21,83,50,0.22), 0 0 120px rgba(222,226,177,0.18)', border: '2px solid rgba(209,165,5,0.52)' }}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: [0, 1, 0.5, 0] }}
                   transition={{ duration: 2.0, ease: 'easeOut' }}
@@ -806,16 +820,16 @@ export default function DashboardLayout({
                 animate={{ opacity: [0, 1, 1, 0], y: [-60, 0, 0, -30] }}
                 transition={{ duration: 3.0, times: [0, 0.15, 0.75, 1], ease: 'easeOut' }}
               >
-                <div className="px-8 py-4 rounded-2xl border border-cyan-400/30"
-                  style={{ background: 'linear-gradient(135deg, rgba(5,5,16,0.95), rgba(20,10,40,0.95))', boxShadow: '0 0 40px rgba(0,212,255,0.3), 0 0 80px rgba(112,0,255,0.15), 0 20px 60px rgba(0,0,0,0.5)' }}
+                <div className="px-8 py-4 rounded-2xl border border-[#d1a505]/30"
+                  style={{ background: 'linear-gradient(135deg, rgba(3,27,23,0.95), rgba(21,83,50,0.94))', boxShadow: '0 0 40px rgba(209,165,5,0.24), 0 0 80px rgba(21,83,50,0.18), 0 20px 60px rgba(0,0,0,0.5)' }}
                 >
                   <div className="text-center">
                     <div className="text-xl sm:text-2xl font-black tracking-wide"
-                      style={{ background: 'linear-gradient(135deg, #00d4ff, #7000ff, #ff00ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                      style={{ background: 'linear-gradient(135deg, #dee2b1, #d1a505, #ffb500)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
                     >
-                      🎉 Welcome to Fread App Elite!
+                      🎉 Welcome to The Capsol Elite!
                     </div>
-                    <div className="mt-1 text-sm text-cyan-300/70">
+                    <div className="mt-1 text-sm text-[#dee2b1]/70">
                       Your dashboard has been upgraded with premium features
                     </div>
                   </div>
