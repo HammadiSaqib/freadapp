@@ -636,8 +636,15 @@ const AffiliateLanding: React.FC = () => {
             <div>
               <h3 className="text-xl font-bold mb-4">The Capsol</h3>
               <p className="text-gray-400 mb-4">
-                Helping people achieve financial freedom through improved credit scores since 2015.
+                AI-powered capital matching for multifamily real estate investors and small business owners.
               </p>
+              <div className="space-y-2 text-sm text-gray-400 mb-4">
+                <p>525 North Tryon St.</p>
+                <p>Ste 1600, Charlotte, North Carolina 28202 USA</p>
+                <p>support@thecapsol.com</p>
+                <p>(704) 966-9919</p>
+                <p>Business Development: Bizcredit@FREAD.Life</p>
+              </div>
               <div className="flex space-x-4">
                 <div className="bg-gray-800 rounded-full w-10 h-10 flex items-center justify-center hover:bg-gray-700 transition-colors">
                   <Globe className="w-5 h-5" />
@@ -691,7 +698,7 @@ const AffiliateLanding: React.FC = () => {
                     {affiliateInfo.companyName && ` from ${affiliateInfo.companyName}`}
                   </span>
                 )}
-                © 2025 The Capsol. All rights reserved.
+                &copy; 2025 The Capsol. All rights reserved.
               </p>
              
             </div>

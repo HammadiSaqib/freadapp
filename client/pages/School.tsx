@@ -3291,21 +3291,21 @@ export default function School() {
                     <Mail className="h-4 w-4 text-ocean-blue" />
                     <div>
                       <div className="text-sm font-medium">Email</div>
-                      <div className="text-xs text-muted-foreground">Use the contact form for support</div>
+                      <div className="text-xs text-muted-foreground">support@thecapsol.com</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-emerald-600" />
                     <div>
                       <div className="text-sm font-medium">Phone</div>
-                      <div className="text-xs text-muted-foreground">{currentUser?.phone || "(475) 259-8768"}</div>
+                      <div className="text-xs text-muted-foreground">{currentUser?.phone || "(704) 966-9919"}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <MapPin className="h-4 w-4 text-purple-600" />
                     <div>
                       <div className="text-sm font-medium">Headquarters</div>
-                      <div className="text-xs text-muted-foreground">{currentUser?.address || "New York, NY"}</div>
+                      <div className="text-xs text-muted-foreground">{currentUser?.address || "525 North Tryon St., Ste 1600, Charlotte, North Carolina 28202 USA"}</div>
                     </div>
                   </div>
                   <Button

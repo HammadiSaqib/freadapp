@@ -80,8 +80,8 @@ interface UserSubscription {
 
 type CancellationReason = 'affordability' | 'guidance' | 'other';
 
-const SUPPORT_PHONE = '(475) 259-8768';
-const SUPPORT_PHONE_LINK = 'tel:4752598768';
+const SUPPORT_PHONE = '(704) 966-9919';
+const SUPPORT_PHONE_LINK = 'tel:+17049669919';
 const CONSULTATION_ROUTE = '/contact';
 const CANCELLATION_REASON_LABELS: Record<CancellationReason, string> = {
   affordability: "Can't afford it right now",

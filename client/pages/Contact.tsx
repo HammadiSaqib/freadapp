@@ -1,16 +1,27 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
+import { Link } from "react-router-dom";
+import {
+  ArrowRight,
+  Building2,
+  CheckCircle2,
+  Clock3,
+  Mail,
+  MapPin,
+  MessageSquare,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import SiteHeader from "@/components/SiteHeader";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mail, Phone, MapPin, Send, MessageSquare, Clock, HelpCircle, Building2, Globe, ArrowRight, Users, Shield, Zap, Star } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { Helmet } from 'react-helmet-async';
-import Footer from '@/components/Footer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type ContactTopic = "support" | "sales" | "partnerships";
 
@@ -46,20 +57,25 @@ const initialPartnershipForm = {
   message: "",
 };
 
+const COMPANY_PHONE_DISPLAY = "(704) 966-9919";
+const COMPANY_PHONE_LINK = "tel:+17049669919";
+const SUPPORT_EMAIL = "support@thecapsol.com";
+const BUSINESS_EMAIL = "Bizcredit@FREAD.Life";
+const COMPANY_ADDRESS = ["525 North Tryon St.", "Ste 1600, Charlotte, North Carolina 28202 USA"];
+
 const buildStructuredMessage = (
   sectionTitle: string,
   lines: Array<string | null | undefined>,
   bodyLabel: string,
   body: string,
-) => {
-  return [
+) =>
+  [
     `Topic: ${sectionTitle}`,
     ...lines.filter(Boolean),
     "",
     `${bodyLabel}:`,
     body.trim(),
   ].join("\n");
-};
 
 export default function Contact({ embed = false }: ContactProps) {
   const [activeTab, setActiveTab] = useState<ContactTopic>("support");
@@ -76,27 +92,13 @@ export default function Contact({ embed = false }: ContactProps) {
     }
 
     const postEmbedHeight = () => {
-      const height = Math.max(
-        document.documentElement.scrollHeight,
-        document.body.scrollHeight,
-      );
-
-      window.parent.postMessage(
-        {
-          type: "scoremachine:contact-embed-resize",
-          height,
-        },
-        "*",
-      );
+      const height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+      window.parent.postMessage({ type: "scoremachine:contact-embed-resize", height }, "*");
     };
 
     postEmbedHeight();
-
     const frameId = window.requestAnimationFrame(postEmbedHeight);
-    const resizeObserver = new ResizeObserver(() => {
-      postEmbedHeight();
-    });
-
+    const resizeObserver = new ResizeObserver(() => postEmbedHeight());
     resizeObserver.observe(document.body);
     window.addEventListener("resize", postEmbedHeight);
 
@@ -105,18 +107,7 @@ export default function Contact({ embed = false }: ContactProps) {
       resizeObserver.disconnect();
       window.removeEventListener("resize", postEmbedHeight);
     };
-  }, [embed, activeTab, error, success, loading]);
-
-  const handleScrollToForm = () => {
-    if (embed) {
-      return;
-    }
-
-    const target = document.getElementById("contact-form");
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
+  }, [embed, activeTab, loading, error, success]);
 
   const resetFeedback = () => {
     setError("");
@@ -151,7 +142,6 @@ export default function Contact({ embed = false }: ContactProps) {
     }
 
     setLoading(true);
-
     try {
       await submitContactRequest({
         name: supportForm.name,
@@ -171,7 +161,7 @@ export default function Contact({ embed = false }: ContactProps) {
 
       setSuccess(true);
       setSupportForm({ ...initialSupportForm });
-    } catch (err) {
+    } catch {
       setError("Failed to send message. Please try again.");
     } finally {
       setLoading(false);
@@ -188,7 +178,6 @@ export default function Contact({ embed = false }: ContactProps) {
     }
 
     setLoading(true);
-
     try {
       await submitContactRequest({
         name: salesForm.name,
@@ -208,7 +197,7 @@ export default function Contact({ embed = false }: ContactProps) {
 
       setSuccess(true);
       setSalesForm({ ...initialSalesForm });
-    } catch (err) {
+    } catch {
       setError("Failed to send message. Please try again.");
     } finally {
       setLoading(false);
@@ -225,7 +214,6 @@ export default function Contact({ embed = false }: ContactProps) {
     }
 
     setLoading(true);
-
     try {
       await submitContactRequest({
         name: partnershipForm.name,
@@ -246,505 +234,315 @@ export default function Contact({ embed = false }: ContactProps) {
 
       setSuccess(true);
       setPartnershipForm({ ...initialPartnershipForm });
-    } catch (err) {
+    } catch {
       setError("Failed to send message. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateSupportForm = (field: keyof typeof initialSupportForm, value: string) => {
-    setSupportForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const updateSalesForm = (field: keyof typeof initialSalesForm, value: string) => {
-    setSalesForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const updatePartnershipForm = (field: keyof typeof initialPartnershipForm, value: string) => {
-    setPartnershipForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleTabChange = (value: string) => {
-    resetFeedback();
-    setActiveTab(value as ContactTopic);
-  };
+  const rootClassName = embed ? "relative overflow-hidden bg-white py-4" : "min-h-screen overflow-hidden bg-white text-slate-950";
 
   return (
-    <div className={embed ? "relative overflow-hidden bg-transparent py-4" : "min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20"}>
+    <div className={rootClassName}>
       <Helmet>
-        <title>{embed ? "Contact Embed - The Capsol" : "Contact Us - The Capsol | Support & Inquiries"}</title>
-        <meta name="description" content="Contact The Capsol for support, account assistance, or platform guidance. Our team provides help with onboarding, technical questions, and feature navigation. Typical responses within business hours." />
-        <link rel="canonical" href="https://scoremachine.com/contact" />
-        {embed && <meta name="robots" content="noindex,nofollow" />}
+        <title>{embed ? "Contact Embed - CapSol" : "Contact | CapSol"}</title>
+        <meta
+          name="description"
+          content="Contact CapSol for support, business development, partnerships, or platform questions."
+        />
       </Helmet>
+
       {!embed && <SiteHeader />}
-      
-      {!embed && (
-      <>
-      {/* Enhanced Hero Section */}
-      <section className="relative py-20 overflow-hidden">
-        {/* Multi-layer Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-ocean-blue via-sea-green to-purple-600"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.1),transparent_50%)]"></div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center text-white max-w-4xl mx-auto">
-            
-            {/* Main Heading */}
-            <h1 className="text-5xl md:text-6xl font-bold my-6 leading-tight">
-              Questions about our
-              <span className="block bg-gradient-to-r from-yellow-300 via-orange-300 to-pink-300 bg-clip-text text-transparent pb-2">
-                Platform or services?
-              </span>
-            </h1>
-            
-            <p className="text-xl md:text-2xl mb-8 text-white/90 leading-relaxed max-w-3xl mx-auto">
-              Our team is here to assist.
-            </p>
-            
-            {/* Trust Indicators */}
-            <div className="flex flex-wrap justify-center items-center gap-8 mb-8 text-white/80">
-              <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                <span className="text-sm">Enterprise Security</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Zap className="h-5 w-5" />
-                <span className="text-sm">Fast Response Times*</span>
-              </div>
-            </div>
-            <div className="text-center mb-8 text-white/60 text-xs max-w-2xl mx-auto">
-              <p>*Client count reflects cumulative users since inception. Response times may vary based on inquiry volume.</p>
-            </div>
-            
-            {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-white text-ocean-blue hover:bg-white/90 font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-                onClick={handleScrollToForm}
-              >
-                Contact Us
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-      </>
-      )}
 
-      {/* Contact Section */}
-      <section id="contact-form" className={embed ? "py-0 relative" : "py-20 relative"}>
-        <div className={embed ? "mx-auto max-w-4xl px-4" : "container mx-auto px-4"}>
-          <div className={embed ? "" : "grid lg:grid-cols-3 gap-12"}>
-            {!embed && (
-            <>
-            {/* Left: Enhanced Quick Contact */}
+      <main>
+        {!embed && (
+          <section className="relative isolate overflow-hidden bg-slate-950 py-24 text-white lg:py-32">
+            <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_76%_18%,rgba(20,184,166,0.24),transparent_28%),radial-gradient(circle_at_18%_82%,rgba(16,185,129,0.18),transparent_24%)]" />
+            <div className="absolute inset-0 -z-10 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,.75)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.75)_1px,transparent_1px)] [background-size:56px_56px]" />
+            <div className="container mx-auto grid gap-14 px-4 lg:grid-cols-[1.02fr_.98fr] lg:items-center">
+              <div className="max-w-3xl">
+                <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-sm font-semibold text-teal-200">
+                  <Sparkles className="h-4 w-4" />
+                  Let’s talk about your next capital move
+                </div>
+                <h1 className="mt-6 text-5xl font-black leading-[1.02] tracking-[-0.045em] sm:text-6xl lg:text-7xl">
+                  Reach the team behind
+                  <span className="block bg-gradient-to-r from-teal-300 via-emerald-300 to-lime-200 bg-clip-text text-transparent">
+                    CapSol.
+                  </span>
+                </h1>
+                <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
+                  Whether you need platform support, partnership help, or a conversation about funding readiness, we’re here to help you move forward.
+                </p>
+                <div className="mt-9 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
+                  {["Support and onboarding", "Business development inquiries", "Charlotte-based company presence"].map((item) => (
+                    <span key={item} className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-teal-400" /> {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl backdrop-blur-sm">
+                  <Mail className="h-7 w-7 text-teal-300" />
+                  <h2 className="mt-5 text-xl font-black">Email support</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{SUPPORT_EMAIL}</p>
+                </article>
+                <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl backdrop-blur-sm">
+                  <Phone className="h-7 w-7 text-teal-300" />
+                  <h2 className="mt-5 text-xl font-black">Phone</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{COMPANY_PHONE_DISPLAY}</p>
+                </article>
+                <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl backdrop-blur-sm">
+                  <Building2 className="h-7 w-7 text-teal-300" />
+                  <h2 className="mt-5 text-xl font-black">Business development</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{BUSINESS_EMAIL}</p>
+                </article>
+                <article className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl backdrop-blur-sm">
+                  <MapPin className="h-7 w-7 text-teal-300" />
+                  <h2 className="mt-5 text-xl font-black">Office</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{COMPANY_ADDRESS.join(" ")}</p>
+                </article>
+              </div>
+            </div>
+          </section>
+        )}
+
+        <section className={embed ? "py-4" : "bg-slate-50 py-24 lg:py-28"}>
+          <div className="container mx-auto grid gap-10 px-4 lg:grid-cols-[.85fr_1.15fr]">
             <div className="space-y-6">
-              {/* Contact Methods */}
-              <div className="bg-white rounded-2xl border border-gray-200/50 p-8 shadow-lg hover:shadow-xl transition-all duration-300">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-ocean-blue to-sea-green flex items-center justify-center">
-                    <MessageSquare className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">Quick Contact</h3>
-                    <p className="text-sm text-gray-600">Get in touch instantly</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="group flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-                    <div className="w-12 h-12 flex-none rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                      <Mail className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 leading-tight">Email Support</p>
-                      <p className="text-sm text-gray-600 leading-tight">Use the contact form below</p>
-                      <p className="text-xs text-green-600 font-medium leading-tight">Fast response times</p>
-                    </div>
-                  </div>
-                  
-                  <div className="group flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-                    <div className="w-12 h-12 flex-none rounded-xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
-                      <Phone className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 leading-tight">Phone Support</p>
-                      <p className="text-sm text-gray-600 leading-tight">(475) 259-8768</p>
-                      <p className="text-xs text-green-600 font-medium leading-tight">Available 9am-6pm PST</p>
-                    </div>
-                  </div>
-                  
-                  <div className="group flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
-                    <div className="w-12 h-12 flex-none rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
-                      <MessageSquare className="h-6 w-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 leading-tight">Live Chat</p>
-                      <p className="text-sm text-gray-600 leading-tight">Instant messaging</p>
-                      <p className="text-xs text-green-600 font-medium leading-tight">Online now</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Global Support Badge - removed per request */}
-              
-              {/* Trust Indicators */}
-              <div className="bg-white rounded-2xl border border-gray-200/50 p-6 shadow-lg">
-                <h4 className="font-semibold mb-4 text-gray-900">Why Choose Us?</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Star className="h-4 w-4 text-yellow-500" />
-                    <span className="text-sm text-gray-600">High Customer Satisfaction*</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Zap className="h-4 w-4 text-blue-500" />
-                    <span className="text-sm text-gray-600">Reliable Platform</span>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 mt-4">*Based on internal post-support surveys.</p>
-              </div>
-            </div>
-            </>
-            )}
-
-            {/* Right: Contact Tabs and Form */}
-            <div className={embed ? "space-y-6" : "lg:col-span-2 space-y-6"}>
-              <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 rounded-lg bg-gradient-to-r from-ocean-blue/10 to-sea-green/10">
-                      <MessageSquare className="h-5 w-5 text-ocean-blue" />
-                    </div>
-                    <CardTitle className="text-2xl bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent">
-                      Send Us a Message
-                    </CardTitle>
-                  </div>
-                  <CardDescription className="text-base text-gray-600">
-                    Choose a topic and share a few details. We'll get back to you quickly.
-                  </CardDescription>
+              <Card className="rounded-3xl border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Direct contact</CardTitle>
+                  <CardDescription>The fastest ways to reach CapSol.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {error && (
-                    <Alert variant="destructive" className="mb-6 border-red-200 bg-red-50">
-                      <AlertDescription className="text-red-700">{error}</AlertDescription>
-                    </Alert>
-                  )}
-                  {success && (
-                    <Alert className="mb-6 border-green-200 bg-green-50">
-                      <AlertDescription className="text-green-700">Your message has been sent. We'll be in touch soon.</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
-                    <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-slate-100/80 p-1">
-                      <TabsTrigger value="support" className="rounded-lg px-3 py-2 text-sm data-[state=active]:bg-white data-[state=active]:text-ocean-blue data-[state=active]:shadow-sm">
-                        Support
-                      </TabsTrigger>
-                      <TabsTrigger value="sales" className="rounded-lg px-3 py-2 text-sm data-[state=active]:bg-white data-[state=active]:text-ocean-blue data-[state=active]:shadow-sm">
-                        Sales
-                      </TabsTrigger>
-                      <TabsTrigger value="partnerships" className="rounded-lg px-3 py-2 text-sm data-[state=active]:bg-white data-[state=active]:text-ocean-blue data-[state=active]:shadow-sm">
-                        Partnerships
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="support" className="space-y-6">
-                      <form onSubmit={handleSupportSubmit} className="space-y-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label htmlFor="name" className="text-sm font-medium text-gray-700">Name</Label>
-                            <Input 
-                              id="name" 
-                              value={supportForm.name} 
-                              onChange={(e) => updateSupportForm("name", e.target.value)} 
-                              placeholder="Your name" 
-                              className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-                            <Input 
-                              id="email" 
-                              type="email" 
-                              value={supportForm.email} 
-                              onChange={(e) => updateSupportForm("email", e.target.value)} 
-                              placeholder="you@example.com" 
-                              className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="message" className="text-sm font-medium text-gray-700">Describe your request</Label>
-                          <Textarea 
-                            id="message" 
-                            value={supportForm.message} 
-                            onChange={(e) => updateSupportForm("message", e.target.value)} 
-                            placeholder="Include goals, steps, screenshots, or URLs" 
-                            rows={6} 
-                            className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg resize-none"
-                            required
-                          />
-                        </div>
-                        <div className="grid md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Urgency</Label>
-                            <Input value={supportForm.urgency} onChange={(e) => updateSupportForm("urgency", e.target.value)} placeholder="Low / Medium / High" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Workspace</Label>
-                            <Input value={supportForm.workspace} onChange={(e) => updateSupportForm("workspace", e.target.value)} placeholder="Company or team name" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Phone</Label>
-                            <Input
-                              type="tel"
-                              value={supportForm.phone}
-                              onChange={(e) => updateSupportForm("phone", e.target.value)}
-                              placeholder="+1 (555) 000-0000"
-                              className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11"
-                              required
-                            />
-                          </div>
-                        </div>
-                        <Button 
-                          type="submit" 
-                          disabled={loading} 
-                          className="bg-gradient-to-r from-ocean-blue to-sea-green hover:from-ocean-blue/90 hover:to-sea-green/90 text-white font-medium px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 h-12"
-                        >
-                          {loading ? "Sending..." : (
-                            <span className="inline-flex items-center">
-                              Send Message <Send className="ml-2 h-4 w-4" />
-                            </span>
-                          )}
-                        </Button>
-                      </form>
-                    </TabsContent>
-
-                    <TabsContent value="sales" className="space-y-6">
-                      <form onSubmit={handleSalesSubmit} className="space-y-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Full Name</Label>
-                            <Input value={salesForm.name} onChange={(e) => updateSalesForm("name", e.target.value)} placeholder="Your name" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Work Email</Label>
-                            <Input type="email" value={salesForm.email} onChange={(e) => updateSalesForm("email", e.target.value)} placeholder="you@company.com" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Company</Label>
-                            <Input value={salesForm.company} onChange={(e) => updateSalesForm("company", e.target.value)} placeholder="Company name" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Team Size</Label>
-                            <Input value={salesForm.teamSize} onChange={(e) => updateSalesForm("teamSize", e.target.value)} placeholder="e.g., 10-50" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Phone</Label>
-                            <Input type="tel" value={salesForm.phone} onChange={(e) => updateSalesForm("phone", e.target.value)} placeholder="+1 (555) 000-0000" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">What are you looking to achieve?</Label>
-                          <Textarea value={salesForm.goals} onChange={(e) => updateSalesForm("goals", e.target.value)} placeholder="Share your goals, team size, and timeline" rows={5} className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg resize-none" required />
-                        </div>
-                        <div className="flex gap-4">
-                          <Button asChild variant="outline" className="border-ocean-blue text-ocean-blue hover:bg-ocean-blue/5 rounded-lg px-6 py-3 h-12">
-                            <a href="/pricing" target={embed ? "_top" : undefined} rel={embed ? "noopener noreferrer" : undefined}>View Pricing</a>
-                          </Button>
-                          <Button type="submit" className="bg-gradient-to-r from-ocean-blue to-sea-green hover:from-ocean-blue/90 hover:to-sea-green/90 text-white font-medium px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 h-12">
-                            Request Demo
-                          </Button>
-                        </div>
-                      </form>
-                    </TabsContent>
-
-                    <TabsContent value="partnerships" className="space-y-6">
-                      <form onSubmit={handlePartnershipSubmit} className="space-y-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Contact Name</Label>
-                            <Input value={partnershipForm.name} onChange={(e) => updatePartnershipForm("name", e.target.value)} placeholder="Your name" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Business Email</Label>
-                            <Input type="email" value={partnershipForm.email} onChange={(e) => updatePartnershipForm("email", e.target.value)} placeholder="you@company.com" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Company</Label>
-                            <Input value={partnershipForm.company} onChange={(e) => updatePartnershipForm("company", e.target.value)} placeholder="Company name" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Partnership Type</Label>
-                            <Input value={partnershipForm.partnershipType} onChange={(e) => updatePartnershipForm("partnershipType", e.target.value)} placeholder="Affiliate / Reseller / White Label" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-6">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Website</Label>
-                            <Input value={partnershipForm.website} onChange={(e) => updatePartnershipForm("website", e.target.value)} placeholder="https://" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Phone</Label>
-                            <Input type="tel" value={partnershipForm.phone} onChange={(e) => updatePartnershipForm("phone", e.target.value)} placeholder="+1 (555) 000-0000" className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg h-11" required />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Describe your partnership proposal</Label>
-                          <Textarea value={partnershipForm.message} onChange={(e) => updatePartnershipForm("message", e.target.value)} placeholder="Share your audience, goals, and how you'd like to partner" rows={5} className="border-gray-200 focus:border-ocean-blue focus:ring-ocean-blue/20 rounded-lg resize-none" required />
-                        </div>
-                        <Button type="submit" className="bg-gradient-to-r from-ocean-blue to-sea-green hover:from-ocean-blue/90 hover:to-sea-green/90 text-white font-medium px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 h-12">
-                          Submit Proposal
-                        </Button>
-                      </form>
-                    </TabsContent>
-                  </Tabs>
+                <CardContent className="space-y-5">
+                  <div className="flex items-start gap-3">
+                    <Mail className="mt-1 h-5 w-5 text-teal-700" />
+                    <div>
+                      <p className="font-semibold text-slate-900">Support</p>
+                      <a href={`mailto:${SUPPORT_EMAIL}`} className="text-slate-600 hover:text-teal-700">
+                        {SUPPORT_EMAIL}
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Phone className="mt-1 h-5 w-5 text-teal-700" />
+                    <div>
+                      <p className="font-semibold text-slate-900">Phone</p>
+                      <a href={COMPANY_PHONE_LINK} className="text-slate-600 hover:text-teal-700">
+                        {COMPANY_PHONE_DISPLAY}
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Building2 className="mt-1 h-5 w-5 text-teal-700" />
+                    <div>
+                      <p className="font-semibold text-slate-900">Business Development</p>
+                      <a href={`mailto:${BUSINESS_EMAIL}`} className="text-slate-600 hover:text-teal-700">
+                        {BUSINESS_EMAIL}
+                      </a>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <MapPin className="mt-1 h-5 w-5 text-teal-700" />
+                    <div>
+                      <p className="font-semibold text-slate-900">Company Address</p>
+                      {COMPANY_ADDRESS.map((line) => (
+                        <p key={line} className="text-slate-600">{line}</p>
+                      ))}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {!embed && (
-      <>
-      {/* FAQs */}
-      <section className="py-20 bg-gradient-to-br from-gray-50 via-white to-blue-50/30 relative overflow-hidden">
-        {/* Background Elements */}
-        <div className="absolute inset-0 bg-gradient-to-r from-ocean-blue/5 to-sea-green/5"></div>
-        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-ocean-blue/10 to-transparent rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-sea-green/10 to-transparent rounded-full blur-3xl"></div>
-        
-        <div className="container mx-auto px-4 relative">
-          <div className="grid lg:grid-cols-2 gap-12 items-start">
-            <div className="space-y-8">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-ocean-blue/10 to-sea-green/10 rounded-full">
-                  <HelpCircle className="h-4 w-4 text-ocean-blue" />
-                  <span className="text-sm font-medium text-ocean-blue">FAQ</span>
-                </div>
-                <h2 className="text-4xl font-bold bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent pb-3">
-                  Frequently Asked Questions
-                </h2>
-                <p className="text-lg text-gray-600 leading-relaxed">
-                  Answers to common questions about The Capsol and your account.
-                </p>
-              </div>
-              
-              <Accordion type="single" collapsible className="space-y-4">
-                <AccordionItem value="item-1" className="border border-gray-200 rounded-xl px-6 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200">
-                  <AccordionTrigger className="text-left font-semibold text-gray-800 hover:text-ocean-blue py-6">
-                    How fast do you respond?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-gray-600 pb-6 leading-relaxed">
-                    We aim for fast response times during office hours. For urgent issues, our premium support offers prioritized assistance.
-                  </AccordionContent>
-                </AccordionItem>
-                
-                <AccordionItem value="item-2" className="border border-gray-200 rounded-xl px-6 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200">
-                  <AccordionTrigger className="text-left font-semibold text-gray-800 hover:text-ocean-blue py-6">
-                    Do you offer onboarding?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-gray-600 pb-6 leading-relaxed">
-                    Yes, we provide guided onboarding and comprehensive resources to help you launch your credit strategy toolkit. Our team will walk you through setup and best practices.
-                  </AccordionContent>
-                </AccordionItem>
-                
-                <AccordionItem value="item-3" className="border border-gray-200 rounded-xl px-6 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200">
-                  <AccordionTrigger className="text-left font-semibold text-gray-800 hover:text-ocean-blue py-6">
-                    Is live chat available?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-gray-600 pb-6 leading-relaxed">
-                    Live chat is available for all paid plans and trial users during office hours (9 AM - 6 PM PST). Outside these hours, you can leave a message and we'll respond promptly.
-                  </AccordionContent>
-                </AccordionItem>
-                
-                <AccordionItem value="item-4" className="border border-gray-200 rounded-xl px-6 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200">
-                  <AccordionContent className="text-gray-600 pb-6 leading-relaxed">
-                    We're SOC 2 compliant with enterprise-grade security including 256-bit encryption, regular security audits, and strict data privacy controls to protect your sensitive information.
-                  </AccordionContent>
-                </AccordionItem>
-                
-                <AccordionItem value="item-5" className="border border-gray-200 rounded-xl px-6 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-200">
-                  <AccordionTrigger className="text-left font-semibold text-gray-800 hover:text-ocean-blue py-6">
-                    Can I cancel anytime?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-gray-600 pb-6 leading-relaxed">
-                    Yes, you can cancel your subscription at any time. No long-term contracts or cancellation fees. Your data remains accessible during your billing period.
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </div>
-            
-            <div className="lg:pl-8">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-ocean-blue/20 to-sea-green/20 rounded-2xl blur-xl"></div>
-                <div className="relative bg-white/90 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-white/20">
-                  <div className="space-y-6">
-                    <div className="text-center space-y-4">
-                      <div className="w-16 h-16 bg-gradient-to-r from-ocean-blue to-sea-green rounded-full flex items-center justify-center mx-auto">
-                        <MessageSquare className="h-8 w-8 text-white" />
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-800">Still have questions?</h3>
-                      <p className="text-gray-600">Our support team is here to help you succeed.</p>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                          <Users className="h-4 w-4 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">Customer Support Team</p>
-                          <p className="text-sm text-gray-600">Dedicated specialists</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <Clock className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">Fast Response</p>
-                          <p className="text-sm text-gray-600">Prompt assistance</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <Button
-                      asChild
-                      className="w-full bg-gradient-to-r from-ocean-blue to-sea-green hover:from-ocean-blue/90 hover:to-sea-green/90 text-white font-medium py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <a href="tel:4752598768"> Call Now (475) 259-8768</a>
+              <Card className="rounded-3xl border-slate-200 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Response expectations</CardTitle>
+                  <CardDescription>What happens after you contact us.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-3">
+                    <Clock3 className="mt-1 h-5 w-5 text-teal-700" />
+                    <p className="text-slate-600">Support and contact requests are typically reviewed during business hours.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <MessageSquare className="mt-1 h-5 w-5 text-teal-700" />
+                    <p className="text-slate-600">Use the form for platform questions, funding-readiness conversations, or partnership outreach.</p>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="mt-1 h-5 w-5 text-teal-700" />
+                    <p className="text-slate-600">Detailed requests help our team respond with more relevant next steps.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {!embed && (
+                <div className="rounded-[2rem] bg-slate-950 p-8 text-white shadow-2xl">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-teal-400">Need more context first?</p>
+                  <h3 className="mt-4 text-3xl font-black">Explore the platform before you reach out.</h3>
+                  <div className="mt-6 flex flex-col gap-3">
+                    <Button className="bg-teal-500 font-bold text-slate-950 hover:bg-teal-400" asChild>
+                      <Link to="/features">
+                        View Features
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button variant="outline" className="border-white/20 bg-white/5 font-bold text-white hover:bg-white/10 hover:text-white" asChild>
+                      <Link to="/pricing">See Pricing</Link>
                     </Button>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
+
+            <Card className="rounded-3xl border-slate-200 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-2xl">Send us a message</CardTitle>
+                <CardDescription>Choose the topic that best matches what you need.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {error && (
+                  <Alert variant="destructive" className="mb-6">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                {success && (
+                  <Alert className="mb-6 border-emerald-200 bg-emerald-50 text-emerald-800">
+                    <AlertDescription>Your message has been sent. We’ll be in touch soon.</AlertDescription>
+                  </Alert>
+                )}
+
+                <Tabs value={activeTab} onValueChange={(value) => { resetFeedback(); setActiveTab(value as ContactTopic); }} className="space-y-6">
+                  <TabsList className="grid h-auto w-full grid-cols-3 rounded-2xl bg-slate-100 p-1">
+                    <TabsTrigger value="support" className="rounded-xl">Support</TabsTrigger>
+                    <TabsTrigger value="sales" className="rounded-xl">Sales</TabsTrigger>
+                    <TabsTrigger value="partnerships" className="rounded-xl">Partnerships</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="support">
+                    <form onSubmit={handleSupportSubmit} className="space-y-5">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="support-name">Name</Label>
+                          <Input id="support-name" value={supportForm.name} onChange={(e) => setSupportForm((prev) => ({ ...prev, name: e.target.value }))} required />
+                        </div>
+                        <div>
+                          <Label htmlFor="support-email">Email</Label>
+                          <Input id="support-email" type="email" value={supportForm.email} onChange={(e) => setSupportForm((prev) => ({ ...prev, email: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="support-phone">Phone</Label>
+                          <Input id="support-phone" value={supportForm.phone} onChange={(e) => setSupportForm((prev) => ({ ...prev, phone: e.target.value }))} required />
+                        </div>
+                        <div>
+                          <Label htmlFor="support-urgency">Urgency</Label>
+                          <Input id="support-urgency" value={supportForm.urgency} onChange={(e) => setSupportForm((prev) => ({ ...prev, urgency: e.target.value }))} placeholder="Low / Medium / High" />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="support-workspace">Workspace or Company</Label>
+                        <Input id="support-workspace" value={supportForm.workspace} onChange={(e) => setSupportForm((prev) => ({ ...prev, workspace: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label htmlFor="support-message">How can we help?</Label>
+                        <Textarea id="support-message" rows={6} value={supportForm.message} onChange={(e) => setSupportForm((prev) => ({ ...prev, message: e.target.value }))} required />
+                      </div>
+                      <Button type="submit" disabled={loading} className="h-12 bg-slate-950 font-bold hover:bg-teal-700">
+                        {loading ? "Sending..." : "Send Support Request"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="sales">
+                    <form onSubmit={handleSalesSubmit} className="space-y-5">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="sales-name">Full Name</Label>
+                          <Input id="sales-name" value={salesForm.name} onChange={(e) => setSalesForm((prev) => ({ ...prev, name: e.target.value }))} required />
+                        </div>
+                        <div>
+                          <Label htmlFor="sales-email">Work Email</Label>
+                          <Input id="sales-email" type="email" value={salesForm.email} onChange={(e) => setSalesForm((prev) => ({ ...prev, email: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div className="grid gap-5 md:grid-cols-3">
+                        <div>
+                          <Label htmlFor="sales-company">Company</Label>
+                          <Input id="sales-company" value={salesForm.company} onChange={(e) => setSalesForm((prev) => ({ ...prev, company: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="sales-team">Team Size</Label>
+                          <Input id="sales-team" value={salesForm.teamSize} onChange={(e) => setSalesForm((prev) => ({ ...prev, teamSize: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="sales-phone">Phone</Label>
+                          <Input id="sales-phone" value={salesForm.phone} onChange={(e) => setSalesForm((prev) => ({ ...prev, phone: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="sales-goals">What are you trying to accomplish?</Label>
+                        <Textarea id="sales-goals" rows={6} value={salesForm.goals} onChange={(e) => setSalesForm((prev) => ({ ...prev, goals: e.target.value }))} required />
+                      </div>
+                      <Button type="submit" disabled={loading} className="h-12 bg-slate-950 font-bold hover:bg-teal-700">
+                        {loading ? "Sending..." : "Send Sales Inquiry"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="partnerships">
+                    <form onSubmit={handlePartnershipSubmit} className="space-y-5">
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="partner-name">Contact Name</Label>
+                          <Input id="partner-name" value={partnershipForm.name} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, name: e.target.value }))} required />
+                        </div>
+                        <div>
+                          <Label htmlFor="partner-email">Business Email</Label>
+                          <Input id="partner-email" type="email" value={partnershipForm.email} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, email: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="partner-company">Company</Label>
+                          <Input id="partner-company" value={partnershipForm.company} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, company: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="partner-type">Partnership Type</Label>
+                          <Input id="partner-type" value={partnershipForm.partnershipType} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, partnershipType: e.target.value }))} placeholder="Affiliate / Reseller / Strategic" />
+                        </div>
+                      </div>
+                      <div className="grid gap-5 md:grid-cols-2">
+                        <div>
+                          <Label htmlFor="partner-website">Website</Label>
+                          <Input id="partner-website" value={partnershipForm.website} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, website: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="partner-phone">Phone</Label>
+                          <Input id="partner-phone" value={partnershipForm.phone} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, phone: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="partner-message">Proposal</Label>
+                        <Textarea id="partner-message" rows={6} value={partnershipForm.message} onChange={(e) => setPartnershipForm((prev) => ({ ...prev, message: e.target.value }))} required />
+                      </div>
+                      <Button type="submit" disabled={loading} className="h-12 bg-slate-950 font-bold hover:bg-teal-700">
+                        {loading ? "Sending..." : "Send Partnership Inquiry"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      </section>
-      
-      <div className="bg-gray-900 text-gray-400 py-8 border-t border-gray-800">
-        <div className="container mx-auto px-4 text-center">
-           <p className="text-xs">The Capsol is a software platform. We do not provide financial advice or guarantee credit score improvements.</p>
-        </div>
-      </div>
-      <Footer />
-      </>
-      )}
+        </section>
+      </main>
+
+      {!embed && <Footer />}
     </div>
   );
 }

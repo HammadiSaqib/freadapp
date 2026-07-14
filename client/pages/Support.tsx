@@ -82,6 +82,11 @@ interface ChatConversation {
   isOnline: boolean;
 }
 
+const SUPPORT_PHONE = "(704) 966-9919";
+const SUPPORT_EMAIL = "support@thecapsol.com";
+const BUSINESS_EMAIL = "Bizcredit@FREAD.Life";
+const SUPPORT_ADDRESS = "525 North Tryon St., Ste 1600, Charlotte, North Carolina 28202 USA";
+
 export default function Support() {
   const { isEliteActive } = useScoreMachineEliteStatus();
   const { userProfile } = useAuthContext();
@@ -832,24 +837,24 @@ export default function Support() {
             <Phone className="h-5 w-5 text-blue-500" />
             <div>
               <p className="font-medium">Phone Support</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">+1 (475) 259-8768</p>
-              <p className="text-xs text-slate-500">Mon-Fri 9AM-6PM EST</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{SUPPORT_PHONE}</p>
+              <p className="text-xs text-slate-500">Direct support line</p>
             </div>
           </div>
           <div className="flex items-center space-x-3 p-3 border rounded-lg">
             <Mail className="h-5 w-5 text-green-500" />
             <div>
               <p className="font-medium">Email Support</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Use the contact form for support</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{SUPPORT_EMAIL}</p>
               <p className="text-xs text-slate-500">Response within 24 hours</p>
             </div>
           </div>
           <div className="flex items-center space-x-3 p-3 border rounded-lg">
             <MessageSquare className="h-5 w-5 text-purple-500" />
             <div>
-              <p className="font-medium">Live Chat</p>
-              <p className="text-sm text-slate-600 dark:text-slate-400">Available now</p>
-              <p className="text-xs text-slate-500">Average response: 2 minutes</p>
+              <p className="font-medium">Business Development</p>
+              <p className="text-sm text-slate-600 dark:text-slate-400">{BUSINESS_EMAIL}</p>
+              <p className="text-xs text-slate-500">Partnership and growth inquiries</p>
             </div>
           </div>
         </CardContent>
@@ -875,6 +880,9 @@ export default function Support() {
           <div className="flex justify-between items-center">
             <span className="font-medium">Sunday</span>
             <span className="text-slate-600 dark:text-slate-400">Closed</span>
+          </div>
+          <div className="rounded-lg border p-3 text-sm text-slate-600 dark:text-slate-400">
+            {SUPPORT_ADDRESS}
           </div>
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <div className="flex items-center space-x-2">
@@ -1441,24 +1449,24 @@ export default function Support() {
                     <Phone className="h-5 w-5 text-blue-500" />
                     <div>
                       <p className="font-medium">Phone Support</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">+1 (475) 259-8768</p>
-                      <p className="text-xs text-slate-500">Mon-Fri 9AM-6PM EST</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{SUPPORT_PHONE}</p>
+                      <p className="text-xs text-slate-500">Direct support line</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 p-3 border rounded-lg">
                     <Mail className="h-5 w-5 text-green-500" />
                     <div>
                       <p className="font-medium">Email Support</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Use the contact form for support</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{SUPPORT_EMAIL}</p>
                       <p className="text-xs text-slate-500">Response within 24 hours</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 p-3 border rounded-lg">
                     <MessageSquare className="h-5 w-5 text-purple-500" />
                     <div>
-                      <p className="font-medium">Live Chat</p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Available now</p>
-                      <p className="text-xs text-slate-500">Average response: 2 minutes</p>
+                      <p className="font-medium">Business Development</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{BUSINESS_EMAIL}</p>
+                      <p className="text-xs text-slate-500">Partnership and growth inquiries</p>
                     </div>
                   </div>
                 </CardContent>
@@ -1484,6 +1492,9 @@ export default function Support() {
                   <div className="flex justify-between items-center">
                     <span className="font-medium">Sunday</span>
                     <span className="text-slate-600 dark:text-slate-400">Closed</span>
+                  </div>
+                  <div className="rounded-lg border p-3 text-sm text-slate-600 dark:text-slate-400">
+                    {SUPPORT_ADDRESS}
                   </div>
                   <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="flex items-center space-x-2">

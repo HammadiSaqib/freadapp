@@ -262,7 +262,7 @@ type CoachPromptQuota = {
   unlinked?: boolean;
 };
 
-const AI_COACH_SUPPORT_PHONE = "(475) 259-8768";
+const AI_COACH_SUPPORT_PHONE = "(704) 966-9919";
 const AI_COACH_ELITE_ONLY_MESSAGE = "This feature For Elite User Only Upgrade To Eilte Or If You Already Have Unlimete Unlimte Pakege So Contact To Support For Elite Activtion";
 
 const createWelcomeCoachMessage = (): CoachChatMessage => ({

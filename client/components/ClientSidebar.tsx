@@ -137,17 +137,14 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
       <div className="p-4 border-b border-border/40 dark:border-slate-700">
         <div className="flex items-center justify-between">
           {!collapsed && (
-             <Link to="/member" className="flex items-center space-x-2">
-               <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
-              <span className="text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                Client Portal
-              </span>
+             <Link to="/member" className="flex flex-1 items-center">
+               <img src="/capsol-logo.png" alt="CapSol" className="h-12 w-full max-w-[180px] object-contain" />
             </Link>
           )}
           {collapsed && (
-            <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg mx-auto">
-              <User className="h-5 w-5 text-white" />
-            </div>
+            <Link to="/member" className="mx-auto">
+              <img src="/capsol-logo.png" alt="CapSol" className="h-9 w-9 object-contain" />
+            </Link>
           )}
           <div className="flex items-center gap-1">
             <Button

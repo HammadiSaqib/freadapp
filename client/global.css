@@ -176,88 +176,96 @@
   }
 
   .admin-purple-theme {
-    --primary: 272 84% 60%;
+    --primary: 47 95% 42%;
     --primary-foreground: 0 0% 98%;
-    --secondary: 227 63% 33%;
+    --secondary: 148 60% 20%;
     --secondary-foreground: 0 0% 98%;
-    --accent: 272 84% 60%;
+    --accent: 86 42% 78%;
     --accent-foreground: 0 0% 98%;
-    --ring: 272 84% 60%;
+    --ring: 47 95% 42%;
 
-    --ocean-blue: 272 84% 60%;
-    --deep-blue: 227 63% 33%;
-    --sea-green: 227 63% 33%;
-    --light-sea-green: 263 78% 93%;
-    --cyan-blue: 262 88% 67%;
-    --teal-green: 231 54% 43%;
+    --ocean-blue: 47 95% 42%;
+    --deep-blue: 148 60% 20%;
+    --sea-green: 148 60% 20%;
+    --light-sea-green: 86 42% 78%;
+    --cyan-blue: 65 46% 79%;
+    --teal-green: 142 44% 33%;
 
     --gradient-primary: linear-gradient(
       135deg,
-      hsl(272 84% 60%) 0%,
-      hsl(227 63% 33%) 100%
+      hsl(86 42% 78%) 0%,
+      hsl(47 95% 42%) 42%,
+      hsl(148 60% 20%) 100%
     );
     --gradient-secondary: linear-gradient(
       135deg,
-      hsl(262 88% 67%) 0%,
-      hsl(231 54% 43%) 100%
+      hsl(65 46% 79%) 0%,
+      hsl(142 44% 33%) 100%
     );
     --gradient-soft: linear-gradient(
       135deg,
-      hsl(270 100% 98%) 0%,
-      hsl(226 100% 97%) 100%
+      hsl(86 40% 96%) 0%,
+      hsl(65 46% 93%) 52%,
+      hsl(142 30% 94%) 100%
     );
     --gradient-dark: linear-gradient(
       135deg,
-      hsl(249 42% 34%) 0%,
-      hsl(227 63% 22%) 100%
+      hsl(148 60% 20%) 0%,
+      hsl(142 52% 26%) 52%,
+      hsl(47 95% 32%) 100%
     );
     --gradient-light: linear-gradient(
       135deg,
-      hsl(270 100% 99%) 0%,
-      hsl(228 100% 99%) 100%
+      hsl(86 40% 98%) 0%,
+      hsl(65 46% 96%) 45%,
+      hsl(142 35% 96%) 100%
     );
   }
 
   .dark .admin-purple-theme {
-    --primary: 271 91% 73%;
-    --primary-foreground: 235 35% 14%;
-    --secondary: 223 72% 58%;
-    --secondary-foreground: 235 35% 14%;
-    --accent: 271 91% 73%;
-    --accent-foreground: 235 35% 14%;
-    --ring: 271 91% 73%;
+    --primary: 43 100% 50%;
+    --primary-foreground: 148 44% 12%;
+    --secondary: 148 48% 42%;
+    --secondary-foreground: 148 44% 12%;
+    --accent: 82 34% 70%;
+    --accent-foreground: 148 44% 12%;
+    --ring: 43 100% 50%;
 
-    --ocean-blue: 271 91% 73%;
-    --deep-blue: 223 72% 58%;
-    --sea-green: 223 72% 58%;
-    --light-sea-green: 228 70% 72%;
-    --cyan-blue: 261 88% 76%;
-    --teal-green: 228 66% 64%;
+    --ocean-blue: 43 100% 50%;
+    --deep-blue: 148 48% 42%;
+    --sea-green: 148 48% 42%;
+    --light-sea-green: 82 34% 70%;
+    --cyan-blue: 65 40% 68%;
+    --teal-green: 146 40% 52%;
 
     --gradient-primary: linear-gradient(
       135deg,
-      hsl(271 91% 73%) 0%,
-      hsl(223 72% 58%) 100%
+      hsl(82 34% 70%) 0%,
+      hsl(43 100% 50%) 42%,
+      hsl(148 48% 42%) 100%
     );
     --gradient-secondary: linear-gradient(
       135deg,
-      hsl(261 88% 76%) 0%,
-      hsl(228 66% 64%) 100%
+      hsl(65 40% 68%) 0%,
+      hsl(146 40% 52%) 100%
     );
     --gradient-soft: linear-gradient(
       135deg,
-      hsl(248 23% 24%) 0%,
-      hsl(226 28% 27%) 100%
+      hsl(150 28% 18%) 0%,
+      hsl(142 24% 22%) 52%,
+      hsl(82 18% 24%) 100%
     );
     --gradient-dark: linear-gradient(
       135deg,
-      hsl(246 34% 20%) 0%,
-      hsl(224 42% 18%) 100%
+      hsl(148 58% 16%) 0%,
+      hsl(142 54% 20%) 45%,
+      hsl(43 92% 28%) 100%
     );
     --gradient-light: linear-gradient(
       135deg,
-      hsl(242 20% 29%) 0%,
-      hsl(225 22% 31%) 100%
+      hsl(150 30% 20%) 0%,
+      hsl(142 24% 24%) 48%,
+      hsl(82 18% 26%) 100%
     );
   }
 

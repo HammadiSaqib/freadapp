@@ -220,17 +220,14 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       <div className="p-4 border-b border-border/40 dark:border-slate-700">
         <div className="flex items-center justify-between">
           {!collapsed && (
-            <Link to="/super-admin/overview" className="flex items-center space-x-2">
-               <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
-              <span className="text-lg font-bold gradient-text-primary">
-                Super Admin
-              </span>
+            <Link to="/super-admin/overview" className="flex flex-1 items-center">
+              <img src="/capsol-logo.png" alt="CapSol" className="h-12 w-full max-w-[180px] object-contain" />
             </Link>
           )}
           {collapsed && (
-            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center shadow-lg mx-auto">
-              <Crown className="h-5 w-5 text-white" />
-            </div>
+            <Link to="/super-admin/overview" className="mx-auto">
+              <img src="/capsol-logo.png" alt="CapSol" className="h-9 w-9 object-contain" />
+            </Link>
           )}
           <Button
             variant="ghost"

@@ -1,223 +1,257 @@
-import SiteHeader from "@/components/SiteHeader";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Sparkles, Shield, Brain, FileText, TrendingUp, Zap, Users, BarChart3, CheckCircle, ArrowRight, Star, Award, Target, Lock, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
+import {
+  ArrowRight,
+  Bot,
+  Building2,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  FileCheck2,
+  HandCoins,
+  Landmark,
+  Layers3,
+  Network,
+  SearchCheck,
+  ShieldCheck,
+  Sparkles,
+  UserRoundCheck,
+  WalletCards,
+  Zap,
+} from "lucide-react";
+import SiteHeader from "@/components/SiteHeader";
 import Footer from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+
+const platformFeatures = [
+  {
+    icon: Bot,
+    title: "AI-powered capital matching",
+    description:
+      "CapSol analyzes your funding target, profile, and deal details to surface aligned capital paths faster.",
+  },
+  {
+    icon: Network,
+    title: "Multiple sources in one workflow",
+    description:
+      "Review SBA lending, private equity, and hard money options without bouncing between disconnected processes.",
+  },
+  {
+    icon: SearchCheck,
+    title: "Readiness gap visibility",
+    description:
+      "Spot credit, entity, or documentation gaps early so you can improve your funding position before applying.",
+  },
+  {
+    icon: WalletCards,
+    title: "Hybrid revenue model",
+    description:
+      "The platform supports a recurring subscription structure plus a 10% success fee on larger funded deals.",
+  },
+];
+
+const operationalFeatures = [
+  {
+    icon: Landmark,
+    title: "SBA loan matching",
+    description: "Support for government-backed programs that fit growth, acquisition, and working-capital needs.",
+  },
+  {
+    icon: HandCoins,
+    title: "Private equity pathways",
+    description: "Designed for larger opportunities, strategic expansion, and multifamily syndication structures.",
+  },
+  {
+    icon: Zap,
+    title: "Hard money access",
+    description: "Flexible options for time-sensitive deals where speed and asset-backed capital matter.",
+  },
+  {
+    icon: UserRoundCheck,
+    title: "Business setup support",
+    description: "Professional setup services can help users present stronger, more lender-ready business entities.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Credit repair add-ons",
+    description: "Built-in support services aimed at improving readiness before capital applications are submitted.",
+  },
+  {
+    icon: FileCheck2,
+    title: "Underwriting preparation",
+    description: "Keep key business and funding information organized in one system built for capital readiness.",
+  },
+];
+
+const outcomes = [
+  "Funding targets from $50,000 to $20 million",
+  "Built for multifamily investors and small business owners",
+  "One platform for matching, readiness, and execution",
+];
 
 export default function Features() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen overflow-hidden bg-white text-slate-950">
+      <Helmet>
+        <title>Features | CapSol</title>
+        <meta
+          name="description"
+          content="Explore CapSol platform features for AI-powered capital matching, readiness support, and streamlined access to SBA, private equity, and hard money opportunities."
+        />
+      </Helmet>
+
       <SiteHeader />
 
-      {/* Enhanced Hero Section */}
-      <section className="relative overflow-hidden py-20 lg:py-28">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/80 via-white to-emerald-50/80" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-100/20 via-transparent to-transparent" />
-        
-        <div className="relative container mx-auto px-4">
-          <div className="text-center max-w-5xl mx-auto">
-            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-ocean-blue/10 to-sea-green/10 rounded-full px-4 py-2 mb-6">
-              <Award className="h-4 w-4 text-ocean-blue" />
-              <span className="text-sm font-medium text-ocean-blue">Elite Credit Strategy Toolkit</span>
-            </div>
-            
-            <h1 className="pb-5 text-5xl lg:text-6xl font-bold tracking-tight leading-snug bg-gradient-to-r from-gray-900 via-ocean-blue to-sea-green bg-clip-text text-transparent mb-6">
-              Advanced Tools for Smarter Credit Understanding
-            </h1>
-            
-            <p className="text-xl text-gray-600 leading-relaxed max-w-4xl mx-auto mb-8">
-              Designed for credit professionals, consultants, and individuals who want clearer insights using structured analytics and AI-enhanced tools.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button size="lg" className="bg-gradient-to-r from-ocean-blue to-sea-green hover:shadow-lg transition-all duration-300 transform hover:scale-105" asChild>
-                <Link to="/register" className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" /> Create a Free Account
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" className="border-ocean-blue text-ocean-blue bg-transparent hover:bg-transparent hover:text-ocean-blue hover:border-ocean-blue transition-colors" asChild>
-                <Link to="/pricing" className="flex items-center gap-2">
-                  <ArrowRight className="h-4 w-4" /> View Pricing Plans
-                </Link>
-              </Button>
+      <main>
+        <section className="relative isolate overflow-hidden bg-slate-950 py-24 text-white lg:py-32">
+          <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_78%_18%,rgba(20,184,166,0.24),transparent_28%),radial-gradient(circle_at_10%_85%,rgba(16,185,129,0.18),transparent_24%)]" />
+          <div className="absolute inset-0 -z-10 opacity-[0.06] [background-image:linear-gradient(rgba(255,255,255,.75)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.75)_1px,transparent_1px)] [background-size:56px_56px]" />
+          <div className="container mx-auto grid gap-14 px-4 lg:grid-cols-[1.02fr_.98fr] lg:items-center">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-sm font-semibold text-teal-200">
+                <Sparkles className="h-4 w-4" />
+                Platform features built for capital execution
+              </div>
+              <h1 className="mt-6 text-5xl font-black leading-[1.02] tracking-[-0.045em] sm:text-6xl lg:text-7xl">
+                The features behind
+                <span className="block bg-gradient-to-r from-teal-300 via-emerald-300 to-lime-200 bg-clip-text text-transparent">
+                  smarter capital matching.
+                </span>
+              </h1>
+              <p className="mt-7 max-w-2xl text-lg leading-8 text-slate-300 sm:text-xl">
+                CapSol combines AI-powered matching, capital readiness support, and multi-source funding visibility in one modern workflow.
+              </p>
+              <div className="mt-9 flex flex-col gap-4 sm:flex-row">
+                <Button size="lg" className="h-14 bg-teal-500 px-7 text-base font-bold text-slate-950 hover:bg-teal-400" asChild>
+                  <Link to="/pricing">
+                    View Pricing
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+                <Button size="lg" variant="outline" className="h-14 border-white/20 bg-white/5 px-7 text-base font-bold text-white hover:bg-white/10 hover:text-white" asChild>
+                  <Link to="/contact">Talk to Our Team</Link>
+                </Button>
+              </div>
             </div>
 
-            {/* Value Proposition */}
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-8 shadow-xl border border-gray-100">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="text-center md:text-left">
-                  <div className="text-3xl font-bold text-gray-900 mb-2">Included Toolkit</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-sea-green mb-2">Starting at $197</div>
-                  <div className="text-gray-600">Monthly subscription</div>
-                </div>
-                <div className="flex items-center gap-2 text-ocean-blue">
-                  <CheckCircle className="h-5 w-5" />
-                  <span className="font-medium">No Setup Fees</span>
-                </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {platformFeatures.map((feature) => (
+                <article key={feature.title} className="rounded-3xl border border-white/10 bg-white/[0.06] p-6 shadow-xl backdrop-blur-sm">
+                  <div className="inline-flex rounded-2xl bg-teal-400/15 p-3 text-teal-300">
+                    <feature.icon className="h-6 w-6" />
+                  </div>
+                  <h2 className="mt-5 text-xl font-black">{feature.title}</h2>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">{feature.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="border-b border-slate-200 py-7">
+          <div className="container mx-auto flex flex-wrap items-center justify-center gap-x-10 gap-y-4 px-4 text-sm font-bold uppercase tracking-[0.14em] text-slate-500 lg:justify-between">
+            <span>Built for real-world capital needs</span>
+            <span className="flex items-center gap-2"><Building2 className="h-5 w-5 text-teal-600" /> Multifamily investors</span>
+            <span className="flex items-center gap-2"><CircleDollarSign className="h-5 w-5 text-teal-600" /> Small business growth</span>
+            <span className="flex items-center gap-2"><Clock3 className="h-5 w-5 text-teal-600" /> Faster funding workflows</span>
+          </div>
+        </section>
+
+        <section className="bg-slate-50 py-24 lg:py-32">
+          <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-700">Core platform</p>
+              <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+                The operating system for capital readiness and funding discovery
+              </h2>
+              <p className="mt-6 text-lg leading-8 text-slate-600">
+                Every feature is designed to reduce friction, improve readiness, and help users move through capital procurement with more confidence.
+              </p>
+            </div>
+
+            <div className="mt-14 grid gap-6 lg:grid-cols-3">
+              {operationalFeatures.map((feature) => (
+                <article
+                  key={feature.title}
+                  className="group rounded-3xl border border-slate-200 bg-white p-8 shadow-sm transition hover:-translate-y-1 hover:border-teal-300 hover:shadow-xl"
+                >
+                  <div className="inline-flex rounded-2xl bg-teal-50 p-4 text-teal-700 group-hover:bg-teal-600 group-hover:text-white">
+                    <feature.icon className="h-7 w-7" />
+                  </div>
+                  <h3 className="mt-7 text-2xl font-black">{feature.title}</h3>
+                  <p className="mt-4 leading-7 text-slate-600">{feature.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="py-24 lg:py-32">
+          <div className="container mx-auto grid gap-16 px-4 lg:grid-cols-[.95fr_1.05fr] lg:items-center">
+            <div className="rounded-[2rem] bg-slate-950 p-8 text-white shadow-2xl sm:p-10">
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-teal-400">What the platform supports</p>
+              <h3 className="mt-4 text-3xl font-black">From profile preparation to funded opportunity.</h3>
+              <div className="mt-8 space-y-4">
+                {outcomes.map((item) => (
+                  <div key={item} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+                    <CheckCircle2 className="h-5 w-5 text-teal-400" />
+                    <span className="font-semibold text-slate-200">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-700">Why it matters</p>
+              <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+                Less fragmentation. More visibility. Better momentum.
+              </h2>
+              <p className="mt-6 text-lg leading-8 text-slate-600">
+                Traditional commercial lending can feel slow, manual, and disconnected. CapSol brings matching, preparation, and funding support into one investor-ready SaaS experience.
+              </p>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                {[
+                  { icon: Layers3, label: "One system for multiple funding paths" },
+                  { icon: ShieldCheck, label: "High-utility readiness support built in" },
+                  { icon: Bot, label: "AI-assisted review across several capital sources" },
+                  { icon: WalletCards, label: "Scalable model for recurring and transaction revenue" },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-slate-200 p-5">
+                    <item.icon className="h-6 w-6 text-teal-700" />
+                    <p className="mt-3 font-semibold text-slate-900">{item.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Enhanced Features Grid */}
-      <section className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Your Complete Credit Toolkit</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Professional-grade tools designed to help organize, evaluate, and better understand credit information.
-            </p>
+        <section className="bg-slate-950 py-24 text-white">
+          <div className="container mx-auto grid gap-10 px-4 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div className="max-w-3xl">
+              <p className="text-sm font-black uppercase tracking-[0.2em] text-teal-400">See it in action</p>
+              <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
+                Explore the platform designed around your next capital move.
+              </h2>
+              <p className="mt-6 text-lg leading-8 text-slate-300">
+                Whether you’re raising for a multifamily acquisition or building a stronger business funding profile, the platform is built to help you prepare and move faster.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Button size="lg" className="h-14 bg-teal-500 px-8 font-bold text-slate-950 hover:bg-teal-400" asChild>
+                <Link to="/how-it-works">
+                  See How It Works
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" className="h-14 border-white/20 bg-white/5 px-8 font-bold text-white hover:bg-white/10 hover:text-white" asChild>
+                <Link to="/contact">Start a Conversation</Link>
+              </Button>
+            </div>
           </div>
+        </section>
+      </main>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                icon: TrendingUp,
-                title: "Progress Report with Score Timeline",
-                description: "Visualize month-to-month changes in reported credit data for clearer understanding.",
-                color: "from-blue-500 to-blue-600",
-                features: ["Timeline visualization", "Display of data changes", "Structured view of report variations"]
-              },
-              {
-                icon: FileText,
-                title: "Client Summary Export & PDF Download",
-                description: "Generate a clean, organized summary of credit data in a downloadable PDF.",
-                color: "from-emerald-500 to-emerald-600",
-                features: ["Professional formatting", "Summary export", "Client-ready reporting"]
-              },
-              {
-                icon: Brain,
-                title: "Full AI Credit File Analysis",
-                description: "Organize report data into categories commonly reviewed by lenders. AI-assisted features organize information but do not guarantee accuracy, outcomes, or lender perception.",
-                color: "from-purple-500 to-purple-600",
-                features: ["Structured breakdown of report sections", "Pattern detection", "General insight identification"]
-              },
-              {
-                icon: Shield,
-                title: "Underwriting Overview",
-                description: "General overview of factors commonly referenced by lenders. Not a guarantee of credit approval, funding approval, or any specific financial outcome.",
-                color: "from-orange-500 to-orange-600",
-                features: ["General indicator overview", "High-level criteria review", "Not a prediction or guarantee"]
-              }
-            ].map((feature, index) => (
-              <Card key={index} className="group hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-3 border-0 shadow-lg overflow-hidden relative h-full">
-                <div className={`absolute inset-0 bg-gradient-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`} />
-                
-                <CardHeader className="pb-6 relative">
-                  {/* Icon */}
-                  <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-all duration-300 shadow-lg`}>
-                    <feature.icon className="h-8 w-8 text-white" />
-                  </div>
-                  
-                  <CardTitle className="text-xl font-bold text-gray-900 mb-3">{feature.title}</CardTitle>
-                  <CardDescription className="text-gray-600 leading-relaxed break-words min-w-0 max-h-24 overflow-hidden">{feature.description}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="pt-0 mt-auto">
-                  <div className="space-y-2">
-                    {feature.features.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 text-sm text-gray-600 break-words">
-                        <CheckCircle className="h-4 w-4 text-sea-green" />
-                        <span className="min-w-0">{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Additional Features Section */}
-      <section className="py-20 bg-gradient-to-br from-slate-50 to-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Plus These Powerful Features</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Tools designed to support clearer review and better organization of credit information.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto items-stretch">
-            {[
-              { icon: Zap, title: "Lightning Fast Processing", desc: "Get results in seconds, not hours" },
-              { icon: Lock, title: "Enterprise-Grade Security", desc: "Your data is protected with enterprise encryption" },
-              { icon: Users, title: "Multi-Client Management", desc: "Handle unlimited clients with ease" },
-              { icon: Sparkles, title: "AI-Assisted Insights", desc: "Smart suggestions and credit insights powered by AI" },
-              { icon: BarChart3, title: "Advanced Analytics", desc: "Deep insights and performance metrics" },
-              { icon: Target, title: "Goal Tracking", desc: "Personal tracking features within the platform for general organizational use" }
-            ].map((feature, index) => (
-              <Card key={index} className="group hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1 border border-slate-200 shadow-md bg-white rounded-2xl overflow-hidden h-full flex">
-                <CardHeader className="text-center pb-4 flex flex-col items-center gap-2 flex-1">
-                  <div className="mx-auto w-12 h-12 bg-gradient-to-br from-ocean-blue to-sea-green rounded-xl flex items-center justify-center mb-2 group-hover:scale-110 transition-transform duration-300">
-                    <feature.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <CardTitle className="text-lg font-semibold text-gray-900 break-words min-w-0">{feature.title}</CardTitle>
-                  <CardDescription className="text-gray-600 text-sm leading-snug break-words min-w-0 max-h-12 overflow-hidden">
-                    {feature.desc}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Value Summary */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <Card className="relative overflow-hidden border-0 shadow-2xl">
-              <div className="absolute inset-0 bg-gradient-to-r from-ocean-blue via-sea-green to-ocean-blue" />
-              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-black/5 to-black/20" />
-              
-              <CardContent className="relative p-12 text-center text-white">
-                <div className="mb-8">
-                  <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 mb-6">
-                    <Star className="h-4 w-4" />
-                    <span className="text-sm font-medium">Complete Package</span>
-                  </div>
-                  
-                  <h3 className="text-3xl lg:text-4xl font-bold mb-4">
-                    Included Toolkit
-                  </h3>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                  <Button size="lg" variant="secondary" className="bg-white text-ocean-blue hover:bg-gray-50 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105" asChild>
-                    <Link to="/register" className="flex items-center gap-2">
-                      Get Started Today <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                  <Button size="lg" variant="outline" className="border-white/30 text-black hover:bg-white/10 backdrop-blur-sm" asChild>
-                    <Link to="/pricing">View All Plans</Link>
-                  </Button>
-                </div>
-                
-                <div className="flex flex-col items-center justify-center gap-2 text-sm text-white/80 mt-6">
-                  <p>Create a free account—no credit card required. Limited access included.</p>
-                  <p>Full report pulls and complete report visibility are billed individually.</p>
-                  <p>Cancel anytime.</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-      
-      <div className="bg-white py-8 px-4 border-t border-gray-100">
-        <div className="container mx-auto max-w-4xl text-center">
-          <p className="text-xs text-gray-500 leading-relaxed">
-            The Capsol may not be used to make eligibility, approval, denial, or onboarding decisions for credit, employment, insurance, or housing.
-          </p>
-        </div>
-      </div>
       <Footer />
     </div>
   );

@@ -981,24 +981,18 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       <div className={`p-4 border-b ${isEliteActive ? 'border-white/50' : isBasicAdminPortalUser ? 'border-sky-100/80 dark:border-slate-800' : 'border-border/40 dark:border-slate-700'}`}>
         <div className="flex items-center justify-between">
           {!collapsed && (
-            <Link to="/" className="flex items-center space-x-2">
-              <img src="/image.png" alt="The Capsol" className={isBasicAdminPortalUser ? 'w-14 h-10 object-contain' : 'w-20 h-14'} />
-              <div className="min-w-0">
-                <span className={`block truncate text-lg font-bold ${isEliteActive ? 'elite-sidebar-logo-text' : isBasicAdminPortalUser ? 'text-slate-900 dark:text-white' : 'gradient-text-primary'}`}>
-                  The Capsol
-                </span>
-                {isBasicAdminPortalUser && (
-                  <span className="block text-xs font-medium text-sky-600 dark:text-sky-300">
-                    Basic Portal
-                  </span>
-                )}
-              </div>
+            <Link to="/" className="flex flex-1 items-center">
+              <img
+                src="/capsol-logo.png"
+                alt="CapSol"
+                className={isBasicAdminPortalUser ? "h-10 w-full max-w-[170px] object-contain" : "h-12 w-full max-w-[180px] object-contain"}
+              />
             </Link>
           )}
           {collapsed && (
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shadow-lg mx-auto ${isEliteActive ? 'bg-gradient-to-br from-[#06362d] to-[#d1a505]' : 'gradient-primary'}`}>
-              <CreditCard className="h-5 w-5 text-white" />
-            </div>
+            <Link to="/" className="mx-auto">
+              <img src="/capsol-logo.png" alt="CapSol" className="h-9 w-9 object-contain" />
+            </Link>
           )}
           <Button
             variant="ghost"

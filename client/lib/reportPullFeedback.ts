@@ -1,4 +1,4 @@
-export const REPORT_PULL_SUPPORT_PHONE = "(475) 259-8768";
+export const REPORT_PULL_SUPPORT_PHONE = "(704) 966-9919";
 
 const REPORT_PULL_LOADING_EVENT = "scoremachine:report-pull-loading";
 const REPORT_PULL_SUCCESS_EVENT = "scoremachine:report-pull-success";

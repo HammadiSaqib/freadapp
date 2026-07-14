@@ -34,6 +34,7 @@ const Footer: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const currentYear = new Date().getFullYear();
+  const companyAddress = ['525 North Tryon St.', 'Ste 1600, Charlotte, North Carolina 28202 USA'];
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,12 +107,32 @@ const Footer: React.FC = () => {
                 <Shield className="h-6 w-6" />
               </div>
               <span className="text-xl font-black text-white tracking-tight">
-                The Capsol
+                CapSol
               </span>
             </div>
             <p className="text-slate-300 leading-relaxed text-sm max-w-xs">
-              Empowering credit professionals with advanced analytics, automated insights, and secure reporting tools.
+              AI-powered capital matching for multifamily real estate investors and small business owners.
             </p>
+            <div className="space-y-2 text-sm text-slate-300">
+              {companyAddress.map((line) => (
+                <p key={line} className="leading-relaxed">{line}</p>
+              ))}
+              <p>
+                <a href="mailto:support@thecapsol.com" className="hover:text-teal-400 transition-colors">
+                  support@thecapsol.com
+                </a>
+              </p>
+              <p>
+                <a href="tel:+17049669919" className="hover:text-teal-400 transition-colors">
+                  (704) 966-9919
+                </a>
+              </p>
+              <p>
+                <a href="mailto:Bizcredit@FREAD.Life" className="hover:text-teal-400 transition-colors">
+                  Business Development: Bizcredit@FREAD.Life
+                </a>
+              </p>
+            </div>
             <div className="flex items-center gap-4">
               {[
                 { icon: Facebook, href: "https://www.facebook.com/profile.php?id=61581433227215", label: "Facebook" },
@@ -191,7 +212,7 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="font-bold text-white text-lg mb-6">Stay Informed</h3>
             <p className="text-slate-300 text-sm mb-4">
-              Subscribe to our newsletter for the latest updates and credit insights.
+              Subscribe for capital insights, funding strategies, and platform updates.
             </p>
             <form className="space-y-3" onSubmit={handleSubscribe}>
               <div className="relative">
@@ -230,7 +251,7 @@ const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-300">
-          <p>© {currentYear} The Capsol. All rights reserved.</p>
+          <p>© {currentYear} Capital Solutions LLC. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <Link to="/privacy" className="hover:text-teal-400 transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-teal-400 transition-colors">Terms</Link>

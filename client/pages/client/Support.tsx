@@ -156,9 +156,9 @@ const Support = () => {
             <CardContent className="p-6 text-center">
               <Phone className="h-12 w-12 text-blue-600 mx-auto mb-3" />
               <h3 className="font-semibold mb-2">Phone Support</h3>
-              <p className="text-sm text-gray-600 mb-3">Call us at (475) 259-8768</p>
+              <p className="text-sm text-gray-600 mb-3">Call us at (704) 966-9919</p>
               <Button variant="outline" asChild>
-                <a href="tel:+15551234567">Call Now</a>
+                <a href="tel:+17049669919">Call Now</a>
               </Button>
             </CardContent>
           </Card>
@@ -167,7 +167,7 @@ const Support = () => {
             <CardContent className="p-6 text-center">
               <Mail className="h-12 w-12 text-purple-600 mx-auto mb-3" />
               <h3 className="font-semibold mb-2">Email Support</h3>
-              <p className="text-sm text-gray-600 mb-3">Send us an email</p>
+              <p className="text-sm text-gray-600 mb-3">support@thecapsol.com</p>
               <Button variant="outline" asChild>
                 <a href="/contact">
                   Contact Support
