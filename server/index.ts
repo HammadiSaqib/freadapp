@@ -48,6 +48,7 @@ import emailCampaignRoutes from "./routes/emailCampaign.js";
 import adminNotificationRoutes from "./routes/adminNotifications.js";
 import knowledgeBaseRoutes from "./routes/knowledgeBase.js";
 import pricingRoutes from "./routes/pricing.js";
+import appointmentRoutes from "./routes/appointments.js";
 import billingRoutes from "./routes/billing.js";
 import { initializeStripe } from "./routes/billing.js";
 import invoicesRoutes from "./routes/invoices.js";
@@ -733,6 +734,7 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // PUBLIC PRICING ROUTES
   // =============================================================================
   app.use("/api/pricing", pricingRoutes);
+  app.use("/api/appointments", appointmentRoutes);
   app.use("/api/shop", shopRoutes);
   // Proxy routes (e.g., Google Drive streaming)
   app.use("/api/proxy", proxyRoutes);

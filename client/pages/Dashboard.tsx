@@ -185,13 +185,13 @@ const eliteDashboardOverviewAnimatedUsers = new Set<string>();
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Active":
-      return "bg-[#dee2b1] text-[#155332] border-[#155332]/20";
+      return "bg-[#dfffe0] text-[#004225] border-[#004225]/20";
     case "New":
-      return "bg-[#f6f7e9] text-[#155332] border-[#dee2b1]";
+      return "bg-[#f3fff3] text-[#004225] border-[#dfffe0]";
     case "In Progress":
-      return "bg-[#ffb500]/15 text-[#155332] border-[#d1a505]/25";
+      return "bg-[#5fcf74]/15 text-[#004225] border-[#77dd77]/25";
     case "Completed":
-      return "bg-[#155332]/10 text-[#d1a505] border-[#155332]/20";
+      return "bg-[#004225]/10 text-[#77dd77] border-[#004225]/20";
     default:
       return "bg-gray-100 text-gray-800 border-gray-200";
   }
@@ -1871,12 +1871,12 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Fundable
             </CardTitle>
-            <div className="bg-gradient-to-br from-[#155332] to-[#d1a505] p-2 rounded-lg">
+            <div className="bg-gradient-to-br from-[#004225] to-[#77dd77] p-2 rounded-lg">
               <Award className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-[#155332] dark:text-[#dee2b1]">
+            <div className="text-3xl font-bold text-[#004225] dark:text-[#dfffe0]">
               {loading ? "--" : (stats.fundable || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -1884,7 +1884,7 @@ export default function Dashboard() {
             </p>
           </CardContent>
           <div className="absolute bottom-0 right-0 opacity-20">
-            <svg width="60" height="60" viewBox="0 0 60 60" className="text-[#d1a505]">
+            <svg width="60" height="60" viewBox="0 0 60 60" className="text-[#77dd77]">
               <circle cx="30" cy="30" r="20" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
               <circle cx="30" cy="30" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" style={{ animationDelay: "0.5s" }} />
               <path d="M30,10 L30,15 M30,45 L30,50 M10,30 L15,30 M45,30 L50,30" stroke="currentColor" strokeWidth="2" />
@@ -2462,7 +2462,7 @@ export default function Dashboard() {
                   <Button
                     onClick={handleAffiliateProAccess}
                     variant="outline"
-                    className="w-full justify-start border-[#155332]/20 text-[#155332] dark:border-[#dee2b1]/20 dark:text-[#dee2b1]"
+                    className="w-full justify-start border-[#004225]/20 text-[#004225] dark:border-[#dfffe0]/20 dark:text-[#dfffe0]"
                   >
                     <Crown className="h-4 w-4 mr-2" />
                     {affiliateVerificationStatus === 'active' 
@@ -2654,12 +2654,12 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Award className="h-4 w-4 text-[#d1a505]" />
+                  <Award className="h-4 w-4 text-[#77dd77]" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Reports Pulls
                   </span>
                 </div>
-                <span className="text-sm font-bold text-[#d1a505]">
+                <span className="text-sm font-bold text-[#77dd77]">
                   {loading ? "--" : (stats.reportPulls || 0)}
                 </span>
               </div>
@@ -2937,16 +2937,16 @@ export default function Dashboard() {
             {/* Popup Card */}
             <motion.div
               className="relative w-[90vw] max-w-lg rounded-3xl overflow-hidden shadow-2xl"
-              style={{ boxShadow: '0 0 80px rgba(209,165,5,0.28), 0 0 160px rgba(21,83,50,0.16)' }}
+              style={{ boxShadow: '0 0 80px rgba(119,221,119,0.28), 0 0 160px rgba(0,66,37,0.16)' }}
               initial={{ opacity: 0, scale: 0.7, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             >
               {/* Neon top border */}
-              <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #dee2b1, #d1a505, #ffb500, #155332, #dee2b1)' }} />
+              <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #dfffe0, #77dd77, #5fcf74, #004225, #dfffe0)' }} />
               {/* Content */}
-              <div className="relative px-8 py-10 text-center" style={{ background: 'linear-gradient(180deg, #041913 0%, #06362d 100%)' }}>
+              <div className="relative px-8 py-10 text-center" style={{ background: 'linear-gradient(180deg, #001c10 0%, #002f1b 100%)' }}>
                 {/* Background particles */}
                 {Array.from({ length: 20 }).map((_, i) => (
                   <motion.div
@@ -2957,7 +2957,7 @@ export default function Dashboard() {
                       height: 2 + Math.random() * 3,
                       left: `${Math.random() * 100}%`,
                       top: `${Math.random() * 100}%`,
-                      background: ['#d1a505', '#155332', '#ffb500', '#dee2b1'][i % 4],
+                      background: ['#77dd77', '#004225', '#5fcf74', '#dfffe0'][i % 4],
                       opacity: 0.3,
                     }}
                     animate={{ opacity: [0.1, 0.5, 0.1], y: [0, -10, 0] }}
@@ -2968,18 +2968,18 @@ export default function Dashboard() {
                 {/* Crown icon */}
                 <motion.div
                   className="mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-6"
-                  style={{ background: 'linear-gradient(135deg, rgba(209,165,5,0.2), rgba(21,83,50,0.2))', border: '2px solid rgba(209,165,5,0.3)', boxShadow: '0 0 30px rgba(209,165,5,0.2)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(119,221,119,0.2), rgba(0,66,37,0.2))', border: '2px solid rgba(119,221,119,0.3)', boxShadow: '0 0 30px rgba(119,221,119,0.2)' }}
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.2, type: 'spring', damping: 12 }}
                 >
-                  <Crown className="h-10 w-10 text-[#d1a505]" />
+                  <Crown className="h-10 w-10 text-[#77dd77]" />
                 </motion.div>
 
                 {/* Title */}
                 <motion.h2
                   className="text-3xl sm:text-4xl font-black mb-3"
-                  style={{ background: 'linear-gradient(135deg, #dee2b1 0%, #d1a505 55%, #155332 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                  style={{ background: 'linear-gradient(135deg, #dfffe0 0%, #77dd77 55%, #004225 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.6 }}
@@ -2989,7 +2989,7 @@ export default function Dashboard() {
 
                 {/* Description */}
                 <motion.p
-                  className="text-[#dee2b1]/80 text-sm sm:text-base mb-8 max-w-sm mx-auto leading-relaxed"
+                  className="text-[#dfffe0]/80 text-sm sm:text-base mb-8 max-w-sm mx-auto leading-relaxed"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.45, duration: 0.5 }}
@@ -3009,9 +3009,9 @@ export default function Dashboard() {
                     { icon: '📊', label: 'Pro Analytics' },
                     { icon: '🛡️', label: 'Premium Tools' },
                   ].map((feat, idx) => (
-                    <div key={idx} className="rounded-xl p-3 border border-[#155332]/30" style={{ background: 'rgba(21,83,50,0.12)' }}>
+                    <div key={idx} className="rounded-xl p-3 border border-[#004225]/30" style={{ background: 'rgba(0,66,37,0.12)' }}>
                       <div className="text-2xl mb-1">{feat.icon}</div>
-                      <div className="text-xs text-[#dee2b1]/80 font-medium">{feat.label}</div>
+                      <div className="text-xs text-[#dfffe0]/80 font-medium">{feat.label}</div>
                     </div>
                   ))}
                 </motion.div>
@@ -3025,7 +3025,7 @@ export default function Dashboard() {
                   <Button
                     onClick={() => setShowEliteWelcome(false)}
                     className="px-10 py-3 text-base font-bold rounded-xl text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                    style={{ background: 'linear-gradient(135deg, #06362d, #155332, #d1a505)', boxShadow: '0 0 30px rgba(209,165,5,0.3)' }}
+                    style={{ background: 'linear-gradient(135deg, #002f1b, #004225, #77dd77)', boxShadow: '0 0 30px rgba(119,221,119,0.3)' }}
                   >
                     🚀 Let's Go!
                   </Button>
@@ -3034,7 +3034,7 @@ export default function Dashboard() {
                 {/* Bottom neon line */}
                 <motion.div
                   className="mt-8 h-0.5 mx-auto rounded-full"
-                  style={{ background: 'linear-gradient(90deg, transparent, #dee2b1, #d1a505, #155332, transparent)' }}
+                  style={{ background: 'linear-gradient(90deg, transparent, #dfffe0, #77dd77, #004225, transparent)' }}
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: 200, opacity: 0.5 }}
                   transition={{ delay: 0.9, duration: 0.6 }}

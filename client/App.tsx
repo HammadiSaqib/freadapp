@@ -96,6 +96,7 @@ const SuperAdminCreditReportUpload = React.lazy(() => import("./pages/super-admi
 const ShopManagement = React.lazy(() => import("./pages/super-admin/ShopManagement"));
 const SuperAdminAffiliateTrialPlans = React.lazy(() => import("./pages/super-admin/SuperAdminAffiliateTrialPlans"));
 const SuperAdminLetterTemplates = React.lazy(() => import("./pages/super-admin/SuperAdminLetterTemplates"));
+const SuperAdminAppointments = React.lazy(() => import("./pages/super-admin/SuperAdminAppointments"));
 const Login = React.lazy(() => import("./pages/Login"));
 const Register = React.lazy(() => import("./pages/Register"));
 const SuperAdminLogin = React.lazy(() => import("./pages/SuperAdminLogin"));
@@ -136,6 +137,7 @@ const Refund = React.lazy(() => import("./pages/Refund"));
 const Docs = React.lazy(() => import("./pages/Docs"));
 const Sitemap = React.lazy(() => import("./pages/Sitemap"));
 const Contact = React.lazy(() => import("./pages/Contact"));
+const BookAppointment = React.lazy(() => import("./pages/BookAppointment"));
 const HowItWorks = React.lazy(() => import("./pages/HowItWorks"));
 const FundingCalculator = React.lazy(() => import("./pages/FundingCalculator"));
 const MortgageCalculator = React.lazy(() => import("./pages/MortgageCalculator"));
@@ -1186,6 +1188,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
           <Route path="/shop/embed" element={<Shop embed />} />
           <Route path="/shop/success" element={<ShopSuccess />} />
           <Route path="/features" element={<Features />} />
+          <Route path="/book-appointment" element={<BookAppointment />} />
           <Route path="/blog" element={<BlogIndex />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
@@ -1467,6 +1470,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             element={
               <SuperAdminProtectedRoute>
                 <SuperAdminOverview />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/appointments"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminAppointments />
               </SuperAdminProtectedRoute>
             }
           />

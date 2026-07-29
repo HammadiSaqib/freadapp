@@ -27,6 +27,7 @@ import {
   ClipboardList,
   Mail,
   CalendarClock,
+  CalendarDays,
   AlertTriangle,
   Building2,
 } from "lucide-react";
@@ -47,6 +48,12 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       name: "Overview",
       href: "/super-admin/overview",
       icon: LayoutDashboard,
+      badge: null,
+    },
+    {
+      name: "Appointments",
+      href: "/super-admin/appointments",
+      icon: CalendarDays,
       badge: null,
     },
     {

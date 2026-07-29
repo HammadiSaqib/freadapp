@@ -10,6 +10,7 @@ const navLinks = [
   { label: "Features", to: "/features" },
   { label: "How It Works", to: "/how-it-works" },
   { label: "Pricing", to: "/pricing" },
+  { label: "Book Appointment", to: "/book-appointment" },
   { label: "Contact", to: "/contact" },
 ];
 
@@ -35,7 +36,7 @@ export default function SiteHeader() {
             width="240"
             height="140"
             decoding="async"
-            fetchpriority="high"
+            fetchPriority="high"
           />
           <div className="hidden min-w-0 lg:block">
             <p className="truncate text-lg font-black tracking-tight text-slate-950">CapSol</p>
@@ -99,7 +100,7 @@ export default function SiteHeader() {
             className="hidden border-slate-300 bg-white text-slate-900 hover:bg-slate-100 hover:text-slate-950 lg:inline-flex"
             asChild
           >
-            <Link to="/contact">Talk to Us</Link>
+            <Link to="/book-appointment">Book Appointment</Link>
           </Button>
           <Button className="bg-teal-500 font-bold text-slate-950 hover:bg-teal-400" asChild>
             <Link to="/business-funding">
@@ -185,7 +186,7 @@ export default function SiteHeader() {
                     className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100 hover:text-slate-950"
                     asChild
                   >
-                    <Link to="/contact">Talk to Us</Link>
+                    <Link to="/book-appointment">Book Appointment</Link>
                   </Button>
                   <Button className="bg-teal-500 font-bold text-slate-950 hover:bg-teal-400" asChild>
                     <Link to="/business-funding">Get Started</Link>
