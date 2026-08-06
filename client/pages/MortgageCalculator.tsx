@@ -84,7 +84,7 @@ export default function MortgageCalculator() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Helmet>
-        <title>Mortgage Calculator | The Capsol</title>
+        <title>Mortgage Calculator | Score Machine</title>
         <meta
           name="description"
           content="Estimate monthly mortgage payment including principal, interest, taxes, insurance, and PMI."

@@ -213,7 +213,7 @@ function EliteHero({
               </div>
               <div className="rounded-3xl border border-slate-100 bg-white/80 p-5 shadow-inner">
                 <div className="text-xs font-black uppercase tracking-[0.35em] text-slate-400">Elite Access</div>
-                <div className="mt-3 text-3xl font-black text-slate-900">The Capsol</div>
+                <div className="mt-3 text-3xl font-black text-slate-900">Score Machine</div>
                 <div className="mt-1 bg-gradient-to-r from-violet-600 to-orange-500 bg-clip-text text-lg font-bold text-transparent">
                   Luxury Credit Workflow
                 </div>
@@ -524,7 +524,7 @@ function ElitePricing({
           Simple, Transparent <span className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-orange-500 bg-clip-text text-transparent">Pricing</span>
         </h2>
         <p className="mx-auto mb-16 max-w-2xl text-xl font-medium text-slate-600">
-          Choose the plan that fits your workflow and move straight into The Capsol experience.
+          Choose the plan that fits your workflow and move straight into the Score Machine experience.
         </p>
 
         <div className="relative mb-20 inline-flex rounded-full border border-slate-200 bg-white p-1.5 shadow-sm">
@@ -664,10 +664,10 @@ function EliteFooter({ affiliate, onPrimaryAction }: { affiliate: AffiliateLandi
             </div>
             <h2 className="mb-8 text-5xl font-extrabold leading-tight text-white drop-shadow-xl md:text-7xl">
               Start Your Journey <br />
-              With <span className="bg-gradient-to-r from-violet-300 to-blue-300 bg-clip-text text-transparent">The Capsol</span>
+              With <span className="bg-gradient-to-r from-violet-300 to-blue-300 bg-clip-text text-transparent">Score Machine</span>
             </h2>
             <p className="mx-auto mb-12 max-w-3xl text-2xl font-medium text-slate-300">
-              Join {affiliate.firstName} and experience the premium The Capsol Elite onboarding flow.
+              Join {affiliate.firstName} and experience the premium Score Machine Elite onboarding flow.
             </p>
 
             <button

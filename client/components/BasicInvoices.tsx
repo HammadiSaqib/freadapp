@@ -6,23 +6,26 @@ interface BasicInvoicesProps {
 
 export default function BasicInvoices({ children }: BasicInvoicesProps) {
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6 bg-white border border-gray-300">
-      
-      {/* Header */}
-      <div className="border-b border-gray-300 pb-4 mb-4">
-        <h1 className="text-xl font-bold text-gray-900 uppercase">Billing Invoices</h1>
-        <p className="text-sm text-gray-600">Standard Financial Records</p>
+    <div className="basic-admin-page-shell">
+      <div className="basic-admin-page-hero">
+        <div className="space-y-3">
+          <span className="basic-admin-page-badge">Basic finance records</span>
+          <h1 className="basic-admin-page-title">Billing Invoices</h1>
+          <p className="basic-admin-page-description">
+            Review issued invoices, check balances, and copy invoice links from the same refreshed basic portal surface.
+          </p>
+        </div>
       </div>
 
-      <div className="border border-gray-300 bg-gray-50">
-        <div className="bg-gray-100 border-b border-gray-300 p-3">
-          <h2 className="text-sm font-bold text-gray-800 uppercase">Invoice History</h2>
+      <div className="basic-admin-page-panel">
+        <div className="mb-5 flex items-center justify-between border-b border-sky-100/80 pb-4 dark:border-slate-800">
+          <h2 className="text-lg font-black text-slate-900 dark:text-white">Invoice History</h2>
+          <span className="basic-admin-page-badge">Admin billing</span>
         </div>
-        <div className="p-6 bg-white w-full">
+        <div className="basic-admin-page-section w-full">
           {children}
         </div>
       </div>
-
     </div>
   );
 }

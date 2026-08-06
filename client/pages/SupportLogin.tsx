@@ -37,7 +37,7 @@ export default function SupportLogin() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  usePortalLoginRedirect({ allowedRoles: ["support"] });
+  usePortalLoginRedirect({ allowedRoles: ["support"], portalAlias: "support" });
 
   const [loginData, setLoginData] = useState({
     email: "",

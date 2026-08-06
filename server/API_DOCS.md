@@ -40,7 +40,7 @@ Response:
     "email": "user@example.com",
     "first_name": "John",
     "last_name": "Doe",
-    "company_name": "The Capsol",
+    "company_name": "The Score Machine",
     "role": "admin"
   }
 }
@@ -56,7 +56,7 @@ Register a new user
   "password": "password123",
   "first_name": "John",
   "last_name": "Doe",
-  "company_name": "The Capsol",
+  "company_name": "The Score Machine",
   "role": "agent"
 }
 ```

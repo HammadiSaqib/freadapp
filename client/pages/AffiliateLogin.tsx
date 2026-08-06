@@ -17,20 +17,27 @@ import { getPortalNavigationTarget } from "@/lib/hostRouting";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import {
-  HelpCircle,
   Eye,
   EyeOff,
   Lock,
   Mail,
-  AlertTriangle,
   DollarSign,
   TrendingUp,
   Users,
   BarChart3,
-  Clock,
-  CheckCircle,
   ArrowLeft,
+  ArrowRight,
+  BadgeDollarSign,
+  Sparkles,
+  WalletCards,
+  ShieldCheck,
 } from "lucide-react";
+
+const affiliateHighlights = [
+  "Track referrals and commissions in one place",
+  "Monitor dashboard performance in real time",
+  "Access affiliate tools without changing workflows",
+];
 
 export default function AffiliateLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,14 +47,13 @@ export default function AffiliateLogin() {
   const { toast } = useToast();
   const { refreshProfile } = useAuthContext();
 
-  usePortalLoginRedirect({ allowedRoles: ["affiliate", "admin", "super_admin"] });
+  usePortalLoginRedirect({ allowedRoles: ["affiliate", "admin", "super_admin"], portalAlias: "affiliate" });
 
   const [loginData, setLoginData] = useState({
     email: "",
     password: "",
   });
 
-  // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordStep, setForgotPasswordStep] = useState<"email" | "code" | "reset">("email");
   const [forgotPasswordData, setForgotPasswordData] = useState({
@@ -58,14 +64,10 @@ export default function AffiliateLogin() {
     resetToken: "",
   });
 
-  // Check for existing theme and apply it
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)",
-    ).matches;
-    const shouldBeDark =
-      savedTheme === "dark" || (!savedTheme && prefersDark);
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const shouldBeDark = savedTheme === "dark" || (!savedTheme && prefersDark);
     setIsDarkMode(shouldBeDark);
     document.documentElement.classList.toggle("dark", shouldBeDark);
   }, []);
@@ -83,12 +85,8 @@ export default function AffiliateLogin() {
     setIsLoading(true);
 
     try {
-      console.log("Attempting affiliate login with:", loginData.email);
       const response = await authApi.affiliateLogin(loginData);
-      
-      console.log("Affiliate login response:", response);
-      
-      // Handle axios response structure - check for error in response.data
+
       if (response.data?.error) {
         toast({
           title: "Login Failed",
@@ -97,35 +95,23 @@ export default function AffiliateLogin() {
         });
         return;
       }
-      
-      // Check for token in response.data (axios wraps the response)
+
       if (response.data?.token) {
-        console.log("Token received:", response.data.token);
-        
-        // Clear any existing tokens first
         localStorage.removeItem("auth_token");
-        
-        // Store token using the same method as other login pages
         setAuthToken(response.data.token);
-        
-        // Verify token was stored
-        const storedToken = localStorage.getItem("auth_token");
-        console.log("Token stored in localStorage:", storedToken);
-        
-        // Store additional user info
+
         localStorage.setItem("userRole", "affiliate");
         localStorage.setItem("userId", response.data.user.id.toString());
         localStorage.setItem("userName", `${response.data.user.first_name} ${response.data.user.last_name}`);
 
-        // Ensure AuthContext has up-to-date profile
         await refreshProfile();
         clearPortalReturnContext();
-        
+
         toast({
           title: "Welcome back!",
           description: "Successfully logged in to Affiliate Dashboard.",
         });
-        
+
         const dashboardTarget = getPortalNavigationTarget("affiliate", "/dashboard");
         if (dashboardTarget.external) {
           window.location.href = dashboardTarget.target;
@@ -140,11 +126,8 @@ export default function AffiliateLogin() {
         });
       }
     } catch (error: any) {
-      console.error("Affiliate login error:", error);
-      
-      // Handle axios error response
       const errorMessage = error.response?.data?.error || error.message || "An error occurred during login. Please try again.";
-      
+
       toast({
         title: "Login Error",
         description: errorMessage,
@@ -155,16 +138,15 @@ export default function AffiliateLogin() {
     }
   };
 
-  // Forgot password functions
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/affiliate/forgot-password', {
-        method: 'POST',
+      const response = await fetch("/api/auth/affiliate/forgot-password", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email: forgotPasswordData.email,
@@ -186,7 +168,7 @@ export default function AffiliateLogin() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -202,10 +184,10 @@ export default function AffiliateLogin() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/affiliate/verify-reset-code', {
-        method: 'POST',
+      const response = await fetch("/api/auth/affiliate/verify-reset-code", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           email: forgotPasswordData.email,
@@ -216,7 +198,7 @@ export default function AffiliateLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        setForgotPasswordData(prev => ({ ...prev, resetToken: data.resetToken }));
+        setForgotPasswordData((prev) => ({ ...prev, resetToken: data.resetToken }));
         setForgotPasswordStep("reset");
         toast({
           title: "Code Verified",
@@ -229,7 +211,7 @@ export default function AffiliateLogin() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -264,10 +246,10 @@ export default function AffiliateLogin() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/auth/affiliate/reset-password', {
-        method: 'POST',
+      const response = await fetch("/api/auth/affiliate/reset-password", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           resetToken: forgotPasswordData.resetToken,
@@ -278,7 +260,6 @@ export default function AffiliateLogin() {
       const data = await response.json();
 
       if (response.ok) {
-        // Reset all forgot password state
         setShowForgotPassword(false);
         setForgotPasswordStep("email");
         setForgotPasswordData({
@@ -288,7 +269,7 @@ export default function AffiliateLogin() {
           confirmPassword: "",
           resetToken: "",
         });
-        
+
         toast({
           title: "Password Reset Successful",
           description: "Your password has been reset. Please log in with your new password.",
@@ -300,7 +281,7 @@ export default function AffiliateLogin() {
           variant: "destructive",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "An unexpected error occurred. Please try again.",
@@ -331,402 +312,346 @@ export default function AffiliateLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-900 dark:via-green-900 dark:to-teal-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 left-40 w-80 h-80 bg-emerald-400 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-      </div>
-      
-      {/* Theme Toggle */}
+    <div className="min-h-screen overflow-hidden bg-[#f8fcf8] text-slate-950 dark:bg-[#07150d] dark:text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(1,255,1,0.08),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(27,139,0,0.12),transparent_34%),linear-gradient(180deg,#f8fcf8_0%,#ffffff_46%,#eef9ef_100%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(119,221,119,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(0,66,37,0.92),transparent_42%),linear-gradient(180deg,#07150d_0%,#0b2416_48%,#04120a_100%)]" />
+
       <Button
         variant="ghost"
         size="sm"
         onClick={toggleTheme}
-        className="absolute top-4 right-4 z-10 bg-white/10 backdrop-blur-sm hover:bg-white/20 border border-white/20"
+        className="absolute right-4 top-4 z-20 rounded-full border border-slate-200 bg-white/80 px-4 backdrop-blur-sm hover:bg-white dark:border-white/10 dark:bg-white/10 dark:hover:bg-white/20"
       >
-        {isDarkMode ? "☀️" : "🌙"}
+        {isDarkMode ? "Light" : "Dark"}
       </Button>
 
-      <div className="w-full max-w-md relative z-10">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-teal-600 rounded-full blur-lg opacity-30 animate-pulse"></div>
-              <div className="relative bg-gradient-to-r from-green-600 to-teal-600 p-4 rounded-full shadow-2xl">
-                <DollarSign className="h-10 w-10 text-white" />
-              </div>
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent mb-3">
-            Affiliate Portal
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300 text-lg">
-            Access your affiliate dashboard and earnings
-          </p>
-        </div>
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <div className="grid w-full max-w-7xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_40px_120px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[0_40px_120px_rgba(0,0,0,0.45)] lg:grid-cols-[1.08fr_.92fr]">
+          <section className="border-b border-slate-200 p-6 sm:p-8 lg:border-b-0 lg:border-r lg:border-slate-200 lg:p-12 xl:p-14 dark:border-white/10">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-200 dark:hover:text-white">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Main Site
+            </Link>
 
-        {/* Login Card */}
-        <Card className="shadow-2xl border-0 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl border border-white/20 dark:border-gray-700/50">
-          <CardHeader className="space-y-1 pb-6">
-            <CardTitle className="text-2xl font-bold text-center text-gray-900 dark:text-white">
-              Sign In
-            </CardTitle>
-            <CardDescription className="text-center text-gray-600 dark:text-gray-300">
-              Enter your affiliate credentials
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-700 dark:text-gray-200">
-                  Email Address
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="affiliate@company.com"
-                    value={loginData.email}
-                    onChange={handleInputChange}
-                    className="pl-10 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 focus:border-green-500 dark:focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all duration-200"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-gray-700 dark:text-gray-200">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={loginData.password}
-                    onChange={handleInputChange}
-                    className="pl-10 pr-10 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 focus:border-green-500 dark:focus:border-green-400 focus:ring-2 focus:ring-green-500/20 transition-all duration-200"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-gray-400" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-gray-400" />
-                    )}
-                  </Button>
-                </div>
+            <div className="mt-8 max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 dark:border-emerald-300/20 dark:bg-emerald-300/10 dark:text-emerald-100">
+                <Sparkles className="h-4 w-4" />
+                CapSol Affiliate Portal
               </div>
 
-              {/* Forgot Password Link */}
-              <div className="flex justify-end">
-                <Button
-                  variant="link"
-                  className="text-sm p-0 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
-                  onClick={() => {
-                    setShowForgotPassword(true);
-                    setForgotPasswordData(prev => ({ ...prev, email: loginData.email }));
-                  }}
-                >
-                  Forgot password?
-                </Button>
-              </div>
+              <h1 className="mt-6 text-4xl font-black leading-[1.02] tracking-[-0.045em] text-slate-950 sm:text-5xl xl:text-6xl dark:text-white">
+                Grow referrals with a
+                <span className="block bg-gradient-to-r from-emerald-700 via-lime-600 to-green-500 bg-clip-text text-transparent dark:from-emerald-200 dark:via-lime-100 dark:to-white">
+                  cleaner affiliate workspace.
+                </span>
+              </h1>
 
-              <Button
-                type="submit"
-                className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-3 shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-200"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <div className="flex items-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Signing In...
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center">
-                    <DollarSign className="h-4 w-4 mr-2" />
-                    Access Affiliate Dashboard
-                  </div>
-                )}
-              </Button>
-            </form>
-
-            {/* Features */}
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-600">
-              <p className="text-sm text-gray-600 dark:text-gray-300 text-center mb-4">
-                Affiliate Features
+              <p className="mt-6 text-lg leading-8 text-slate-600 dark:text-slate-300">
+                Sign in to manage commissions, track performance, and access the same affiliate tools you already use — now in a more polished, easier-to-navigate layout.
               </p>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                  <TrendingUp className="h-3 w-3 mr-2 text-green-500" />
-                  Earnings Tracking
-                </div>
-                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                  <BarChart3 className="h-3 w-3 mr-2 text-teal-500" />
-                  Performance Analytics
-                </div>
-                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                  <Users className="h-3 w-3 mr-2 text-emerald-500" />
-                  Referral Management
-                </div>
-                <div className="flex items-center text-gray-600 dark:text-gray-300">
-                  <Clock className="h-3 w-3 mr-2 text-green-600" />
-                  Real-time Reports
-                </div>
-              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Forgot Password Modal/Overlay */}
-        {showForgotPassword && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 top-2 h-8 w-8 p-0"
-                onClick={resetForgotPasswordFlow}
-              >
-                ×
-              </Button>
-
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Lock className="h-8 w-8 text-white" />
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {affiliateHighlights.map((item) => (
+                <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-white/10 dark:bg-white/[0.05]">
+                  <BadgeDollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-800 dark:text-slate-200">{item}</p>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {forgotPasswordStep === "email" && "Reset Password"}
-                  {forgotPasswordStep === "code" && "Enter Verification Code"}
-                  {forgotPasswordStep === "reset" && "Set New Password"}
-                </h2>
-                <p className="text-gray-600 dark:text-gray-300 mt-2">
-                  {forgotPasswordStep === "email" && "Enter your affiliate email address to receive a verification code"}
-                  {forgotPasswordStep === "code" && "Enter the 6-digit code sent to your email"}
-                  {forgotPasswordStep === "reset" && "Create a new secure password for your affiliate account"}
+              ))}
+            </div>
+
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.05] dark:shadow-none">
+                <div className="inline-flex rounded-2xl bg-emerald-50 p-3 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-200">
+                  <TrendingUp className="h-6 w-6" />
+                </div>
+                <h2 className="mt-4 text-xl font-black">Performance visibility</h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                  See your activity, conversion movement, and earnings updates from one affiliate access point.
                 </p>
               </div>
 
-              {/* Email Step */}
-              {forgotPasswordStep === "email" && (
-                <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-white/[0.05] dark:shadow-none">
+                <div className="inline-flex rounded-2xl bg-emerald-50 p-3 text-emerald-700 dark:bg-emerald-300/10 dark:text-emerald-200">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <h2 className="mt-4 text-xl font-black">Secure partner access</h2>
+                <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                  Protected affiliate sign-in with password recovery and dashboard access preserved.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="flex items-center justify-center p-5 sm:p-7 lg:p-8">
+            <Card className="w-full max-w-xl rounded-[1.75rem] border border-slate-200 bg-white shadow-none dark:border-white/10 dark:bg-[#07150d]/80">
+              <CardHeader className="space-y-5 px-6 pt-6 sm:px-8 sm:pt-8">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-950 text-white shadow-lg dark:bg-gradient-to-r dark:from-[#004225] dark:to-[#77dd77]">
+                  <WalletCards className="h-8 w-8" />
+                </div>
+                <div>
+                  <CardTitle className="text-3xl font-black tracking-tight sm:text-4xl">
+                    Affiliate Login
+                  </CardTitle>
+                  <CardDescription className="mt-3 text-base leading-7 text-slate-600 dark:text-slate-300">
+                    Enter your affiliate credentials to access dashboard, commissions, referrals, and analytics.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
+                <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-2">
-                    <Label htmlFor="forgotEmail" className="text-sm font-medium">
+                    <Label htmlFor="email" className="text-sm font-bold text-slate-800 dark:text-slate-100">
                       Email Address
                     </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                       <Input
-                        id="forgotEmail"
+                        id="email"
+                        name="email"
                         type="email"
                         placeholder="affiliate@company.com"
-                        className="pl-10 h-11"
-                        value={forgotPasswordData.email}
-                        onChange={(e) =>
-                          setForgotPasswordData(prev => ({
-                            ...prev,
-                            email: e.target.value,
-                          }))
-                        }
+                        value={loginData.email}
+                        onChange={handleInputChange}
+                        className="h-14 rounded-2xl border-slate-200 pl-12 text-base focus-visible:ring-emerald-500 dark:border-white/10 dark:bg-white/[0.04]"
                         required
                       />
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={loginData.password}
+                        onChange={handleInputChange}
+                        className="h-14 rounded-2xl border-slate-200 pl-12 pr-12 text-base focus-visible:ring-emerald-500 dark:border-white/10 dark:bg-white/[0.04]"
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700 dark:hover:text-white"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                      <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                      Commissions, referrals, analytics
+                    </div>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-sm font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-white"
+                      onClick={() => {
+                        setShowForgotPassword(true);
+                        setForgotPasswordData((prev) => ({ ...prev, email: loginData.email }));
+                      }}
+                    >
+                      Forgot password?
+                    </Button>
+                  </div>
+
                   <Button
                     type="submit"
-                    className="w-full h-11 bg-green-600 hover:bg-green-700 text-white"
+                    className="h-14 w-full rounded-2xl bg-slate-950 text-base font-bold text-white hover:bg-emerald-700 dark:bg-gradient-to-r dark:from-[#004225] dark:to-[#77dd77] dark:hover:opacity-90"
                     disabled={isLoading}
                   >
                     {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Sending Code...</span>
-                      </div>
+                      <span className="flex items-center gap-2">
+                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Signing In...
+                      </span>
                     ) : (
-                      "Send Verification Code"
+                      <span className="flex items-center gap-2">
+                        Access Affiliate Dashboard
+                        <ArrowRight className="h-5 w-5" />
+                      </span>
                     )}
                   </Button>
                 </form>
-              )}
 
-              {/* Code Verification Step */}
-              {forgotPasswordStep === "code" && (
-                <form onSubmit={handleVerifyResetCode} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="resetCode" className="text-sm font-medium">
-                      Verification Code
-                    </Label>
+                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Earnings</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <BarChart3 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Analytics</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+                    <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Referrals</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        </div>
+      </div>
+
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-[#08160d]">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black text-slate-950 dark:text-white">
+                  {forgotPasswordStep === "email" && "Reset Password"}
+                  {forgotPasswordStep === "code" && "Verify Code"}
+                  {forgotPasswordStep === "reset" && "Create New Password"}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {forgotPasswordStep === "email" && "Enter your affiliate email address to receive a verification code."}
+                  {forgotPasswordStep === "code" && "Enter the 6-digit code sent to your email."}
+                  {forgotPasswordStep === "reset" && "Set a new secure password for your affiliate account."}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-3 py-1 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:border-white/10 dark:text-slate-300 dark:hover:text-white"
+                onClick={resetForgotPasswordFlow}
+              >
+                Close
+              </button>
+            </div>
+
+            {forgotPasswordStep === "email" && (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="forgotEmail" className="text-sm font-bold">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <Input
-                      id="resetCode"
-                      type="text"
-                      placeholder="Enter 6-digit code"
-                      className="h-11 text-center text-2xl font-mono tracking-widest"
-                      value={forgotPasswordData.code}
+                      id="forgotEmail"
+                      type="email"
+                      placeholder="affiliate@company.com"
+                      className="h-14 rounded-2xl border-slate-200 pl-12 dark:border-white/10 dark:bg-white/[0.04]"
+                      value={forgotPasswordData.email}
                       onChange={(e) =>
-                        setForgotPasswordData(prev => ({
+                        setForgotPasswordData((prev) => ({
                           ...prev,
-                          code: e.target.value.replace(/\D/g, '').slice(0, 6),
+                          email: e.target.value,
                         }))
                       }
-                      maxLength={6}
                       required
                     />
                   </div>
-                  <div className="text-center text-sm text-gray-600 dark:text-gray-300">
-                    Code sent to: <strong>{forgotPasswordData.email}</strong>
-                  </div>
-                  <div className="flex space-x-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1 h-11"
-                      onClick={() => setForgotPasswordStep("email")}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white"
-                      disabled={isLoading || forgotPasswordData.code.length !== 6}
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span>Verifying...</span>
-                        </div>
-                      ) : (
-                        "Verify Code"
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              )}
+                </div>
+                <Button type="submit" className="h-14 w-full rounded-2xl bg-slate-950 font-bold text-white hover:bg-emerald-700" disabled={isLoading}>
+                  {isLoading ? "Sending Code..." : "Send Verification Code"}
+                </Button>
+              </form>
+            )}
 
-              {/* Password Reset Step */}
-              {forgotPasswordStep === "reset" && (
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="newPassword" className="text-sm font-medium">
-                      New Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="newPassword"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter new password"
-                        className="pl-10 pr-12 h-11"
-                        value={forgotPasswordData.newPassword}
-                        onChange={(e) =>
-                          setForgotPasswordData(prev => ({
-                            ...prev,
-                            newPassword: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium">
-                      Confirm Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="confirmPassword"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Confirm new password"
-                        className="pl-10 h-11"
-                        value={forgotPasswordData.confirmPassword}
-                        onChange={(e) =>
-                          setForgotPasswordData(prev => ({
-                            ...prev,
-                            confirmPassword: e.target.value,
-                          }))
-                        }
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="flex space-x-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="flex-1 h-11"
-                      onClick={() => setForgotPasswordStep("code")}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                          <span>Resetting...</span>
-                        </div>
-                      ) : (
-                        "Reset Password"
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        )}
+            {forgotPasswordStep === "code" && (
+              <form onSubmit={handleVerifyResetCode} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="resetCode" className="text-sm font-bold">Verification Code</Label>
+                  <Input
+                    id="resetCode"
+                    type="text"
+                    placeholder="Enter 6-digit code"
+                    className="h-14 rounded-2xl border-slate-200 text-center text-2xl font-mono tracking-[0.35em] dark:border-white/10 dark:bg-white/[0.04]"
+                    value={forgotPasswordData.code}
+                    onChange={(e) =>
+                      setForgotPasswordData((prev) => ({
+                        ...prev,
+                        code: e.target.value.replace(/\D/g, "").slice(0, 6),
+                      }))
+                    }
+                    maxLength={6}
+                    required
+                  />
+                </div>
+                <p className="text-center text-sm text-slate-600 dark:text-slate-300">
+                  Code sent to <strong>{forgotPasswordData.email}</strong>
+                </p>
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="h-14 flex-1 rounded-2xl" onClick={() => setForgotPasswordStep("email")}>
+                    Back
+                  </Button>
+                  <Button type="submit" className="h-14 flex-1 rounded-2xl bg-slate-950 font-bold text-white hover:bg-emerald-700" disabled={isLoading || forgotPasswordData.code.length !== 6}>
+                    {isLoading ? "Verifying..." : "Verify Code"}
+                  </Button>
+                </div>
+              </form>
+            )}
 
-        {/* Footer */}
-        <div className="text-center mt-6">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            Need help with your affiliate account?{" "}
-            <Link
-              to="/contact"
-              className="text-green-600 hover:text-green-700 dark:text-green-400 font-medium"
-            >
-              Contact Support
-            </Link>
-          </p>
-          <div className="mt-4 flex justify-center space-x-4 text-xs text-gray-500 dark:text-gray-400">
-            <Link to="/" className="hover:text-gray-700 dark:hover:text-gray-200">
-              ← Back to Main Site
-            </Link>
-            <span>|</span>
-            <Link to="/login" className="hover:text-gray-700 dark:hover:text-gray-200">
-              Admin Login
-            </Link>
+            {forgotPasswordStep === "reset" && (
+              <form onSubmit={handleResetPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword" className="text-sm font-bold">New Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="newPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter new password"
+                      className="h-14 rounded-2xl border-slate-200 pl-12 pr-12 dark:border-white/10 dark:bg-white/[0.04]"
+                      value={forgotPasswordData.newPassword}
+                      onChange={(e) =>
+                        setForgotPasswordData((prev) => ({
+                          ...prev,
+                          newPassword: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-bold">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Confirm new password"
+                      className="h-14 rounded-2xl border-slate-200 pl-12 dark:border-white/10 dark:bg-white/[0.04]"
+                      value={forgotPasswordData.confirmPassword}
+                      onChange={(e) =>
+                        setForgotPasswordData((prev) => ({
+                          ...prev,
+                          confirmPassword: e.target.value,
+                        }))
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button type="button" variant="outline" className="h-14 flex-1 rounded-2xl" onClick={() => setForgotPasswordStep("code")}>
+                    Back
+                  </Button>
+                  <Button type="submit" className="h-14 flex-1 rounded-2xl bg-slate-950 font-bold text-white hover:bg-emerald-700" disabled={isLoading}>
+                    {isLoading ? "Resetting..." : "Reset Password"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

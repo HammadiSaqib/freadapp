@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Facebook, 
-  Instagram, 
-  Youtube, 
-  Send, 
+import {
+  Facebook,
+  Instagram,
+  Youtube,
+  Send,
   Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -88,19 +88,16 @@ const Footer: React.FC = () => {
   }, []);
 
   return (
-    <footer 
+    <footer
       ref={footerRef}
       className={`bg-[#0f182a] border-t border-slate-800 pt-16 pb-8 relative overflow-hidden transition-all duration-1000 ease-out ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
       }`}
     >
-      {/* Decorative Top Gradient Line */}
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 via-emerald-500 to-teal-500 opacity-50"></div>
 
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8 mb-16">
-          
-          {/* Brand Column */}
           <div className="space-y-6">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center text-white shadow-lg shadow-teal-900/20">
@@ -140,8 +137,8 @@ const Footer: React.FC = () => {
                 { icon: TikTok, href: "https://www.tiktok.com/@smarthustlersuniversity", label: "TikTok" },
                 { icon: Youtube, href: "https://www.youtube.com/@Smarthustlersuniversity", label: "YouTube" },
               ].map((social, i) => (
-                <a 
-                  key={i} 
+                <a
+                  key={i}
                   href={social.href}
                   aria-label={social.label}
                   className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-teal-400 hover:border-teal-500 hover:-translate-y-1 hover:shadow-md hover:shadow-teal-900/20 transition-all duration-300"
@@ -152,7 +149,6 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
           <div>
             <h3 className="font-bold text-white text-lg mb-6">Quick Links</h3>
             <ul className="space-y-4">
@@ -171,8 +167,8 @@ const Footer: React.FC = () => {
                 { label: "Affiliate Program", to: "/affiliate/login" },
               ].map((link, i) => (
                 <li key={i}>
-                  <Link 
-                    to={link.to} 
+                  <Link
+                    to={link.to}
                     className="text-slate-300 hover:text-teal-400 transition-colors duration-300 flex items-center gap-2 group"
                   >
                     <span className="w-0 group-hover:w-2 h-0.5 bg-teal-500 transition-all duration-300"></span>
@@ -183,7 +179,6 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Resources / Support */}
           <div>
             <h3 className="font-bold text-white text-lg mb-6">Resources</h3>
             <ul className="space-y-4">
@@ -196,8 +191,8 @@ const Footer: React.FC = () => {
                 { label: "Documentation", to: "/docs" },
               ].map((link, i) => (
                 <li key={i}>
-                  <Link 
-                    to={link.to} 
+                  <Link
+                    to={link.to}
                     className="text-slate-300 hover:text-teal-400 transition-colors duration-300 flex items-center gap-2 group"
                   >
                     <span className="w-0 group-hover:w-2 h-0.5 bg-teal-500 transition-all duration-300"></span>
@@ -208,7 +203,6 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Newsletter */}
           <div>
             <h3 className="font-bold text-white text-lg mb-6">Stay Informed</h3>
             <p className="text-slate-300 text-sm mb-4">
@@ -216,9 +210,9 @@ const Footer: React.FC = () => {
             </p>
             <form className="space-y-3" onSubmit={handleSubscribe}>
               <div className="relative">
-                <Input 
-                  type="email" 
-                  placeholder="Enter your email" 
+                <Input
+                  type="email"
+                  placeholder="Enter your email"
                   className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-lg pl-4 pr-4 py-6 shadow-sm"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -226,12 +220,12 @@ const Footer: React.FC = () => {
                   required
                 />
               </div>
-              <Button 
+              <Button
                 type="submit"
                 disabled={status === 'loading' || status === 'success'}
                 className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white shadow-lg shadow-teal-900/20 rounded-lg py-6 font-bold transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {status === 'loading' ? 'Subscribing...' : status === 'success' ? 'Subscribed!' : 'Subscribe'} 
+                {status === 'loading' ? 'Subscribing...' : status === 'success' ? 'Subscribed!' : 'Subscribe'}
                 {status !== 'loading' && status !== 'success' && <Send className="ml-2 h-4 w-4" />}
               </Button>
               {message && (
@@ -246,10 +240,8 @@ const Footer: React.FC = () => {
               )}
             </form>
           </div>
-
         </div>
 
-        {/* Bottom Bar */}
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-300">
           <p>© {currentYear} Capital Solutions LLC. All rights reserved.</p>
           <div className="flex items-center gap-6">

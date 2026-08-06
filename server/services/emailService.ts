@@ -6,6 +6,7 @@ interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  allowDevelopmentFallback?: boolean;
   attachments?: Array<{
     filename: string;
     content: Buffer;
@@ -77,6 +78,19 @@ interface PurchaseNotificationData {
   transactionId: string;
 }
 
+interface KycSubmissionEmailData {
+  firstName: string;
+  email: string;
+  supportPhoneDisplay: string;
+  supportPhoneLink: string;
+}
+
+interface KycStatusEmailData {
+  firstName: string;
+  email: string;
+  adminNotes?: string | null;
+}
+
 class EmailService {
   private transporter: nodemailer.Transporter | null = null;
 
@@ -85,7 +99,7 @@ class EmailService {
   }
 
   // Enhanced email template with admin dashboard color scheme
-  private getEmailTemplate(content: string, title: string = 'The Capsol'): string {
+  private getEmailTemplate(content: string, title: string = 'Score Machine'): string {
     const baseUrl = this.getFrontendBaseUrl();
     const logoUrl = process.env.EMAIL_LOGO_URL || 'https://thescoremachine.com/image.png';
     return `
@@ -433,14 +447,14 @@ class EmailService {
             <div class="logo">
               <img src="${logoUrl}" alt="" style="height: 80px; width: auto; display: block;" onerror="this.style.display='none'" />
               <div>
-                <h1>The Capsol</h1>
+                <h1>The Score Machine</h1>
                 <p>Professional Credit Management Platform</p>
               </div>
             </div>
           </div>
           ${content}
           <div class="footer">
-            <p>&copy; ${new Date().getFullYear()} The Capsol. All rights reserved.</p>
+            <p>&copy; ${new Date().getFullYear()} Score Machine. All rights reserved.</p>
             <p>
               <a href="#">Privacy Policy</a> | 
               <a href="#">Terms of Service</a> | 
@@ -471,6 +485,11 @@ class EmailService {
         host,
         port,
         secure,
+        pool: true,
+        maxConnections: 1,
+        maxMessages: 100,
+        rateDelta: 1000,
+        rateLimit: 2,
         auth: user && pass ? { user, pass } : undefined,
         tls: { rejectUnauthorized: false }
       } as any);
@@ -482,7 +501,7 @@ class EmailService {
     try {
       const transporter = this.initializeTransporter();
       const mailOptions = {
-        from: `"${process.env.EMAIL_FROM_NAME || 'The Capsol Support'}" <${process.env.EMAIL_FROM_ADDRESS || 'support@thescoremachine.com' || process.env.EMAIL_USER}>`,
+        from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine Support'}" <${process.env.EMAIL_FROM_ADDRESS || 'support@thescoremachine.com' || process.env.EMAIL_USER}>`,
         to: options.to,
         subject: options.subject,
         html: options.html,
@@ -501,7 +520,7 @@ class EmailService {
     } catch (error) {
       console.error('❌ Error sending email:', error);
       try {
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV !== 'production' && options.allowDevelopmentFallback !== false) {
           const testAccount = await nodemailer.createTestAccount();
           const ethTransporter = nodemailer.createTransport({
             host: 'smtp.ethereal.email',
@@ -513,7 +532,7 @@ class EmailService {
             },
           });
           const mailOptions = {
-            from: `"${process.env.EMAIL_FROM_NAME || 'The Capsol'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || testAccount.user}>`,
+            from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || testAccount.user}>`,
             to: options.to,
             subject: options.subject,
             html: options.html,
@@ -548,7 +567,7 @@ class EmailService {
     // Generate role-specific content
     const roleInfo = this.getRoleInfo(type);
     
-    const subject = `Invitation to Join The Capsol as ${roleInfo.title}`;
+    const subject = `Invitation to Join Score Machine as ${roleInfo.title}`;
     
     const html = this.generateInvitationHTML({
       recipientName: name || email,
@@ -630,7 +649,7 @@ class EmailService {
       default:
         return {
           title: 'User',
-          description: 'Access to The Capsol platform.',
+          description: 'Access to the Score Machine platform.',
           permissions: ['Access to platform features']
         };
     }
@@ -653,7 +672,7 @@ class EmailService {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invitation to The Capsol</title>
+    <title>Invitation to Score Machine</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -810,13 +829,13 @@ class EmailService {
         <div class="header">
             <div class="logo">CR</div>
             <h1>You're Invited!</h1>
-            <p>Join The Capsol</p>
+            <p>Join Score Machine</p>
         </div>
         
         <div class="content">
             <h2 class="greeting">Hello ${data.recipientName}!</h2>
             
-            <p>You have been invited to join <strong>The Capsol</strong> as a <span class="role-badge">${data.roleTitle}</span></p>
+            <p>You have been invited to join <strong>Score Machine</strong> as a <span class="role-badge">${data.roleTitle}</span></p>
             
             <p>${data.roleDescription}</p>
             
@@ -850,7 +869,7 @@ class EmailService {
         </div>
         
         <div class="footer">
-            <p><strong>The Capsol</strong></p>
+            <p><strong>Score Machine</strong></p>
             <p>Professional Funding Management System</p>
             <p>If you have any questions, please contact our support team.</p>
         </div>
@@ -869,7 +888,7 @@ class EmailService {
     return `
 Hello ${data.recipientName}!
 
-You have been invited to join The Capsol as a ${data.roleTitle}.
+You have been invited to join Score Machine as a ${data.roleTitle}.
 
 To accept this invitation and set up your account, please visit:
 ${data.invitationUrl}
@@ -879,12 +898,12 @@ This invitation expires in ${data.expiresIn}.
 If you didn't expect this invitation, please ignore this email.
 
 Best regards,
-The Capsol Team
+Score Machine Team
     `.trim();
   }
 
   async sendVerificationCode(email: string, code: string, firstName?: string): Promise<boolean> {
-    const subject = 'Email Verification Code - The Capsol';
+    const subject = 'Email Verification Code - Score Machine';
     
     const html = this.getEmailTemplate(`
       <div style="text-align: center; margin-bottom: 30px;">
@@ -904,7 +923,7 @@ The Capsol Team
           ${firstName ? `Welcome ${firstName}!` : 'Welcome!'}
         </h2>
         <p style="color: #475569; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
-          Thank you for joining The Capsol as an affiliate partner. Please enter the verification code below to activate your account:
+          Thank you for joining Score Machine as an affiliate partner. Please enter the verification code below to activate your account:
         </p>
         
         <div class="code-box" style="background: white; border: 3px solid #0ea5e9; border-radius: 12px; padding: 25px; margin: 25px 0; box-shadow: 0 4px 20px rgba(14, 165, 233, 0.15);">
@@ -936,14 +955,14 @@ The Capsol Team
           If you didn't request this verification, please ignore this email.
         </p>
       </div>
-    `, 'Email Verification - The Capsol');
+    `, 'Email Verification - Score Machine');
 
     const text = `
-      The Capsol - Email Verification
+      Score Machine - Email Verification
       
       ${firstName ? `Welcome ${firstName}!` : 'Welcome!'}
       
-      Thank you for joining The Capsol as an affiliate partner!
+      Thank you for joining Score Machine as an affiliate partner!
       
       Your verification code is: ${code}
       
@@ -952,7 +971,7 @@ The Capsol Team
       If you didn't request this verification, please ignore this email.
       
       Best regards,
-      The Capsol Team
+      Score Machine Team
     `;
 
     return await this.sendEmail({
@@ -1051,7 +1070,7 @@ The Capsol Team
   }
 
   async sendPasswordResetCode(email: string, code: string, firstName?: string): Promise<boolean> {
-    const subject = 'Password Reset Code - The Capsol';
+    const subject = 'Password Reset Code - Score Machine';
     
     const html = this.getEmailTemplate(`
       <div style="text-align: center; margin-bottom: 30px;">
@@ -1071,7 +1090,7 @@ The Capsol Team
           ${firstName ? `Hello ${firstName}!` : 'Hello!'}
         </h2>
         <p style="color: #475569; font-size: 16px; margin-bottom: 30px; line-height: 1.6;">
-          We received a request to reset your password for your The Capsol account. Please enter the verification code below to proceed:
+          We received a request to reset your password for your Score Machine account. Please enter the verification code below to proceed:
         </p>
         
         <div class="code-box" style="background: white; border: 3px solid #dc2626; border-radius: 12px; padding: 25px; margin: 25px 0; box-shadow: 0 4px 20px rgba(220, 38, 38, 0.15);">
@@ -1103,14 +1122,14 @@ The Capsol Team
           If you continue to have problems, please contact our support team.
         </p>
       </div>
-    `, 'Password Reset - The Capsol');
+    `, 'Password Reset - Score Machine');
 
     const text = `
-      The Capsol - Password Reset
+      Score Machine - Password Reset
       
       ${firstName ? `Hello ${firstName}!` : 'Hello!'}
       
-      We received a request to reset your password for your The Capsol account.
+      We received a request to reset your password for your Score Machine account.
       
       Your verification code is: ${code}
       
@@ -1119,7 +1138,7 @@ The Capsol Team
       If you didn't request this password reset, please ignore this email.
       
       Best regards,
-      The Capsol Team
+      Score Machine Team
     `;
 
     return await this.sendEmail({
@@ -1144,19 +1163,19 @@ The Capsol Team
                 </td>
               </tr>
             </table>
-            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">Welcome to The Capsol</h2>
+            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">Welcome to The Score Machine</h2>
           </div>
 
           <div class="details-card" style="background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #10b981;">
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">${firstNameLine}</p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
-              First off — thank you for signing up for The Capsol. We truly appreciate you trusting us and becoming part of the ecosystem. You just made a powerful decision toward better clarity, smarter positioning, and stronger funding strategy. We’re excited to have you inside.
+              First off — thank you for signing up for The Score Machine. We truly appreciate you trusting us and becoming part of the ecosystem. You just made a powerful decision toward better clarity, smarter positioning, and stronger funding strategy. We’re excited to have you inside.
             </p>
 
             <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 24px 0;">
               <h3 style="color: #047857; font-size: 18px; font-weight: 600; margin-bottom: 12px;">🎉 Exclusive Bonus for You</h3>
               <p style="color: #065f46; font-size: 15px; line-height: 1.6; margin-bottom: 16px;">
-                We also have a private community called <strong>Paid In Full</strong>. Normally, access to this community is paid — but since you are now a member of The Capsol, you get access completely free. Inside the community, we:
+                We also have a private community called <strong>Paid In Full</strong>. Normally, access to this community is paid — but since you are now a member of The Score Machine, you get access completely free. Inside the community, we:
               </p>
               <ul style="color: #065f46; font-size: 15px; line-height: 1.6; margin: 0 0 16px 20px; padding: 0;">
                 <li>Share live sessions and updates</li>
@@ -1172,9 +1191,9 @@ The Capsol Team
               We’re grateful to have you with us and look forward to helping you win. If you need anything at all, just reply to this email — we’re here to support you.
             </p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
-              Welcome to The Capsol family.<br /><br />
+              Welcome to The Score Machine family.<br /><br />
               Best regards,<br />
-              <strong>The Capsol Support</strong>
+              <strong>Score Machine Support</strong>
             </p>
           </div>
         </div>
@@ -1182,8 +1201,8 @@ The Capsol Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: `🎉 Welcome to The Capsol`,
-        html: this.getEmailTemplate(content, 'Welcome to The Capsol')
+        subject: `🎉 Welcome to The Score Machine`,
+        html: this.getEmailTemplate(content, 'Welcome to The Score Machine')
       });
     } catch (error) {
       console.error('Failed to send welcome email:', error);
@@ -1213,7 +1232,7 @@ The Capsol Team
               We just wanted to take a quick moment to say thank you.
             </p>
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
-              Thank you for being part of The Capsol. Thank you for trusting us. Thank you for building with us. We truly appreciate every member inside our ecosystem, and we don’t take that lightly.
+              Thank you for being part of The Score Machine. Thank you for trusting us. Thank you for building with us. We truly appreciate every member inside our ecosystem, and we don’t take that lightly.
             </p>
 
             <div style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 24px 0;">
@@ -1237,7 +1256,7 @@ The Capsol Team
 
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
               Best regards,<br />
-              <strong>The Capsol Support</strong>
+              <strong>Score Machine Support</strong>
             </p>
           </div>
         </div>
@@ -1245,7 +1264,7 @@ The Capsol Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: 'Thank You from The Capsol',
+        subject: 'Thank You from The Score Machine',
         html: this.getEmailTemplate(content, 'Thank You')
       });
     } catch (error) {
@@ -1309,9 +1328,9 @@ The Capsol Team
             </p>
 
             <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
-              We appreciate you being part of The Capsol ecosystem and look forward to continuing to support you.<br /><br />
+              We appreciate you being part of the Score Machine ecosystem and look forward to continuing to support you.<br /><br />
               Best regards,<br />
-              <strong>The Capsol Support</strong>
+              <strong>Score Machine Support</strong>
             </p>
           </div>
         </div>
@@ -1319,11 +1338,119 @@ The Capsol Team
 
       return await this.sendEmail({
         to: data.email,
-        subject: 'Upcoming Payment Reminder - The Capsol',
+        subject: 'Upcoming Payment Reminder - Score Machine',
         html: this.getEmailTemplate(content, 'Upcoming Payment')
       });
     } catch (error) {
       console.error('Failed to send upcoming payment email:', error);
+      return false;
+    }
+  }
+
+  async sendKycSubmissionReceivedEmail(data: KycSubmissionEmailData): Promise<boolean> {
+    try {
+      const firstNameLine = data.firstName ? `Hi ${data.firstName},` : 'Hi,';
+      const content = `
+        <div style="padding: 40px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">KYC Submitted</h2>
+          </div>
+
+          <div style="background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #e2e8f0;">
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">${firstNameLine}</p>
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
+              Your KYC has been submitted and is waiting for review.
+            </p>
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
+              If you want to verify your KYC right now, please contact our support team at
+              <a href="${data.supportPhoneLink}" style="color: #2563eb; font-weight: 600; text-decoration: none;">${data.supportPhoneDisplay}</a>.
+              They can help verify it with you in real time.
+            </p>
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
+              We will let you know as soon as your KYC review is complete.
+            </p>
+          </div>
+        </div>
+      `;
+
+      return await this.sendEmail({
+        to: data.email,
+        subject: 'Your KYC submission is under review',
+        html: this.getEmailTemplate(content, 'KYC Submitted'),
+      });
+    } catch (error) {
+      console.error('Failed to send KYC submission email:', error);
+      return false;
+    }
+  }
+
+  async sendKycApprovedEmail(data: KycStatusEmailData): Promise<boolean> {
+    try {
+      const firstNameLine = data.firstName ? `Hi ${data.firstName},` : 'Hi,';
+      const content = `
+        <div style="padding: 40px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">KYC Approved</h2>
+          </div>
+
+          <div style="background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #10b981;">
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">${firstNameLine}</p>
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
+              Your KYC has been verified. You can now purchase your subscription.
+            </p>
+          </div>
+        </div>
+      `;
+
+      return await this.sendEmail({
+        to: data.email,
+        subject: 'Your KYC has been verified',
+        html: this.getEmailTemplate(content, 'KYC Approved'),
+      });
+    } catch (error) {
+      console.error('Failed to send KYC approved email:', error);
+      return false;
+    }
+  }
+
+  async sendKycResubmissionRequiredEmail(data: KycStatusEmailData): Promise<boolean> {
+    try {
+      const firstNameLine = data.firstName ? `Hi ${data.firstName},` : 'Hi,';
+      const notesBlock = data.adminNotes
+        ? `
+            <div style="background: #fff7ed; border: 1px solid #fdba74; border-radius: 12px; padding: 16px; margin: 20px 0;">
+              <div style="color: #9a3412; font-size: 14px; font-weight: 600; margin-bottom: 6px;">Review notes</div>
+              <div style="color: #7c2d12; font-size: 15px; line-height: 1.6;">${String(data.adminNotes).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            </div>
+          `
+        : '';
+
+      const content = `
+        <div style="padding: 40px;">
+          <div style="text-align: center; margin-bottom: 24px;">
+            <h2 style="color: #0f172a; margin: 0; font-size: 26px; font-weight: 700;">KYC Resubmission Needed</h2>
+          </div>
+
+          <div style="background: #ffffff; border-radius: 16px; padding: 28px; border: 1px solid #f59e0b;">
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">${firstNameLine}</p>
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">
+              Your KYC could not be verified. Please resubmit your KYC.
+            </p>
+            ${notesBlock}
+            <p style="color: #1f2937; font-size: 16px; line-height: 1.7; margin-bottom: 0;">
+              Once you submit a new KYC image, our team will review it again.
+            </p>
+          </div>
+        </div>
+      `;
+
+      return await this.sendEmail({
+        to: data.email,
+        subject: 'Please resubmit your KYC',
+        html: this.getEmailTemplate(content, 'KYC Resubmission Needed'),
+      });
+    } catch (error) {
+      console.error('Failed to send KYC resubmission email:', error);
       return false;
     }
   }
@@ -1450,7 +1577,7 @@ The Capsol Team
       
       <p>Hi ${data.firstName},</p>
       
-      <p><strong>${data.adminName}</strong> has invited you to join their team on The Capsol.</p>
+      <p><strong>${data.adminName}</strong> has invited you to join their team on The Score Machine.</p>
       
       ${passwordSection}
       
@@ -1462,12 +1589,12 @@ The Capsol Team
       
       <p>If you have any questions, please reach out to your administrator.</p>
       
-      <p style="margin-bottom: 30px;">Best regards,<br>The Capsol Team</p>
+      <p style="margin-bottom: 30px;">Best regards,<br>The Score Machine Team</p>
     `;
 
     return await this.sendEmail({
       to: data.email,
-      subject: `You've been invited to join The Capsol`,
+      subject: `You've been invited to join The Score Machine`,
       html: this.getEmailTemplate(content, 'Welcome to the Team')
     });
   }

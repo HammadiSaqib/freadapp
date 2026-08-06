@@ -6,6 +6,7 @@ import { SecurityLogger } from '../utils/securityLogger.js';
 
 const router = express.Router();
 const securityLogger = new SecurityLogger();
+const ADMIN_CUSTOM_FILTERS_SETTING_KEY = 'super_admin.admin_custom_filters';
 
 // Middleware to ensure only support staff can access admin management
 const requireSupportRole = (req: any, res: any, next: any) => {
@@ -20,6 +21,30 @@ const requireSupportRole = (req: any, res: any, next: any) => {
   }
   next();
 };
+
+// GET /api/admin-management/custom-filters - Support read-only access to saved admin filters
+router.get('/custom-filters', authenticateToken, requireSupportRole, async (_req, res) => {
+  try {
+    const rows = await executeQuery(
+      'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+      [ADMIN_CUSTOM_FILTERS_SETTING_KEY]
+    );
+    const rawValue = Array.isArray(rows) && rows.length > 0 ? String((rows[0] as any)?.setting_value || '[]') : '[]';
+    let filters: any[] = [];
+
+    try {
+      const parsed = JSON.parse(rawValue);
+      filters = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      filters = [];
+    }
+
+    res.json({ success: true, data: filters });
+  } catch (error: any) {
+    console.error('Error fetching support admin custom filters:', error);
+    res.status(500).json({ error: 'Failed to fetch admin custom filters' });
+  }
+});
 
 // GET /api/admin-management - Get all regular admin users with subscription info
 router.get('/', authenticateToken, requireSupportRole, async (req, res) => {

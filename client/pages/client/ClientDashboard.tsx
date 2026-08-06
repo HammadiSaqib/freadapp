@@ -4216,7 +4216,7 @@ export default function CreditReport() {
             </p>
             <p>This content is provided for educational purposes only.</p>
             <p>
-              The Capsol does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
+              Score Machine does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
               of Law Engine outputs.
             </p>
           </div>

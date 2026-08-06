@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Building2,
@@ -26,7 +27,11 @@ interface BusinessDirectory {
   business_email: string;
   business_phone_number: string;
   business_address: string;
+  description: string;
   logo_url: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  approved_at: string | null;
+  approved_by: number | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -36,6 +41,7 @@ interface DirectoryFormState {
   business_email: string;
   business_phone_number: string;
   business_address: string;
+  description: string;
 }
 
 const EMPTY_FORM: DirectoryFormState = {
@@ -43,6 +49,7 @@ const EMPTY_FORM: DirectoryFormState = {
   business_email: "",
   business_phone_number: "",
   business_address: "",
+  description: "",
 };
 
 export default function BusinessDirectoryManagement() {
@@ -53,6 +60,7 @@ export default function BusinessDirectoryManagement() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<number | null>(null);
   const [editingDirectory, setEditingDirectory] = useState<BusinessDirectory | null>(null);
   const [formState, setFormState] = useState<DirectoryFormState>(EMPTY_FORM);
   const [selectedLogoFile, setSelectedLogoFile] = useState<File | null>(null);
@@ -122,6 +130,7 @@ export default function BusinessDirectoryManagement() {
       business_email: directory.business_email,
       business_phone_number: directory.business_phone_number,
       business_address: directory.business_address,
+      description: directory.description || "",
     });
     setSelectedLogoFile(null);
     setRemoveCurrentLogo(false);
@@ -166,6 +175,7 @@ export default function BusinessDirectoryManagement() {
       formData.append("business_email", formState.business_email.trim());
       formData.append("business_phone_number", formState.business_phone_number.trim());
       formData.append("business_address", formState.business_address.trim());
+      formData.append("description", formState.description.trim());
 
       if (selectedLogoFile) {
         formData.append("logo", selectedLogoFile);
@@ -227,6 +237,46 @@ export default function BusinessDirectoryManagement() {
     }
   };
 
+  const handleStatusUpdate = async (directory: BusinessDirectory, status: 'approved' | 'rejected') => {
+    try {
+      setUpdatingStatusId(directory.id);
+      await superAdminApi.updateBusinessDirectoryStatus(directory.id, status);
+      toast({
+        title: status === 'approved' ? 'Directory approved' : 'Directory rejected',
+        description: `${directory.business_name} is now ${status}.`,
+      });
+      await fetchDirectories();
+    } catch (error: any) {
+      toast({
+        title: 'Unable to update directory status',
+        description: error?.response?.data?.error || 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingStatusId(null);
+    }
+  };
+
+  const getDirectoryStatus = (directory: BusinessDirectory): 'pending' | 'approved' | 'rejected' => {
+    if (directory.status === 'pending' || directory.status === 'rejected') {
+      return directory.status;
+    }
+
+    return 'approved';
+  };
+
+  const getDirectoryStatusBadgeClassName = (status: 'pending' | 'approved' | 'rejected') => {
+    if (status === 'pending') {
+      return 'border-amber-300 bg-amber-50 text-amber-800';
+    }
+    if (status === 'rejected') {
+      return 'border-red-300 bg-red-50 text-red-700';
+    }
+    return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  };
+
+  const pendingCount = directories.filter((directory) => getDirectoryStatus(directory) === 'pending').length;
+
   const existingLogoUrl = !selectedLogoFile && !removeCurrentLogo ? editingDirectory?.logo_url || null : null;
 
   return (
@@ -239,12 +289,15 @@ export default function BusinessDirectoryManagement() {
               Business Directory
             </CardTitle>
             <CardDescription>
-              Create, edit, and manage the directory entries that appear in The Capsol Academy.
+              Create, edit, and manage the directory entries that appear in Score Machine Academy.
             </CardDescription>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="px-3 py-1">
               {directories.length} {directories.length === 1 ? "Directory" : "Directories"}
+            </Badge>
+            <Badge variant="outline" className="border-amber-300 bg-amber-50 px-3 py-1 text-amber-800">
+              {pendingCount} Pending Approval
             </Badge>
             <Button onClick={openCreateDialog} className="gradient-primary hover:opacity-90">
               <Plus className="mr-2 h-4 w-4" />
@@ -283,6 +336,10 @@ export default function BusinessDirectoryManagement() {
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {directories.map((directory) => (
             <Card key={directory.id} className="overflow-hidden border-border/60 shadow-sm transition-shadow hover:shadow-md">
+              {(() => {
+                const directoryStatus = getDirectoryStatus(directory);
+                return (
+                  <>
               <div className="flex h-44 items-center justify-center overflow-hidden bg-gradient-to-br from-slate-100 via-white to-slate-50 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
                 {directory.logo_url ? (
                   <img
@@ -301,9 +358,12 @@ export default function BusinessDirectoryManagement() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-lg font-semibold leading-tight">{directory.business_name}</h3>
-                    <Badge variant="outline" className="mt-2">
-                      {directory.logo_url ? "Logo added" : "Logo optional"}
-                    </Badge>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{directory.logo_url ? "Logo added" : "Logo optional"}</Badge>
+                      <Badge variant="outline" className={getDirectoryStatusBadgeClassName(directoryStatus)}>
+                        {directoryStatus === 'pending' ? 'Pending Approval' : directoryStatus === 'rejected' ? 'Rejected' : 'Approved'}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button type="button" variant="outline" size="icon" onClick={() => openEditDialog(directory)}>
@@ -326,6 +386,11 @@ export default function BusinessDirectoryManagement() {
                 </div>
 
                 <div className="space-y-3 text-sm text-muted-foreground">
+                  {directory.description ? (
+                    <p className="line-clamp-3 whitespace-pre-wrap text-sm text-foreground/80">
+                      {directory.description}
+                    </p>
+                  ) : null}
                   <div className="flex items-start gap-3">
                     <Mail className="mt-0.5 h-4 w-4 shrink-0" />
                     <span className="break-all">{directory.business_email}</span>
@@ -340,10 +405,37 @@ export default function BusinessDirectoryManagement() {
                   </div>
                 </div>
 
+                {directoryStatus === 'pending' ? (
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="gradient-primary hover:opacity-90"
+                      onClick={() => void handleStatusUpdate(directory, 'approved')}
+                      disabled={updatingStatusId === directory.id}
+                    >
+                      {updatingStatusId === directory.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Approve
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleStatusUpdate(directory, 'rejected')}
+                      disabled={updatingStatusId === directory.id}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                ) : null}
+
                 <div className="border-t border-border/60 pt-3 text-xs text-muted-foreground">
                   Updated {new Date(directory.updated_at || directory.created_at || Date.now()).toLocaleDateString()}
                 </div>
               </CardContent>
+                  </>
+                );
+              })()}
             </Card>
           ))}
         </div>
@@ -400,6 +492,18 @@ export default function BusinessDirectoryManagement() {
                   value={formState.business_address}
                   onChange={(event) => handleFieldChange("business_address", event.target.value)}
                   required
+                />
+              </div>
+
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="business_description">Description (Optional)</Label>
+                <Textarea
+                  id="business_description"
+                  value={formState.description}
+                  onChange={(event) => handleFieldChange("description", event.target.value)}
+                  placeholder="Describe the business, services, and who it helps."
+                  rows={5}
+                  maxLength={5000}
                 />
               </div>
             </div>

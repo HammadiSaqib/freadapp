@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -405,8 +405,8 @@ const buildLettersRouteUrl = ({
   if (type) {
     pathSegments.push(...toRoutePathSegments(LETTER_CONTENT_TYPE_LABELS[type] || type));
   }
-  if (block && blockLabel) {
-    pathSegments.push(...toRoutePathSegments(blockLabel));
+  if (block) {
+    pathSegments.push(...toRoutePathSegments(blockLabel || getDefaultBlockLabel(block)));
   }
   if (round) {
     pathSegments.push(`Round-${round}`);
@@ -512,12 +512,20 @@ const parseLettersRouteState = ({
     return nextRouteState;
   }
 
-  const matchedBlock =
+  const normalizedBlockPath = normalizeRouteToken(blockSegments.join(" "));
+  const matchedDefaultBlock =
+    availableBlocks.find(
+      (block) => normalizeRouteToken(getDefaultBlockLabel(block)) === normalizedBlockPath,
+    ) || null;
+  const matchedSummaryBlock =
     availableBlocks.find(
       (block) =>
         normalizeRouteToken(getSummaryBlockLabel(matchedCategory, matchedType, block)) ===
-        normalizeRouteToken(blockSegments.join(" ")),
+        normalizedBlockPath,
     ) || null;
+  const matchedKeyBlock =
+    availableBlocks.find((block) => normalizeRouteToken(block) === normalizedBlockPath) || null;
+  const matchedBlock = matchedDefaultBlock || matchedSummaryBlock || matchedKeyBlock;
 
   if (!matchedBlock) {
     return nextRouteState;
@@ -863,12 +871,21 @@ export function LetterContentManager() {
         ?.block_label || "",
     ).trim();
 
-  const getDisplayBlockLabel = (block: string, blockEntries?: ContentRow[]) =>
-    getStoredBlockLabel(blockEntries) || getDefaultBlockLabel(block);
+  const getDisplayBlockLabel = (block: string, blockEntries?: ContentRow[]) => {
+    const normalizedBlock = normalizeBlockKey(block);
+    if (isBuiltInBlock(normalizedBlock)) {
+      return getDefaultBlockLabel(normalizedBlock);
+    }
+
+    return getStoredBlockLabel(blockEntries) || getDefaultBlockLabel(normalizedBlock);
+  };
 
   const getSummaryBlockLabel = useCallback(
     (category: string, type: LetterContentType, block: string) => {
       const normalizedBlock = normalizeBlockKey(block);
+      if (isBuiltInBlock(normalizedBlock)) {
+        return getDefaultBlockLabel(normalizedBlock);
+      }
       const matchingItems = summary.filter(
         (item) =>
           item.bureau === UI_BUREAU &&
@@ -1000,7 +1017,7 @@ export function LetterContentManager() {
 
     pendingEditUrlSyncRef.current = false;
     suppressEditRouteHydrationRef.current = true;
-    window.location.replace(nextUrl);
+    navigate(nextUrl, { replace: true });
   };
 
   const handleInlineEditorCancel = () => {
@@ -1187,7 +1204,13 @@ export function LetterContentManager() {
   };
 
   const handleSave = async () => {
-    if (!formContent.trim() || !formCategory.trim()) {
+    const pathBeforeSave = selectedPath ? { ...selectedPath } : null;
+    const targetCategory = pathBeforeSave?.category || formCategory;
+    const targetType = pathBeforeSave?.type || formType || "STANDARD";
+    const targetBlock = pathBeforeSave?.block || formBlock || "INTRO";
+    const targetRound = pathBeforeSave?.round || formRound || 1;
+
+    if (!formContent.trim() || !targetCategory.trim()) {
       toast({
         title: "Validation",
         description: "Content and category are required",
@@ -1195,23 +1218,52 @@ export function LetterContentManager() {
       });
       return;
     }
+
     setSaving(true);
     try {
       const normalizedBlockLabel = formBlockLabel.trim();
-      const blockLabelValue =
-        normalizedBlockLabel && normalizedBlockLabel !== getDefaultBlockLabel(formBlock)
+      const targetDefaultBlockLabel = getDefaultBlockLabel(targetBlock);
+      const targetIsBuiltInBlock = isBuiltInBlock(targetBlock);
+      const selectedRouteLabel =
+        pathBeforeSave && targetBlock === pathBeforeSave.block
+          ? selectedBlockRouteLabel
+          : null;
+      const formLabelMatchesAnotherDefault = allKnownBlocks.some(
+        (block) =>
+          block !== targetBlock &&
+          normalizeRouteToken(getDefaultBlockLabel(block)) ===
+            normalizeRouteToken(normalizedBlockLabel),
+      );
+      const labelToSave = targetIsBuiltInBlock
+        ? targetDefaultBlockLabel
+        : normalizedBlockLabel &&
+            (!selectedRouteLabel ||
+              normalizeRouteToken(normalizedBlockLabel) === normalizeRouteToken(selectedRouteLabel) ||
+              !formLabelMatchesAnotherDefault)
           ? normalizedBlockLabel
+          : selectedRouteLabel ||
+            getSummaryBlockLabel(targetCategory, targetType, targetBlock) ||
+            targetDefaultBlockLabel;
+      const routeBlockLabel = targetIsBuiltInBlock
+        ? targetDefaultBlockLabel
+        : selectedRouteLabel ||
+          labelToSave ||
+          getSummaryBlockLabel(targetCategory, targetType, targetBlock) ||
+          targetDefaultBlockLabel;
+      const blockLabelValue =
+        !targetIsBuiltInBlock && labelToSave && labelToSave !== targetDefaultBlockLabel
+          ? labelToSave
           : null;
       const categoryToSave =
-        editingEntry?.source_category && formCategory === editingEntry.category
+        editingEntry?.source_category && targetCategory === editingEntry.category
           ? editingEntry.source_category
-          : formCategory;
+          : targetCategory;
       const nextPath: TreePath = {
         bureau: UI_BUREAU,
-        category: formCategory,
-        type: formType,
-        block: formBlock,
-        round: formRound,
+        category: targetCategory,
+        type: targetType,
+        block: targetBlock,
+        round: targetRound,
       };
 
       if (editingEntry) {
@@ -1220,10 +1272,10 @@ export function LetterContentManager() {
           body: JSON.stringify({
             clause_content: formContent,
             bureau: UI_BUREAU,
-            round: formRound,
+            round: targetRound,
             category: categoryToSave,
-            type: formType,
-            block: formBlock,
+            type: targetType,
+            block: targetBlock,
             block_label: blockLabelValue,
           }),
         });
@@ -1234,10 +1286,10 @@ export function LetterContentManager() {
           body: JSON.stringify({
             clause_content: formContent,
             bureau: UI_BUREAU,
-            round: formRound,
+            round: targetRound,
             category: categoryToSave,
-            type: formType,
-            block: formBlock,
+            type: targetType,
+            block: targetBlock,
             block_label: blockLabelValue,
           }),
         });
@@ -1248,42 +1300,47 @@ export function LetterContentManager() {
         method: "PUT",
         body: JSON.stringify({
           bureau: UI_BUREAU,
-          round: formRound,
+          round: targetRound,
           category: categoryToSave,
-          type: formType,
-          block: formBlock,
+          type: targetType,
+          block: targetBlock,
           block_label: blockLabelValue,
         }),
       });
 
-      if (editingEntry) {
-        reloadToLettersRound(
-          {
-            category: formCategory,
-            type: formType,
-            block: formBlock,
-            round: formRound,
-            editVariantIndex: null,
-          },
-          blockLabelValue || getDefaultBlockLabel(formBlock),
-        );
-        return;
-      }
+      const nextUrl = buildLettersRouteUrl({
+        category: targetCategory,
+        type: targetType,
+        block: targetBlock,
+        round: targetRound,
+        editVariantIndex: null,
+        blockLabel: routeBlockLabel,
+      });
 
-      setSelectedCategory(formCategory);
-      setSelectedType(formType);
-      setSelectedBlock(formBlock);
-      setSelectedRound(formRound);
+      setSelectedCategory(targetCategory);
+      setSelectedType(targetType);
+      setSelectedBlock(targetBlock);
+      setSelectedRound(targetRound);
+      setFormCategory(targetCategory);
+      setFormType(targetType);
+      setFormBlock(targetBlock);
+      setFormRound(targetRound);
+      setFormBlockLabel(routeBlockLabel);
       // Load data BEFORE setting selectedPath to avoid the useEffect
       // triggering a duplicate loadEntries that briefly shows the loading
       // spinner and hides the inline editor.
       await loadSummary();
       await loadEntries(nextPath);
       setSelectedPath(nextPath);
-      setExpandedBlocks(new Set([`${UI_BUREAU}:${formRound}:${formCategory}:${formType}:${formBlock}`]));
+      setExpandedBlocks(new Set([`${UI_BUREAU}:${targetRound}:${targetCategory}:${targetType}:${targetBlock}`]));
       setEditingEntry(null);
-      setFormContent(getDefaultClauseContent(formBlock));
-      setInlineEditor({ mode: "create", block: formBlock });
+      pendingEditUrlSyncRef.current = false;
+      suppressEditRouteHydrationRef.current = true;
+      navigate(nextUrl, { replace: true });
+
+      setFormContent(getDefaultClauseContent(targetBlock));
+      setSelectedVariantExampleIds(new Set());
+      setInlineEditor({ mode: "create", block: targetBlock });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
@@ -1860,9 +1917,11 @@ export function LetterContentManager() {
       : null;
 
   const selectedBlockRouteLabel =
-    selectedCategory && selectedType && selectedBlock
-      ? getSummaryBlockLabel(selectedCategory, selectedType, selectedBlock)
-      : null;
+    selectedPath && selectedBlock === selectedPath.block
+      ? selectedBlockLabel
+      : selectedCategory && selectedType && selectedBlock
+        ? getSummaryBlockLabel(selectedCategory, selectedType, selectedBlock)
+        : null;
 
   const currentSelectedRound = selectedPath?.round ?? selectedRound ?? null;
 
@@ -2481,6 +2540,7 @@ export function LetterContentManager() {
                         <FolderOpen className="h-5 w-5" style={{ color: BUREAU_HEX[UI_BUREAU] }} />
                       </div>
                       <div className="flex items-center gap-1">
+                        {/* 
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
@@ -2489,6 +2549,7 @@ export function LetterContentManager() {
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </button>
+                        */}
                         <button
                           type="button"
                           className="flex h-8 w-8 items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"

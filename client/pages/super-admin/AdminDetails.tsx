@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import SuperAdminLayout from '../../components/SuperAdminLayout';
 import { useParams } from 'react-router-dom';
-import { api, superAdminApi } from '../../lib/api';
+import { api, getAuthToken, superAdminApi } from '../../lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { Download } from 'lucide-react';
+import { Download, Eye } from 'lucide-react';
 
 type AgreementHistoryTab = 'admin-contracts' | 'score-machine-elite';
 
@@ -40,6 +40,23 @@ export default function AdminDetails() {
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingAgreement, setDownloadingAgreement] = useState(false);
+  const authToken = getAuthToken();
+
+  const getKycImageUrl = (download = false) => {
+    const latestKyc = admin?.latest_kyc;
+    if (!latestKyc?.id || !authToken) {
+      return null;
+    }
+
+    const params = new URLSearchParams({ token: authToken });
+    if (download) {
+      params.set('download', '1');
+    }
+
+    return `${window.location.origin}/api/super-admin/kyc/${latestKyc.id}/image?${params.toString()}`;
+  };
+
+  const kycStatusLabel = String(admin?.latest_kyc?.status || admin?.kyc_status || 'not_started').replace(/_/g, ' ');
 
   const getAgreementStatusLabel = (status?: string | null) => {
     switch (status) {
@@ -70,7 +87,7 @@ export default function AdminDetails() {
 
   const currentAgreements = activeAgreementTab === 'admin-contracts' ? adminAgreements : tsmEliteAgreements;
   const currentSelectedAgreement = activeAgreementTab === 'admin-contracts' ? selectedAdminAgreement : selectedTsmEliteAgreement;
-  const currentAgreementPdfLabel = activeAgreementTab === 'admin-contracts' ? 'Admin Contract PDF' : 'The Capsol Elite PDF';
+  const currentAgreementPdfLabel = activeAgreementTab === 'admin-contracts' ? 'Admin Contract PDF' : 'Score Machine Elite PDF';
 
   const selectAgreement = (agreement: any) => {
     if (activeAgreementTab === 'admin-contracts') {
@@ -83,7 +100,7 @@ export default function AdminDetails() {
 
   const getEmptyAgreementHistoryMessage = () => {
     if (activeAgreementTab === 'score-machine-elite') {
-      return 'No The Capsol Elite history found for this admin yet.';
+      return 'No Score Machine Elite history found for this admin yet.';
     }
 
     return 'No admin contract history found for this admin yet.';
@@ -262,7 +279,7 @@ export default function AdminDetails() {
             return nextAgreements.find((agreement: any) => agreement.id === currentAgreement.id) || nextAgreements[0] || null;
           });
         } else {
-          console.error('Failed to load admin The Capsol Elite agreements:', tsmEliteAgreementsRes.reason);
+          console.error('Failed to load admin Score Machine Elite agreements:', tsmEliteAgreementsRes.reason);
           setTsmEliteAgreements([]);
           setSelectedTsmEliteAgreement(null);
         }
@@ -379,7 +396,7 @@ export default function AdminDetails() {
       <Tabs value={activeAgreementTab} onValueChange={(value) => setActiveAgreementTab(value as AgreementHistoryTab)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="admin-contracts">Admin Contracts</TabsTrigger>
-          <TabsTrigger value="score-machine-elite">The Capsol Elite</TabsTrigger>
+          <TabsTrigger value="score-machine-elite">Score Machine Elite</TabsTrigger>
         </TabsList>
 
         <TabsContent value="admin-contracts" className="space-y-3">
@@ -418,7 +435,7 @@ export default function AdminDetails() {
             >
               <div className="space-y-2">
                 <div className="font-semibold">{agreement.title}</div>
-                <div className="text-gray-600 text-sm line-clamp-2 max-w-xl">{agreement.content || 'No agreement content stored for this The Capsol Elite template.'}</div>
+                <div className="text-gray-600 text-sm line-clamp-2 max-w-xl">{agreement.content || 'No agreement content stored for this Score Machine Elite template.'}</div>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Badge variant="outline" className="capitalize">{getAgreementStatusLabel(agreement.status)}</Badge>
                   <span>{getAgreementTimestampLabel(agreement)}</span>
@@ -434,6 +451,87 @@ export default function AdminDetails() {
       </Tabs>
     </CardContent>
   </Card>
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <CardTitle>KYC Verification</CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="capitalize">
+                  {kycStatusLabel}
+                </Badge>
+                {getKycImageUrl(true) && (
+                  <Button asChild variant="outline">
+                    <a href={getKycImageUrl(true) || '#'} download={`admin-${adminId}-kyc`}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Download KYC
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">KYC Required</div>
+                      <div className="mt-1 text-sm text-slate-700">
+                        {Number(admin?.kyc_required || 0) === 1 ? 'Yes' : 'No'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Submitted</div>
+                      <div className="mt-1 text-sm text-slate-700">
+                        {admin?.latest_kyc?.created_at ? new Date(admin.latest_kyc.created_at).toLocaleString() : 'No submission yet.'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Reviewed</div>
+                      <div className="mt-1 text-sm text-slate-700">
+                        {admin?.latest_kyc?.reviewed_at ? new Date(admin.latest_kyc.reviewed_at).toLocaleString() : '-'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border bg-slate-50 p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Record ID</div>
+                      <div className="mt-1 text-sm text-slate-700">
+                        {admin?.latest_kyc?.id || '-'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-slate-50 p-3">
+                    <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Admin Notes</div>
+                    <div className="mt-1 text-sm text-slate-700">
+                      {admin?.latest_kyc?.admin_notes || 'No admin notes.'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="overflow-hidden rounded-lg border bg-slate-100">
+                    {getKycImageUrl() ? (
+                      <img
+                        src={getKycImageUrl() || ''}
+                        alt={`${admin.first_name || 'Admin'} ${admin.last_name || ''} KYC`}
+                        className="h-[320px] w-full object-contain bg-slate-950"
+                      />
+                    ) : (
+                      <div className="flex h-[320px] items-center justify-center text-sm text-slate-500">
+                        No KYC image available.
+                      </div>
+                    )}
+                  </div>
+                  {getKycImageUrl() && (
+                    <Button asChild variant="outline" className="w-full">
+                      <a href={getKycImageUrl() || '#'} target="_blank" rel="noreferrer">
+                        <Eye className="h-4 w-4 mr-1" />
+                        Open Full Preview
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-3">
               <CardTitle>Transactions</CardTitle>

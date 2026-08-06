@@ -122,6 +122,18 @@ api.interceptors.response.use(
         }
       } catch {}
     }
+    if (status === 403 && code === 'KYC_REQUIRED') {
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('kyc-required', {
+            detail: {
+              source: error?.config?.url,
+              status: error?.response?.data?.kyc_status || 'not_started',
+            },
+          }));
+        }
+      } catch {}
+    }
     return Promise.reject(error);
   }
 );
@@ -437,6 +449,28 @@ export const clientDocumentsApi = {
 
   deleteAdditionalDocument: (clientId: string | number, docId: number) =>
     api.delete(`/api/client-documents/${clientId}/additional/${docId}`),
+
+  getPowerOfAttorneyDocuments: (clientId: string | number) =>
+    api.get(`/api/client-documents/${clientId}/power-of-attorney`),
+
+  uploadPowerOfAttorneyDocuments: (clientId: string | number, files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    return api.post(`/api/client-documents/${clientId}/power-of-attorney/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  replacePowerOfAttorneyDocument: (clientId: string | number, docId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.put(`/api/client-documents/${clientId}/power-of-attorney/${docId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  deletePowerOfAttorneyDocument: (clientId: string | number, docId: number) =>
+    api.delete(`/api/client-documents/${clientId}/power-of-attorney/${docId}`),
 };
 
 // Contracts API
@@ -499,7 +533,8 @@ export const billingApi = {
   
   getSubscription: () => api.get('/api/billing/subscription'),
   
-  getStripeConfig: () => api.get('/api/billing/stripe-config'),
+  getStripeConfig: (params?: { planId?: string | number; plan_id?: string | number }) =>
+    api.get('/api/billing/stripe-config', { params }),
   
   // Create a Stripe Checkout Session for subscription
   createSubscriptionCheckout: (data: {
@@ -526,8 +561,28 @@ export const billingApi = {
   finalizeCheckoutSession: (sessionId: string) =>
     api.post('/api/billing/finalize-checkout-session', { sessionId }),
   
-  cancelSubscription: (data?: { reasonCode?: string; reasonText?: string }) =>
+  cancelSubscription: (data?: {
+    reasonCode?: string;
+    reasonText?: string;
+    guidanceChoice?: 'join_class_now' | 'not_now' | 'still_cancel';
+  }) =>
     api.post('/api/billing/cancel-subscription', data),
+  trackCancellationGuidanceChoice: (data: {
+    guidanceChoice: 'join_class_now' | 'not_now' | 'still_cancel';
+  }) => api.post('/api/billing/cancellation-guidance-choice', data),
+};
+
+export const kycApi = {
+  getMe: () => api.get('/api/kyc/me'),
+  submit: (file: File) => {
+    const form = new FormData();
+    form.append('image', file);
+    return api.post('/api/kyc/submit', form, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 
 // Credit Report Scraper API
@@ -736,6 +791,13 @@ export const shopApi = {
     api.post('/api/shop/success-verify-code', data),
 };
 
+export const aiPlansApi = {
+  getPlans: () => api.get('/api/ai-plans'),
+  getStripeConfig: () => api.get('/api/ai-plans/stripe-config'),
+  createCheckout: (planId: string | number) => api.post(`/api/ai-plans/${planId}/checkout`),
+  finalizeCheckout: (sessionId: string) => api.post('/api/ai-plans/finalize', { sessionId }),
+};
+
 // Super Admin API
 export const superAdminApi = {
   getUsers: (params?: { page?: number; limit?: number; search?: string; role?: string; status?: string; account_type?: string; referral_source?: string; created_from?: string; created_to?: string }) =>
@@ -745,24 +807,58 @@ export const superAdminApi = {
   updateDefaultContractTemplate: (payload: { name?: string; description?: string; content?: string }) => api.put('/api/super-admin/contract-templates/default', payload),
   updateUser: (id: string, data: any) => api.put(`/api/super-admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/api/super-admin/users/${id}`),
-  getPlans: (params?: { page?: number; limit?: number; search?: string; is_active?: boolean | string }) =>
+  getPlans: (params?: { page?: number; limit?: number | string; search?: string; is_active?: boolean | string }) =>
     api.get('/api/super-admin/plans', { params }),
   createPlan: (data: any) => api.post('/api/super-admin/plans', data),
   updatePlan: (id: string | number, data: any) => api.put(`/api/super-admin/plans/${id}`, data),
   deletePlan: (id: string | number) => api.delete(`/api/super-admin/plans/${id}`),
+  getAiPlans: () => api.get('/api/ai-plans/admin'),
+  createAiPlan: (data: any) => api.post('/api/ai-plans/admin', data),
+  updateAiPlan: (id: string | number, data: any) => api.put(`/api/ai-plans/admin/${id}`, data),
+  deleteAiPlan: (id: string | number) => api.delete(`/api/ai-plans/admin/${id}`),
+  getKycSubmissions: (params?: { status?: string; search?: string }) =>
+    api.get('/api/super-admin/kyc', { params }),
+  approveKyc: (id: string | number) => api.post(`/api/super-admin/kyc/${id}/approve`),
+  requestKycResubmission: (id: string | number, data: { admin_notes?: string }) =>
+    api.post(`/api/super-admin/kyc/${id}/resubmit`, data),
+  moveKycToManualReview: (id: string | number, data?: { admin_notes?: string }) =>
+    api.post(`/api/super-admin/kyc/${id}/manual-review`, data || {}),
+  disableUserKyc: (userId: string | number) => api.post(`/api/super-admin/kyc/users/${userId}/disable`),
   getInvitations: (params?: { page?: number; limit?: number }) =>
     api.get('/api/super-admin/invitations', { params }),
   sendInvitation: (data: { email: string; role: string }) =>
     api.post('/api/super-admin/invitations/send', data),
   sendBulkInvitations: (invitations: Array<{ email: string; name?: string; type: string }>) =>
     api.post('/api/super-admin/invitations/bulk', { invitations }),
-  getAdminProfiles: (params?: { page?: number; limit?: number; search?: string; is_active?: string; access_level?: string }) =>
+  getAdminProfiles: (params?: { page?: number; limit?: number | string; search?: string; is_active?: string; access_level?: string }) =>
     api.get('/api/super-admin/admins', { params }),
+  getAdminCustomFilters: () => api.get('/api/super-admin/admin-custom-filters'),
+  getSupportAdminCustomFilters: () => api.get('/api/admin-management/custom-filters'),
+  saveAdminCustomFilters: (filters: any[]) => api.put('/api/super-admin/admin-custom-filters', { filters }),
+  getDisputeLetterEmailSettings: () => api.get('/api/super-admin/dispute-letter-email-settings'),
+  saveDisputeLetterEmailSettings: (enabled: boolean) =>
+    api.put('/api/super-admin/dispute-letter-email-settings', { enabled }),
+  getAdminInactivityEmailSettings: () => api.get('/api/super-admin/admin-inactivity-email-settings'),
+  saveAdminInactivityEmailSettings: (enabled: boolean) =>
+    api.put('/api/super-admin/admin-inactivity-email-settings', { enabled }),
+  getReportPullReminderEmailSettings: () => api.get('/api/super-admin/report-pull-reminder-email-settings'),
+  saveReportPullReminderEmailSettings: (enabled: boolean) =>
+    api.put('/api/super-admin/report-pull-reminder-email-settings', { enabled }),
+  getSupportAdminFilterAccess: () => api.get('/api/super-admin/support-admin-filter-access'),
+  saveSupportAdminFilterAccess: (settings: Record<string, any>) =>
+    api.put('/api/super-admin/support-admin-filter-access', { settings }),
+  getMySupportAdminFilterAccess: () => api.get('/api/super-admin/support-admin-filter-access/me'),
+  updateMySupportFollowUp: (enabled: boolean) =>
+    api.patch('/api/super-admin/support-admin-filter-access/me/follow-up', { enabled }),
   getAdminProfile: (id: string | number) => api.get(`/api/super-admin/admins/${id}`),
   getAdminAgreements: (id: string | number) => api.get(`/api/super-admin/admins/${id}/agreements`),
   getAdminTsmEliteAgreements: (id: string | number) => api.get(`/api/super-admin/admins/${id}/tsm-elite-agreements`),
   createAdminProfile: (data: any) => api.post('/api/super-admin/admins', data),
   updateAdminProfile: (id: string | number, data: any) => api.put(`/api/super-admin/admins/${id}`, data),
+  updateAdminAffiliateReferrer: (id: string | number, data: { affiliateId: number }) =>
+    api.put(`/api/super-admin/admins/${id}/referrer`, data),
+  clearAdminAffiliateReferrer: (id: string | number) =>
+    api.delete(`/api/super-admin/admins/${id}/referrer`),
   deleteAdminProfile: (id: string | number) => api.delete(`/api/super-admin/admins/${id}`),
   getUserSubscriptions: (params?: { page?: number; limit?: number }) =>
     api.get('/api/super-admin/user-subscriptions', { params }),
@@ -826,6 +922,30 @@ export const superAdminApi = {
         [SKIP_REFRESH_TOKEN_PERSIST_HEADER]: '1',
       },
     }),
+  getEmployeeAnnouncements: () =>
+    api.get('/api/super-admin/employee-progress/announcements'),
+  getEmployeeProgressOverview: () =>
+    api.get('/api/super-admin/employee-progress/overview'),
+  createEmployeeAnnouncement: (data: { title: string; description?: string; label?: string }) =>
+    api.post('/api/super-admin/employee-progress/announcements', data),
+  updateEmployeeAnnouncement: (id: number, data: { title: string; description?: string; label?: string }) =>
+    api.put(`/api/super-admin/employee-progress/announcements/${id}`, data),
+  deleteEmployeeAnnouncement: (id: number) =>
+    api.delete(`/api/super-admin/employee-progress/announcements/${id}`),
+  getEmployeeProgress: (userId: number) =>
+    api.get(`/api/super-admin/employee-progress/employees/${userId}`),
+  createEmployeeProgressTask: (userId: number, data: { title: string; description?: string; priority: 'Done' | 'High' | 'Required' | 'Medium'; today_only: boolean }) =>
+    api.post(`/api/super-admin/employee-progress/employees/${userId}/tasks`, data),
+  updateEmployeeProgressTask: (userId: number, taskId: number, data: { title: string; description?: string; priority: 'Done' | 'High' | 'Required' | 'Medium'; today_only: boolean }) =>
+    api.put(`/api/super-admin/employee-progress/employees/${userId}/tasks/${taskId}`, data),
+  deleteEmployeeProgressTask: (userId: number, taskId: number) =>
+    api.delete(`/api/super-admin/employee-progress/employees/${userId}/tasks/${taskId}`),
+  assignEmployeeAnnouncement: (userId: number, data: { announcement_id?: number; title?: string; description?: string; label?: string }) =>
+    api.post(`/api/super-admin/employee-progress/employees/${userId}/announcements`, data),
+  removeEmployeeAnnouncement: (userId: number, assignmentId: number) =>
+    api.delete(`/api/super-admin/employee-progress/employees/${userId}/announcements/${assignmentId}`),
+  updateEmployeeWorkingHours: (userId: number, data: { start_time: string; end_time: string; off_days: string[]; break_hours: number }) =>
+    api.put(`/api/super-admin/employee-progress/employees/${userId}/working-hours`, data),
   // Subscription Management
   getSubscriptions: (params?: { page?: number; limit?: number; search?: string; status?: string; admin?: string }) =>
     api.get('/api/super-admin/subscriptions', { params }),
@@ -834,6 +954,8 @@ export const superAdminApi = {
     api.get('/api/super-admin/subscriptions/upcoming-renewals', { params }),
   getRecentCancellations: (params?: { page?: number; limit?: number; days?: number; search?: string }) =>
     api.get('/api/super-admin/subscriptions/recent-cancellations', { params }),
+  getCancellationGuidanceStats: (params?: { days?: number }) =>
+    api.get('/api/super-admin/subscriptions/cancellation-guidance-stats', { params }),
   updateSubscription: (id: number, data: any) => api.put(`/api/super-admin/subscriptions/${id}`, data),
   cancelSubscription: (id: number) => api.post(`/api/super-admin/subscriptions/${id}/cancel`),
   renewSubscription: (id: number, expires_at: string) => api.post(`/api/super-admin/subscriptions/${id}/renew`, { expires_at }),
@@ -846,8 +968,12 @@ export const superAdminApi = {
   getAffiliate: (id: string) => api.get(`/api/affiliate-management/${id}`),
   createAffiliate: (data: any) => api.post('/api/affiliate-management', data),
   updateAffiliate: (id: string, data: any) => api.put(`/api/affiliate-management/${id}`, data),
+  updateAffiliateReferrer: (id: string | number, data: { parentAffiliateId: number }) =>
+    api.put(`/api/affiliate-management/${id}/referrer`, data),
+  clearAffiliateReferrer: (id: string | number) =>
+    api.delete(`/api/affiliate-management/${id}/referrer`),
   deleteAffiliate: (id: string) => api.delete(`/api/affiliate-management/${id}`),
-  getCommissionHistory: (params?: { page?: number; limit?: number; affiliate_id?: string; affiliateId?: string }) => {
+  getCommissionHistory: (params?: { page?: number; limit?: number; offset?: number; affiliate_id?: string; affiliateId?: string }) => {
     const mapped: any = { ...params };
     if (params?.affiliate_id && !params?.affiliateId) {
       mapped.affiliateId = params.affiliate_id;
@@ -877,6 +1003,8 @@ export const superAdminApi = {
     api.put(`/api/super-admin/business-directories/${id}`, data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  updateBusinessDirectoryStatus: (id: string | number, status: 'pending' | 'approved' | 'rejected') =>
+    api.patch(`/api/super-admin/business-directories/${id}/status`, { status }),
   deleteBusinessDirectory: (id: string | number) =>
     api.delete(`/api/super-admin/business-directories/${id}`),
   importAffiliateCSV: (file: File) => {
@@ -942,6 +1070,22 @@ export const superAdminApi = {
   updateAffiliateTrialPlan: (id: number, data: { affiliate_id: number; duration_months: number; status: string; start_date?: string | null; end_date?: string | null }) =>
     api.put(`/api/super-admin/affiliate-trial-plans/${id}`, data),
   deleteAffiliateTrialPlan: (id: number) => api.delete(`/api/super-admin/affiliate-trial-plans/${id}`),
+};
+
+export const supportEmployeeProgressApi = {
+  getMyProgress: () => api.get('/api/support/employee-progress'),
+  clockIn: () => api.post('/api/support/employee-progress/attendance/clock-in'),
+  clockOut: () => api.post('/api/support/employee-progress/attendance/clock-out'),
+  startBreak: () => api.post('/api/support/employee-progress/attendance/break-start'),
+  endBreak: () => api.post('/api/support/employee-progress/attendance/break-end'),
+  updateTimezonePreference: (timezone: 'America/New_York' | 'Asia/Karachi') =>
+    api.put('/api/support/employee-progress/preferences/timezone', { timezone }),
+  createWorkSchedule: (data: { work_date?: string; start_time: string; end_time: string; activity: string; assigned_task_id?: number | null; status: 'Completed' | 'In Progress' | 'Pending' }) =>
+    api.post('/api/support/employee-progress/work-schedule', data),
+  updateWorkSchedule: (id: number, data: { work_date?: string; start_time: string; end_time: string; activity: string; assigned_task_id?: number | null; status: 'Completed' | 'In Progress' | 'Pending' }) =>
+    api.put(`/api/support/employee-progress/work-schedule/${id}`, data),
+  deleteWorkSchedule: (id: number) =>
+    api.delete(`/api/support/employee-progress/work-schedule/${id}`),
 };
 
 // Affiliate API module
@@ -1096,6 +1240,17 @@ export const supportApi = {
   getProfile: () => api.get('/api/auth/profile'),
   updateProfile: (data: any) => api.put('/api/auth/profile', data),
   getTasks: () => api.get('/api/support/dashboard/tasks'),
+  getTaskControl: () => api.get('/api/support/dashboard/tasks/control'),
+  saveTaskControl: (data: {
+    title: string;
+    description: string;
+    continue_anyway: boolean;
+    start_now: boolean;
+    never_ends: boolean;
+    start_at?: string;
+    end_at?: string;
+  }) => api.put('/api/support/dashboard/tasks/control', data),
+  removeTaskControl: () => api.delete('/api/support/dashboard/tasks/control'),
   createTask: (data: { title: string; description: string; status?: string; priority?: string; rejection_reason?: string | null; attachments?: File[]; screenshot?: File | null }) => {
     const form = new FormData();
     form.append('title', data.title);
@@ -1245,6 +1400,11 @@ export const schoolManagementApi = {
   getCourseAnalytics: (courseId: string) => api.get(`/api/school-management/courses/${courseId}/analytics`),
   getLeaderboard: () => api.get('/api/school-management/leaderboard'),
   getBusinessDirectories: () => api.get('/api/school-management/business-directories'),
+  getMyBusinessDirectoryApplications: () => api.get('/api/school-management/business-directories/my-applications'),
+  submitBusinessDirectoryApplication: (formData: FormData) =>
+    api.post('/api/school-management/business-directories/applications', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   
   // File Upload (Generic)
   uploadFile: (data: FormData) => 

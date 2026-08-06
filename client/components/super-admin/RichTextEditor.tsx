@@ -325,6 +325,7 @@ export function RichTextEditor({
   const [customFontSize, setCustomFontSize] = useState("16");
   const [variablesOpen, setVariablesOpen] = useState(false);
   const [variableSearch, setVariableSearch] = useState("");
+  const [customFontColor, setCustomFontColor] = useState("#000000");
   const [customHighlightColor, setCustomHighlightColor] = useState("#fef08a");
   const [sourceMode, setSourceMode] = useState(false);
   const [sourceValue, setSourceValue] = useState("");
@@ -891,6 +892,28 @@ export function RichTextEditor({
                   }}
                 />
               ))}
+            </div>
+            <div className="mt-3 border-t border-border pt-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-medium text-muted-foreground">Custom Color</span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-6 w-6 rounded border border-border"
+                    style={{ backgroundColor: customFontColor }}
+                  />
+                  <input
+                    type="color"
+                    value={customFontColor}
+                    title="Choose custom text color"
+                    className="h-8 w-10 cursor-pointer rounded border border-border bg-background p-1"
+                    onChange={(e) => {
+                      const nextColor = e.target.value;
+                      setCustomFontColor(nextColor);
+                      exec("foreColor", nextColor);
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </PopoverContent>
         </Popover>

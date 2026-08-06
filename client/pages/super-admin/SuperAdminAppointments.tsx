@@ -81,10 +81,10 @@ export default function SuperAdminAppointments() {
 
   const [availabilityForm, setAvailabilityForm] = useState({
     weekday: 1,
-    start_time: "09:00",
-    end_time: "17:00",
+    start_time: "17:00",
+    end_time: "20:00",
     slot_interval_minutes: 30,
-    buffer_minutes: 10,
+    buffer_minutes: 0,
     is_active: true,
     team_member_name: "CapSol Team",
     zoom_join_url: "",

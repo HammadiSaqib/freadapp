@@ -10,6 +10,11 @@ import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
 import { fetchCreditReport, PLATFORMS } from '../services/scrapers/index.js';
+import {
+  formatPartialDobParts,
+  normalizeUnifiedDob,
+  normalizeYearOnlyDob,
+} from '../../shared/partialDob.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
 import { getDatabaseAdapter } from '../database/databaseAdapter.js';
 import { emailService } from '../services/emailService.js';
@@ -1123,9 +1128,8 @@ if (!dobArray || dobArray.length === 0) {
   dobArray = rawNamesForDob.map((n, idx) => {
     const bi = n?.bureau_id ?? bureauToIdMSQ(n?.bureau) ?? bureauIndexToIdMSQ(idx % 3);
     const y = normalizeStr(n?.year_of_birth, '');
-    const hasY = /^\d{4}$/.test(y);
-    const full = toYMD(parseDate(n?.dob || n?.date_of_birth)) || '';
-    const dobVal = full || (hasY ? `${y}-01-01` : '');
+    const full = normalizeUnifiedDob(n?.dob || n?.date_of_birth);
+    const dobVal = full || normalizeYearOnlyDob(y);
     return {
       BureauId: bi,
       DOB: dobVal
@@ -1142,7 +1146,7 @@ const dobArrayFormal = [1,2,3].map((id) => {
   const existing = dobByBureau.get(id);
   return {
     BureauId: id,
-    DOB: existing ? (toYMD(existing.DOB) || '') : ''
+    DOB: existing ? normalizeUnifiedDob(existing.DOB) : ''
   };
 });
 
@@ -1852,7 +1856,9 @@ const normalizePublicRecordComments = (value) => {
           const m = normalizeStr(b?.BirthDate?.['@month'] || '');
           const d = normalizeStr(b?.BirthDate?.['@day'] || '');
           const dateRaw = normalizeStr(b?.['@date'] || '');
-          const date = (parseDate(dateRaw || (y && m && d ? `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}` : '')) || '')?.slice(0,10) || '';
+          const date = dateRaw
+            ? normalizeUnifiedDob(dateRaw)
+            : formatPartialDobParts({ year: y, month: m, day: d });
           return {
             BureauId: bi ?? ((idx % 3) + 1),
             DOB: date
@@ -1950,7 +1956,7 @@ const normalizePublicRecordComments = (value) => {
         });
         const dobsByBureau = new Map();
         try { for (const d of dobsFormal) { if (d && d.BureauId) dobsByBureau.set(d.BureauId, d.DOB || ''); } } catch {}
-        const dobNorm = (s) => ((parseDate(s) || '')?.slice(0,10) || '');
+        const dobNorm = (s) => normalizeUnifiedDob(s);
         const fallbackDob = dobNorm(fullDob || '');
         const dobsArrayFull = [1,2,3].map(id => ({ BureauId: id, DOB: dobNorm(dobsByBureau.get(id) || fallbackDob) }));
         const isNegative = (acc) => {

@@ -27,7 +27,7 @@ const Sitemap: React.FC = () => {
                 Site Map
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                A comprehensive list of all pages and resources available on The Capsol platform.
+                A comprehensive list of all pages and resources available on The Score Machine platform.
               </p>
             </div>
 

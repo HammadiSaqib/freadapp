@@ -38,12 +38,6 @@ export default function SiteHeader() {
             decoding="async"
             fetchPriority="high"
           />
-          <div className="hidden min-w-0 lg:block">
-            <p className="truncate text-lg font-black tracking-tight text-slate-950">CapSol</p>
-            <p className="mt-1 truncate text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Capital Solutions
-            </p>
-          </div>
         </Link>
 
         <nav className="hidden items-center gap-2 xl:flex">

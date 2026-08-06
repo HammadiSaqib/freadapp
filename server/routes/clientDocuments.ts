@@ -101,6 +101,20 @@ async function safelyUnlink(filePath?: string | null) {
   }
 }
 
+async function safelyUnlinkClientDocumentUrl(fileUrl?: string | null) {
+  if (!fileUrl) return;
+  try {
+    const pathname = fileUrl.startsWith('http') ? new URL(fileUrl).pathname : fileUrl;
+    if (!pathname.startsWith('/uploads/client-documents/')) return;
+    const uploadDirectory = path.resolve(process.cwd(), 'uploads/client-documents');
+    const resolvedPath = path.resolve(uploadDirectory, path.basename(pathname));
+    if (!resolvedPath.startsWith(uploadDirectory)) return;
+    await safelyUnlink(resolvedPath);
+  } catch {
+    // Ignore malformed legacy URLs and cleanup failures.
+  }
+}
+
 async function optimizePdfUpload(file: MutableUploadedFile) {
   if (path.extname(file.filename).toLowerCase() !== '.pdf') return;
 
@@ -220,6 +234,14 @@ const singleAdditionalDocumentUpload = (req: Request, res: Response, next: NextF
 
 const multipleDocumentUpload = (req: Request, res: Response, next: NextFunction) => {
   additionalUpload.fields([
+    { name: 'files', maxCount: 20 },
+    { name: 'files[]', maxCount: 20 },
+    { name: 'file', maxCount: 20 },
+  ])(req, res, (error) => handleUploadMiddlewareError(error, req, res, next));
+};
+
+const multiplePowerOfAttorneyUpload = (req: Request, res: Response, next: NextFunction) => {
+  primaryUpload.fields([
     { name: 'files', maxCount: 20 },
     { name: 'files[]', maxCount: 20 },
     { name: 'file', maxCount: 20 },
@@ -395,6 +417,38 @@ async function ensureAdditionalDocsTable() {
 }
 ensureAdditionalDocsTable();
 
+async function insertPowerOfAttorneyDocument(
+  clientId: string,
+  fileUrl: string,
+  originalName: string,
+) {
+  const values = [clientId, 'power_of_attorney', fileUrl, originalName || null];
+  try {
+    await runQuery(
+      'INSERT INTO client_additional_documents (client_id, document_type, file_url, original_name) VALUES (?, ?, ?, ?)',
+      values,
+    );
+  } catch (error: any) {
+    const missingIdDefault = error?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+      && String(error?.message || error?.sqlMessage || '').includes("Field 'id'");
+    if (!missingIdDefault) throw error;
+
+    await runQuery(
+      `INSERT INTO client_additional_documents (id, client_id, document_type, file_url, original_name)
+       SELECT COALESCE(MAX(id), 0) + 1, ?, ?, ?, ? FROM client_additional_documents`,
+      values,
+    );
+  }
+
+  return getQuery(
+    `SELECT id, client_id, document_type, file_url, original_name, created_at
+       FROM client_additional_documents
+      WHERE client_id = ? AND document_type = 'power_of_attorney' AND file_url = ?
+      ORDER BY id DESC LIMIT 1`,
+    [clientId, fileUrl],
+  );
+}
+
 async function getLegacyOtherDocuments(clientId: string): Promise<StoredOtherDocument[]> {
   try {
     await ensureAdditionalDocsTable();
@@ -502,6 +556,128 @@ router.delete('/:clientId/document/:type', authenticateToken, async (req: AuthRe
   } catch (error) {
     console.error('Error deleting document:', error);
     res.status(500).json({ message: 'Error deleting document' });
+  }
+});
+
+router.get('/:clientId/power-of-attorney', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureAdditionalDocsTable();
+    const documents = await allQuery(
+      `SELECT id, client_id, document_type, file_url, original_name, created_at
+         FROM client_additional_documents
+        WHERE client_id = ? AND document_type = 'power_of_attorney'
+        ORDER BY created_at DESC, id DESC`,
+      [req.params.clientId],
+    );
+    res.json({ success: true, data: documents });
+  } catch (error) {
+    console.error('Error fetching Power of Attorney documents:', error);
+    res.status(500).json({ message: 'Error fetching Power of Attorney documents' });
+  }
+});
+
+router.post(
+  '/:clientId/power-of-attorney/upload',
+  authenticateToken,
+  multiplePowerOfAttorneyUpload,
+  async (req: AuthRequest, res: Response) => {
+    const files = collectUploadedFiles(req.files);
+    try {
+      if (!files.length) {
+        return res.status(400).json({ message: 'Choose at least one PDF or image file.' });
+      }
+
+      const client = await getQuery('SELECT id FROM clients WHERE id = ?', [req.params.clientId]);
+      if (!client) {
+        await Promise.all(files.map((file) => safelyUnlink(file.path)));
+        return res.status(404).json({ message: 'Client not found' });
+      }
+
+      await ensureAdditionalDocsTable();
+      const baseUrl = getServerBaseUrl(req);
+      const uploaded = [];
+      for (const file of files) {
+        await optimizeUploadedFile(file as MutableUploadedFile);
+        const fileUrl = `${baseUrl}/uploads/client-documents/${file.filename}`;
+        uploaded.push(await insertPowerOfAttorneyDocument(req.params.clientId, fileUrl, file.originalname));
+      }
+
+      res.json({
+        success: true,
+        message: `${uploaded.length} Power of Attorney document(s) uploaded successfully`,
+        data: uploaded.filter(Boolean),
+      });
+    } catch (error) {
+      console.error('Error uploading Power of Attorney documents:', error);
+      await Promise.all(files.map((file) => safelyUnlink(file.path)));
+      res.status(500).json({ message: 'Error uploading Power of Attorney documents' });
+    }
+  },
+);
+
+router.put(
+  '/:clientId/power-of-attorney/:docId',
+  authenticateToken,
+  singleDocumentUpload,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: 'Choose a replacement PDF or image file.' });
+
+      const existing = await getQuery(
+        `SELECT id, file_url
+           FROM client_additional_documents
+          WHERE id = ? AND client_id = ? AND document_type = 'power_of_attorney'`,
+        [req.params.docId, req.params.clientId],
+      );
+      if (!existing) {
+        await safelyUnlink(req.file.path);
+        return res.status(404).json({ message: 'Power of Attorney document not found' });
+      }
+
+      await optimizeUploadedFile(req.file as MutableUploadedFile);
+      const fileUrl = `${getServerBaseUrl(req)}/uploads/client-documents/${req.file.filename}`;
+      await runQuery(
+        `UPDATE client_additional_documents
+            SET file_url = ?, original_name = ?, created_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND client_id = ? AND document_type = 'power_of_attorney'`,
+        [fileUrl, req.file.originalname, req.params.docId, req.params.clientId],
+      );
+      await safelyUnlinkClientDocumentUrl(existing.file_url);
+
+      const updated = await getQuery(
+        `SELECT id, client_id, document_type, file_url, original_name, created_at
+           FROM client_additional_documents WHERE id = ?`,
+        [req.params.docId],
+      );
+      res.json({ success: true, message: 'Power of Attorney document replaced successfully', data: updated });
+    } catch (error) {
+      console.error('Error replacing Power of Attorney document:', error);
+      await safelyUnlink(req.file?.path);
+      res.status(500).json({ message: 'Error replacing Power of Attorney document' });
+    }
+  },
+);
+
+router.delete('/:clientId/power-of-attorney/:docId', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const existing = await getQuery(
+      `SELECT id, file_url
+         FROM client_additional_documents
+        WHERE id = ? AND client_id = ? AND document_type = 'power_of_attorney'`,
+      [req.params.docId, req.params.clientId],
+    );
+    if (!existing) return res.status(404).json({ message: 'Power of Attorney document not found' });
+
+    await runQuery(
+      `DELETE FROM client_additional_documents
+        WHERE id = ? AND client_id = ? AND document_type = 'power_of_attorney'`,
+      [req.params.docId, req.params.clientId],
+    );
+    await safelyUnlinkClientDocumentUrl(existing.file_url);
+    res.json({ success: true, message: 'Power of Attorney document removed successfully' });
+  } catch (error) {
+    console.error('Error deleting Power of Attorney document:', error);
+    res.status(500).json({ message: 'Error deleting Power of Attorney document' });
   }
 });
 

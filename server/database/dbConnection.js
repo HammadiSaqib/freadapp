@@ -11,7 +11,8 @@ let pool = null;
 
 // Import environment configuration
 import { ENV_CONFIG } from '../config/environment.js';
-import { syncGhlCreditScores } from '../services/ghlService.js';
+import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
+import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 
 // Default database configuration using ENV_CONFIG
 const DEFAULT_CONFIG = {
@@ -97,6 +98,40 @@ async function persistClientSsnLastFour(clientId, ssnLastFour) {
   );
 }
 
+async function repairCreditReportHistoryIdAutoIncrement(columns = null) {
+  const inspectedColumns = columns || await executeQuery(
+    `SELECT COLUMN_NAME, COLUMN_KEY, EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'credit_report_history'`,
+    [ENV_CONFIG.MYSQL_DATABASE]
+  );
+  const idColumn = inspectedColumns.find(c => c.COLUMN_NAME === 'id');
+
+  if (!idColumn) {
+    await executeQuery('ALTER TABLE credit_report_history ADD COLUMN id INT NOT NULL AUTO_INCREMENT PRIMARY KEY FIRST');
+    console.log('credit_report_history id column added as AUTO_INCREMENT');
+    return true;
+  }
+
+  const isAutoIncrement = String(idColumn.EXTRA || '').toLowerCase().includes('auto_increment');
+  if (isAutoIncrement) {
+    return true;
+  }
+
+  const primaryIndexes = await executeQuery("SHOW INDEX FROM credit_report_history WHERE Key_name = 'PRIMARY'");
+  const hasPrimaryKey = Array.isArray(primaryIndexes) && primaryIndexes.length > 0;
+  const idIsPrimary = String(idColumn.COLUMN_KEY || '').toUpperCase() === 'PRI';
+
+  if (!hasPrimaryKey) {
+    await executeQuery('ALTER TABLE credit_report_history ADD PRIMARY KEY (id)');
+  } else if (!idIsPrimary) {
+    console.warn('credit_report_history.id is not AUTO_INCREMENT and another primary key exists; falling back to explicit IDs for inserts');
+    return false;
+  }
+
+  await executeQuery('ALTER TABLE credit_report_history MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT');
+  console.log('credit_report_history id column repaired to AUTO_INCREMENT');
+  return true;
+}
+
 /**
  * Create the credit_report_history table if it doesn't exist
  */
@@ -126,10 +161,15 @@ async function ensureCreditReportHistoryTable() {
     await executeQuery(createSql);
     // Ensure missing columns are added for existing tables
     const columns = await executeQuery(
-      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'credit_report_history'`,
+      `SELECT COLUMN_NAME, COLUMN_KEY, EXTRA FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'credit_report_history'`,
       [ENV_CONFIG.MYSQL_DATABASE]
     );
     const existing = new Set(columns.map(c => c.COLUMN_NAME));
+    try {
+      await repairCreditReportHistoryIdAutoIncrement(columns);
+    } catch (repairError) {
+      console.warn('Unable to repair credit_report_history.id automatically; inserts will use explicit IDs if needed:', repairError?.message || repairError);
+    }
     const adds = [];
     if (!existing.has('credit_score')) adds.push('ADD COLUMN credit_score INT NULL');
     if (!existing.has('experian_score')) adds.push('ADD COLUMN experian_score INT NULL');
@@ -146,6 +186,40 @@ async function ensureCreditReportHistoryTable() {
   } catch (error) {
     console.error('Failed to ensure credit_report_history table:', error);
     throw error;
+  }
+}
+
+function isMissingCreditReportHistoryIdDefault(error) {
+  return error?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+    && String(error?.sqlMessage || error?.message || '').toLowerCase().includes("field 'id'");
+}
+
+async function insertCreditReportHistory(sql, params) {
+  try {
+    return await executeQuery(sql, params);
+  } catch (error) {
+    if (!isMissingCreditReportHistoryIdDefault(error)) {
+      throw error;
+    }
+
+    console.warn('credit_report_history.id is missing AUTO_INCREMENT; attempting repair before retrying insert');
+    try {
+      await repairCreditReportHistoryIdAutoIncrement();
+      return await executeQuery(sql, params);
+    } catch (repairOrRetryError) {
+      if (!isMissingCreditReportHistoryIdDefault(repairOrRetryError)) {
+        throw repairOrRetryError;
+      }
+    }
+
+    const nextRows = await executeQuery('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM credit_report_history');
+    const nextId = Number(Array.isArray(nextRows) ? nextRows[0]?.next_id : nextRows?.next_id) || 1;
+    const fallbackSql = `
+      INSERT INTO credit_report_history
+      (id, client_id, platform, report_path, status, credit_score, experian_score, equifax_score, transunion_score, report_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    return executeQuery(fallbackSql, [nextId, ...params]);
   }
 }
 
@@ -178,7 +252,7 @@ async function saveCreditReport(data) {
   ];
 
   try {
-    const result = await executeQuery(sql, params);
+    const result = await insertCreditReportHistory(sql, params);
     await persistClientSsnLastFour(data.client_id, data.ssn_last_four);
     try {
       const clientId = data.client_id;
@@ -193,112 +267,31 @@ async function saveCreditReport(data) {
         }
       }
       if (clientRow?.user_id) {
-        let integrationRow = null;
-        if (clientRow.integration_id) {
-          const rows = await executeQuery(
-            `SELECT * FROM admin_integrations WHERE id = ? AND admin_id = ? AND provider = 'ghl' AND is_active = 1 LIMIT 1`,
-            [clientRow.integration_id, clientRow.user_id]
-          );
-          if (Array.isArray(rows) && rows.length > 0) {
-            integrationRow = rows[0];
-          }
-        }
-        if (!integrationRow) {
-          const rows = await executeQuery(
-            `SELECT * FROM admin_integrations WHERE admin_id = ? AND provider = 'ghl' AND is_active = 1 ORDER BY id DESC LIMIT 1`,
-            [clientRow.user_id]
-          );
-          if (Array.isArray(rows) && rows.length > 0) {
-            integrationRow = rows[0];
-          }
-        }
-        if (integrationRow?.access_token) {
-          const integrationId = integrationRow.id;
-          const adminId = integrationRow.admin_id || clientRow.user_id;
-          const payload = {
-            integration: {
-              accessToken: integrationRow.access_token,
-              locationId: integrationRow.location_id || null,
-              businessRecordId: integrationRow.business_record_id || null,
-              outboundUrl: integrationRow.outbound_url || null,
-              customFieldCreditScore: integrationRow.custom_field_credit_score || null,
-              customFieldExperianScore: integrationRow.custom_field_experian_score || null,
-              customFieldEquifaxScore: integrationRow.custom_field_equifax_score || null,
-              customFieldTransunionScore: integrationRow.custom_field_transunion_score || null,
-              customFieldReportDate: integrationRow.custom_field_report_date || null
-            },
-            email: clientRow?.email || null,
-            phone: clientRow?.phone || null,
-            firstName: clientRow?.first_name || null,
-            lastName: clientRow?.last_name || null,
-            scores: {
-              creditScore: data.credit_score ?? null,
-              experianScore: data.experian_score ?? null,
-              equifaxScore: data.equifax_score ?? null,
-              transunionScore: data.transunion_score ?? null
-            },
-            reportDate: data.report_date ? new Date(data.report_date).toISOString().split('T')[0] : null
-          };
-          void syncGhlCreditScoresWithRetry({
-            payload,
-            integrationId,
-            adminId,
-            clientId: clientRow?.id || null
-          }).catch(() => {});
-        }
+        syncGhlAdminLifecycleTagsInBackground(Number(clientRow.user_id));
+        syncAdminClientToGhlInBackground(
+          Number(clientRow.user_id),
+          Number(clientRow.id),
+          'report_pulled'
+        );
       }
     } catch (ghlError) {
       console.error('GHL sync failed:', ghlError);
+    }
+    const numericClientId = Number(data.client_id);
+    if ((data.status || 'completed') === 'completed' && Number.isFinite(numericClientId) && numericClientId > 0) {
+      import('../services/reportPullEmailService.js')
+        .then(({ sendClientReportPulledNotificationInBackground }) => {
+          sendClientReportPulledNotificationInBackground(numericClientId);
+        })
+        .catch((notificationError) => {
+          console.error('Unable to start client report-pulled notification:', notificationError?.message || notificationError);
+        });
     }
     return result;
   } catch (error) {
     console.error('Failed to save credit report history:', error);
     throw error;
   }
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function logIntegrationActivity({ integrationId, adminId, clientId, status, message }) {
-  try {
-    await executeQuery(
-      `INSERT INTO integration_activity_logs (integration_id, admin_id, direction, event_type, status, message, client_id, created_at)
-       VALUES (?, ?, 'outbound', 'score_synced', ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [integrationId, adminId, status, message || null, clientId || null]
-    );
-  } catch {}
-}
-
-async function syncGhlCreditScoresWithRetry({ payload, integrationId, adminId, clientId }) {
-  const backoffDelays = [5000, 30000, 120000];
-  let lastError = null;
-  for (let attempt = 0; attempt < backoffDelays.length + 1; attempt += 1) {
-    try {
-      await syncGhlCreditScores(payload);
-      await logIntegrationActivity({
-        integrationId,
-        adminId,
-        clientId,
-        status: 'success',
-        message: attempt > 0 ? 'Retry succeeded' : 'Report synced to GHL'
-      });
-      return;
-    } catch (error) {
-      lastError = error;
-      if (attempt < backoffDelays.length) {
-        await sleep(backoffDelays[attempt]);
-      }
-    }
-  }
-  await logIntegrationActivity({
-    integrationId,
-    adminId,
-    clientId,
-    status: 'failed',
-    message: lastError?.message || 'GHL sync failed'
-  });
 }
 
 /**

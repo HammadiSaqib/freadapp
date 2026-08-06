@@ -15,6 +15,7 @@ import { useNavigate, useParams, useSearchParams, useLocation } from "react-rout
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import { creditReportScraperApi } from "@/lib/api";
+import { getBankruptcyBureaus } from "@/utils/fundingBankruptcyEligibility";
 import { FileText, Building2, User, ArrowLeft, CreditCard, Shield, DollarSign, CheckCircle, AlertCircle, Clock, Info, Bot, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -269,6 +270,7 @@ export default function FundingDIY() {
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [reportState, setReportState] = useState<string | null>(null);
   const [latestReportData, setLatestReportData] = useState<any>(null);
+  const bankruptcyBureaus = useMemo(() => getBankruptcyBureaus(latestReportData), [latestReportData]);
   const [strategyMode, setStrategyMode] = useState<StrategyMode>("hybrid");
   const [aiStrategy, setAiStrategy] = useState<FundingStrategyResult | null>(null);
   const [aiStrategyLoading, setAiStrategyLoading] = useState<boolean>(false);
@@ -379,6 +381,7 @@ export default function FundingDIY() {
     return null;
   };
   const cardHasBureau = (card: FundingCard, bureau: 'Experian' | 'Equifax' | 'TransUnion') => {
+    if (bankruptcyBureaus.has(bureau)) return false;
     const raw: any = (card as any).credit_bureaus;
     const arrA = Array.isArray(raw)
       ? raw
@@ -478,12 +481,12 @@ export default function FundingDIY() {
       const exFlag = normalize((clientDetails as any)?.fundable_in_ex);
       const eqFlag = normalize((clientDetails as any)?.fundable_in_eq);
       const tuFlag = normalize((clientDetails as any)?.fundable_in_tu);
-      if (exFlag) out.push("Experian");
-      if (eqFlag) out.push("Equifax");
-      if (tuFlag) out.push("TransUnion");
+      if (exFlag && !bankruptcyBureaus.has("Experian")) out.push("Experian");
+      if (eqFlag && !bankruptcyBureaus.has("Equifax")) out.push("Equifax");
+      if (tuFlag && !bankruptcyBureaus.has("TransUnion")) out.push("TransUnion");
     } catch {}
     return out;
-  }, [clientDetails]);
+  }, [bankruptcyBureaus, clientDetails]);
 
   const clientFundableFlags = useMemo(() => ({
     Experian: fundableBureaus.includes("Experian"),

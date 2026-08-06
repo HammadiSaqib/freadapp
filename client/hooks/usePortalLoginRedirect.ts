@@ -3,10 +3,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "@/lib/api";
 import { clearStoredAuth } from "@/lib/authStorage";
 import { resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
+import { getPortalNavigationTarget, type PortalAlias } from "@/lib/hostRouting";
 
 interface UsePortalLoginRedirectOptions {
   allowedRoles: string[];
   redirectPath?: string;
+  portalAlias?: PortalAlias;
 }
 
 function getSafeRedirectPath(search: string, fallbackPath: string) {
@@ -22,6 +24,7 @@ function getSafeRedirectPath(search: string, fallbackPath: string) {
 export function usePortalLoginRedirect({
   allowedRoles,
   redirectPath = "/dashboard",
+  portalAlias,
 }: UsePortalLoginRedirectOptions) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -66,7 +69,9 @@ export function usePortalLoginRedirect({
           profile = user;
         }
 
-        const target = resolveAdminPortalTarget(resolvedRedirectPath, profile);
+        const target = portalAlias
+          ? getPortalNavigationTarget(portalAlias, resolvedRedirectPath)
+          : resolveAdminPortalTarget(resolvedRedirectPath, profile);
         if (target.external) {
           window.location.href = target.target;
           return;
@@ -85,5 +90,5 @@ export function usePortalLoginRedirect({
     return () => {
       cancelled = true;
     };
-  }, [allowedRoleKey, navigate, resolvedRedirectPath]);
+  }, [allowedRoleKey, navigate, portalAlias, resolvedRedirectPath]);
 }

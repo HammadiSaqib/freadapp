@@ -25,6 +25,7 @@ import PrintingTeamProtectedRoute from "./components/PrintingTeamProtectedRoute"
 import ClientProtectedRoute from "./components/ClientProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import ReportPullFeedbackHost from "./components/ReportPullFeedbackHost";
+import KycRequiredGate from "./components/KycRequiredGate";
 import ReactGA from "react-ga4";
 import LoadingScreen from "./components/LoadingScreen";
 import { useScoreMachineEliteStatus } from "./hooks/useScoreMachineEliteStatus";
@@ -73,6 +74,8 @@ const BillingCancel = React.lazy(() => import("./pages/BillingCancel"));
 const SuperAdmin = React.lazy(() => import("./pages/SuperAdmin"));
 const SuperAdminOverview = React.lazy(() => import("./pages/super-admin/SuperAdminOverview"));
 const SuperAdminPlans = React.lazy(() => import("./pages/super-admin/SuperAdminPlans"));
+const SuperAdminAiPlansCredits = React.lazy(() => import("./pages/super-admin/SuperAdminAiPlansCredits"));
+const SuperAdminKycVerification = React.lazy(() => import("./pages/super-admin/SuperAdminKycVerification"));
 const SuperAdminAdmins = React.lazy(() => import("./pages/super-admin/SuperAdminAdmins"));
 const AdminDetails = React.lazy(() => import("./pages/super-admin/AdminDetails"));
 const BlogIndex = React.lazy(() => import("./pages/Blog/BlogIndex"));
@@ -87,6 +90,7 @@ const SuperAdminClientTransactions = React.lazy(() => import("./pages/super-admi
 const SuperAdminReports = React.lazy(() => import("./pages/super-admin/SuperAdminReports"));
 const SuperAdminContracts = React.lazy(() => import("./pages/super-admin/SuperAdminContracts"));
 const SuperAdminSupportUsers = React.lazy(() => import("./pages/super-admin/SuperAdminSupportUsers"));
+const SuperAdminEmployeeProgress = React.lazy(() => import("./pages/super-admin/SuperAdminEmployeeProgress"));
 const SuperAdminSchoolManagement = React.lazy(() => import("./pages/super-admin/SuperAdminSchoolManagement"));
 const SuperAdminBusinessDirectory = React.lazy(() => import("./pages/super-admin/SuperAdminBusinessDirectory"));
 const SuperAdminAdminImport = React.lazy(() => import("./pages/super-admin/SuperAdminAdminImport"));
@@ -96,12 +100,12 @@ const SuperAdminCreditReportUpload = React.lazy(() => import("./pages/super-admi
 const ShopManagement = React.lazy(() => import("./pages/super-admin/ShopManagement"));
 const SuperAdminAffiliateTrialPlans = React.lazy(() => import("./pages/super-admin/SuperAdminAffiliateTrialPlans"));
 const SuperAdminLetterTemplates = React.lazy(() => import("./pages/super-admin/SuperAdminLetterTemplates"));
-const SuperAdminAppointments = React.lazy(() => import("./pages/super-admin/SuperAdminAppointments"));
 const Login = React.lazy(() => import("./pages/Login"));
 const Register = React.lazy(() => import("./pages/Register"));
 const SuperAdminLogin = React.lazy(() => import("./pages/SuperAdminLogin"));
 const SupportLogin = React.lazy(() => import("./pages/SupportLogin"));
 const SupportDashboard = React.lazy(() => import("./pages/SupportDashboard"));
+const SupportMyProgress = React.lazy(() => import("./pages/SupportMyProgress"));
 const SupportTasks = React.lazy(() => import("./pages/SupportTasks"));
 const SupportAffiliateCsvImport = React.lazy(() => import("./pages/SupportAffiliateCsvImport"));
 const SupportTickets = React.lazy(() => import("./pages/SupportTickets"));
@@ -137,8 +141,8 @@ const Refund = React.lazy(() => import("./pages/Refund"));
 const Docs = React.lazy(() => import("./pages/Docs"));
 const Sitemap = React.lazy(() => import("./pages/Sitemap"));
 const Contact = React.lazy(() => import("./pages/Contact"));
-const BookAppointment = React.lazy(() => import("./pages/BookAppointment"));
 const HowItWorks = React.lazy(() => import("./pages/HowItWorks"));
+const BookAppointment = React.lazy(() => import("./pages/BookAppointment"));
 const FundingCalculator = React.lazy(() => import("./pages/FundingCalculator"));
 const MortgageCalculator = React.lazy(() => import("./pages/MortgageCalculator"));
 const CarLoanCalculator = React.lazy(() => import("./pages/CarLoanCalculator"));
@@ -370,6 +374,22 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
           ),
         },
         {
+          path: "/ai-plans-credits",
+          element: (
+            <SuperAdminProtectedRoute>
+              <SuperAdminAiPlansCredits />
+            </SuperAdminProtectedRoute>
+          ),
+        },
+        {
+          path: "/kyc-verification",
+          element: (
+            <SuperAdminProtectedRoute>
+              <SuperAdminKycVerification />
+            </SuperAdminProtectedRoute>
+          ),
+        },
+        {
           path: "/admins",
           element: (
             <SuperAdminProtectedRoute>
@@ -491,6 +511,14 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
           ),
         },
         {
+          path: "/employee-progress",
+          element: (
+            <SuperAdminProtectedRoute>
+              <SuperAdminEmployeeProgress />
+            </SuperAdminProtectedRoute>
+          ),
+        },
+        {
           path: "/school-management",
           element: (
             <SuperAdminProtectedRoute>
@@ -572,6 +600,14 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
           element: (
             <SupportProtectedRoute>
               <SupportDashboard />
+            </SupportProtectedRoute>
+          ),
+        },
+        {
+          path: "/my-progress",
+          element: (
+            <SupportProtectedRoute>
+              <SupportMyProgress />
             </SupportProtectedRoute>
           ),
         },
@@ -1144,13 +1180,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
                 <Toaster />
                 <Sonner />
                 <ReportPullFeedbackHost />
+                <KycRequiredGate />
                 <Router {...(routerProps ?? {})}>
                 <Helmet>
                   <script type="application/ld+json">
                     {JSON.stringify({
                       "@context": "https://schema.org",
                       "@type": "SoftwareApplication",
-                      name: "The Capsol",
+                      name: "Score Machine",
                       operatingSystem: "Web-based",
                       applicationCategory: "FinanceApplication",
                       description:
@@ -1188,7 +1225,6 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
           <Route path="/shop/embed" element={<Shop embed />} />
           <Route path="/shop/success" element={<ShopSuccess />} />
           <Route path="/features" element={<Features />} />
-          <Route path="/book-appointment" element={<BookAppointment />} />
           <Route path="/blog" element={<BlogIndex />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
@@ -1474,18 +1510,26 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             }
           />
           <Route
-            path="/super-admin/appointments"
-            element={
-              <SuperAdminProtectedRoute>
-                <SuperAdminAppointments />
-              </SuperAdminProtectedRoute>
-            }
-          />
-          <Route
             path="/super-admin/plans"
             element={
               <SuperAdminProtectedRoute>
                 <SuperAdminPlans />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/ai-plans-credits"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminAiPlansCredits />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/kyc-verification"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminKycVerification />
               </SuperAdminProtectedRoute>
             }
           />
@@ -1662,6 +1706,22 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             element={
               <SupportProtectedRoute>
                 <SupportDashboard />
+              </SupportProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/employee-progress"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminEmployeeProgress />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/support/my-progress"
+            element={
+              <SupportProtectedRoute>
+                <SupportMyProgress />
               </SupportProtectedRoute>
             }
           />
@@ -2001,6 +2061,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
           <Route path="/join-affiliate" element={<JoinAffiliate />} />
           <Route path="/join-affiliate/embed" element={<JoinAffiliate embed />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/book-appointment" element={<BookAppointment />} />
           <Route path="/contact/embed" element={<Contact embed />} />
           <Route path="/ref/:affiliateId" element={<ReferralLandingPage />} />
           <Route path="/:publicId" element={<DynamicPublicHostRoute />} />

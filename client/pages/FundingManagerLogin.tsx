@@ -42,7 +42,7 @@ export default function FundingManagerLogin() {
   const { toast } = useToast();
   const { refreshProfile } = useAuthContext();
 
-  usePortalLoginRedirect({ allowedRoles: ["funding_manager"] });
+  usePortalLoginRedirect({ allowedRoles: ["funding_manager"], portalAlias: "funding-manager" });
 
   const [loginData, setLoginData] = useState({
     email: "",

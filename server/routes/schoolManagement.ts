@@ -6,12 +6,91 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
-import { listBusinessDirectories } from '../utils/businessDirectories.js';
+import { emailService } from '../services/emailService.js';
+import {
+  ensureBusinessDirectoriesTable,
+  getBusinessDirectoryById,
+  listBusinessDirectories,
+} from '../utils/businessDirectories.js';
 
 const router = Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function notifyAdminsAboutCourseVideoUpload(db: any, video: any): Promise<void> {
+  try {
+    const dbType = db.getType ? db.getType() : 'sqlite';
+    const adminQuery = dbType === 'mysql'
+      ? `SELECT email, first_name, last_name
+         FROM users
+         WHERE role = 'admin'
+           AND email IS NOT NULL
+           AND email != ''
+           AND (status = 'active' OR is_active = 1)`
+      : `SELECT email, first_name, last_name
+         FROM users
+         WHERE role = 'admin'
+           AND email IS NOT NULL
+           AND email != ''
+           AND (is_active = 1 OR is_active IS NULL)`;
+
+    const admins = await db.allQuery(adminQuery, []);
+    if (!admins.length) return;
+
+    const course = await db.getQuery('SELECT title FROM courses WHERE id = ?', [video.course_id]);
+    const uploaderName = [video.uploaded_by_first_name, video.uploaded_by_last_name]
+      .filter(Boolean)
+      .join(' ')
+      .trim() || 'Super Admin';
+    const courseTitle = course?.title || 'Unknown Course';
+    const videoTitle = video.title || 'Untitled Video';
+    const videoUrl = video.video_url || '';
+
+    const subject = `New course video uploaded: ${videoTitle}`;
+    const text = [
+      'A new course video has been uploaded to Score Machine.',
+      '',
+      `Video: ${videoTitle}`,
+      `Course: ${courseTitle}`,
+      `Uploaded by: ${uploaderName}`,
+      videoUrl ? `Video URL: ${videoUrl}` : '',
+    ].filter(Boolean).join('\n');
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.5;">
+        <h2 style="margin: 0 0 12px;">New course video uploaded</h2>
+        <p>A new course video has been uploaded to Score Machine.</p>
+        <p><strong>Video:</strong> ${escapeHtml(videoTitle)}</p>
+        <p><strong>Course:</strong> ${escapeHtml(courseTitle)}</p>
+        <p><strong>Uploaded by:</strong> ${escapeHtml(uploaderName)}</p>
+        ${videoUrl ? `<p><strong>Video URL:</strong> ${escapeHtml(videoUrl)}</p>` : ''}
+      </div>
+    `;
+
+    const results = await Promise.allSettled(
+      admins.map((admin: any) => emailService.sendEmail({
+        to: admin.email,
+        subject,
+        html,
+        text,
+      }))
+    );
+    const failedCount = results.filter((result) => result.status === 'rejected' || result.value === false).length;
+    if (failedCount > 0) {
+      console.error(`Failed to send course video upload notification to ${failedCount} admin(s)`);
+    }
+  } catch (error) {
+    console.error('Error notifying admins about course video upload:', error);
+  }
+}
 
 // ============================================================================
 // VALIDATION SCHEMAS
@@ -140,6 +219,14 @@ const getCourseQuerySchema = z.object({
   sort_order: z.enum(['asc', 'desc']).default('desc')
 });
 
+const businessDirectoryApplicationSchema = z.object({
+  business_name: z.string().trim().min(1).max(255),
+  business_email: z.string().trim().email().max(255),
+  business_phone_number: z.string().trim().min(1).max(50),
+  business_address: z.string().trim().min(1).max(1000),
+  description: z.string().trim().max(5000).optional().default(''),
+});
+
 // ============================================================================
 // FILE UPLOAD CONFIGURATION
 // ============================================================================
@@ -200,6 +287,39 @@ const upload = multer({
   }
 });
 
+const businessDirectoryApplicationStorage = multer.diskStorage({
+  destination: async (_req, _file, cb) => {
+    const uploadDir = path.join(process.cwd(), 'uploads', 'business-directories');
+
+    if (!existsSync(uploadDir)) {
+      await fs.mkdir(uploadDir, { recursive: true });
+    }
+
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, `business-directory-application-${uniqueSuffix}${ext}`);
+  },
+});
+
+const businessDirectoryApplicationUpload = multer({
+  storage: businessDirectoryApplicationStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+
+    cb(new Error('Invalid logo file type'));
+  },
+});
+
 // ============================================================================
 // ROUTE MAPPINGS
 // ============================================================================
@@ -256,6 +376,8 @@ router.get('/courses/:courseId/analytics', getCourseAnalytics);
 // Leaderboard route
 router.get('/leaderboard', getSchoolLeaderboard);
 router.get('/business-directories', getBusinessDirectories);
+router.get('/business-directories/my-applications', getMyBusinessDirectoryApplications);
+router.post('/business-directories/applications', businessDirectoryApplicationUpload.single('logo'), submitBusinessDirectoryApplication);
 
 // Bulk operations
 router.put('/courses/bulk', bulkUpdateCourses);
@@ -393,11 +515,78 @@ export async function getCourses(req: Request, res: Response) {
 export async function getBusinessDirectories(_req: Request, res: Response) {
   try {
     const db = getDatabaseAdapter();
-    const directories = await listBusinessDirectories(db);
+    const directories = await listBusinessDirectories(db, { statuses: ['approved'] });
     res.json({ success: true, directories });
   } catch (error) {
     console.error('Error fetching school business directories:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch business directories' });
+  }
+}
+
+export async function getMyBusinessDirectoryApplications(req: Request, res: Response) {
+  try {
+    const userId = Number((req as any).user?.id || 0);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    const db = getDatabaseAdapter();
+    const directories = await listBusinessDirectories(db, { createdBy: userId });
+    res.json({ success: true, directories });
+  } catch (error) {
+    console.error('Error fetching directory applications:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch directory applications' });
+  }
+}
+
+export async function submitBusinessDirectoryApplication(req: Request, res: Response) {
+  try {
+    const userId = Number((req as any).user?.id || 0);
+    const userRole = String((req as any).user?.role || '').toLowerCase();
+
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+
+    if (userRole !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only admins can submit business directory applications' });
+    }
+
+    const parsed = businessDirectoryApplicationSchema.parse(req.body);
+    const logoUrl = (req as any).file ? `/uploads/business-directories/${(req as any).file.filename}` : null;
+    const db = getDatabaseAdapter();
+
+    await ensureBusinessDirectoriesTable(db);
+
+    const insertResult = await db.executeQuery(
+      `INSERT INTO business_directories
+       (business_name, business_email, business_phone_number, business_address, description, logo_url, status, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      [
+        parsed.business_name,
+        parsed.business_email,
+        parsed.business_phone_number,
+        parsed.business_address,
+        parsed.description,
+        logoUrl,
+        userId,
+        userId,
+      ],
+    );
+
+    const insertedId = Number((insertResult as any)?.insertId ?? (insertResult as any)?.lastID ?? 0);
+    const createdDirectory = insertedId
+      ? await getBusinessDirectoryById(db, insertedId)
+      : null;
+
+    res.status(201).json({ success: true, directory: createdDirectory });
+  } catch (error: any) {
+    if (error?.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: 'Invalid business directory payload' });
+    }
+
+    console.error('Error submitting business directory application:', error);
+    res.status(500).json({ success: false, error: 'Failed to submit directory application' });
   }
 }
 
@@ -1504,6 +1693,12 @@ export async function uploadCourseVideo(req: Request, res: Response) {
       'SELECT * FROM course_videos WHERE id = ?',
       [result.insertId]
     );
+
+    await notifyAdminsAboutCourseVideoUpload(db, {
+      ...createdVideo,
+      uploaded_by_first_name: (req as any).user?.first_name,
+      uploaded_by_last_name: (req as any).user?.last_name,
+    });
 
     res.status(201).json({
       success: true,

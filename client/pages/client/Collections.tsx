@@ -13623,7 +13623,7 @@ const CREDIT_REPAIR_URL = (userProfile?.credit_repair_url?.trim())
                   What Is in My Credit Report?
                 </h3>
                 <p className="text-gray-700 mb-6">
-                  A credit report is a detailed document that outlines your
+                  aaaaA credit report is a detailed document that outlines your
                   credit history, compiled by credit bureaus. It is used by
                   lenders, landlords, and even some employers to gauge your
                   reliability as a financial borrower.

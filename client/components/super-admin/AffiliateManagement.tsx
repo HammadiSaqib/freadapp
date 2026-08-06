@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -70,6 +70,7 @@ import { format } from 'date-fns';
 interface Affiliate {
   id: number;
   admin_id: number;
+  parent_affiliate_id?: number | null;
   email: string;
   first_name: string;
   last_name: string;
@@ -82,6 +83,7 @@ interface Affiliate {
   logo_url?: string;
   commission_rate: number;
   total_earnings: number;
+  paid_referrals_count?: number;
   total_referrals: number;
   status: 'active' | 'inactive' | 'pending' | 'suspended';
   email_verified: boolean;
@@ -90,6 +92,11 @@ interface Affiliate {
   updated_at: string;
   referral_slug?: string;
   elite_landing_page?: 'allow' | 'deny';
+  parent_info?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  } | null;
   // Bank Details
   bank_name?: string;
   account_holder_name?: string;
@@ -102,6 +109,14 @@ interface Affiliate {
   payment_method?: 'bank_transfer' | 'paypal' | 'stripe' | 'check';
   paypal_email?: string;
   stripe_account_id?: string;
+}
+
+interface AffiliateReferrerOption {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  email?: string | null;
+  status?: string;
 }
 
 interface AffiliateStats {
@@ -183,6 +198,13 @@ type AffiliateFormState = {
   stripe_account_id: string;
 };
 
+type AffiliateSortOption =
+  | 'most_referrals'
+  | 'newest'
+  | 'oldest'
+  | 'most_paid_referrals'
+  | 'most_unpaid_referrals';
+
 const createDefaultAffiliateForm = (): AffiliateFormState => ({
   email: '',
   first_name: '',
@@ -222,6 +244,7 @@ const AffiliateManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<AffiliateSortOption>('most_referrals');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedAffiliate, setSelectedAffiliate] = useState<Affiliate | null>(null);
@@ -257,6 +280,10 @@ const AffiliateManagement: React.FC = () => {
 
   // Form state for creating/editing affiliates
   const [affiliateForm, setAffiliateForm] = useState<AffiliateFormState>(createDefaultAffiliateForm);
+  const [isReferralDialogOpen, setIsReferralDialogOpen] = useState(false);
+  const [referralAffiliate, setReferralAffiliate] = useState<Affiliate | null>(null);
+  const [affiliateSearchTerm, setAffiliateSearchTerm] = useState('');
+  const [savingAffiliateId, setSavingAffiliateId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchAffiliates();
@@ -322,8 +349,37 @@ const AffiliateManagement: React.FC = () => {
 
   const fetchCommissions = async () => {
     try {
-      const response = await superAdminApi.getCommissionHistory();
-      setCommissions(response.data || []);
+      const batchSize = 500;
+      const maxBatches = 50;
+      let offset = 0;
+      const allCommissions: AffiliateCommission[] = [];
+
+      for (let batchIndex = 0; batchIndex < maxBatches; batchIndex += 1) {
+        const response = await superAdminApi.getCommissionHistory({
+          limit: batchSize,
+          offset,
+        });
+
+        const batchRows = Array.isArray(response.data?.data)
+          ? response.data.data
+          : Array.isArray(response.data)
+            ? response.data
+            : [];
+
+        if (batchRows.length === 0) {
+          break;
+        }
+
+        allCommissions.push(...batchRows);
+
+        if (batchRows.length < batchSize) {
+          break;
+        }
+
+        offset += batchSize;
+      }
+
+      setCommissions(allCommissions);
     } catch (error) {
       console.error('Error fetching commissions:', error);
       setCommissions([]);
@@ -376,6 +432,72 @@ const AffiliateManagement: React.FC = () => {
         {renderLastMonthPaymentBadge(affiliateId)}
       </div>
     );
+  };
+
+  const getUnpaidReferralsCount = (affiliate: Affiliate) => {
+    const totalReferrals = Number(affiliate.total_referrals || 0);
+    const paidReferrals = Number(affiliate.paid_referrals_count || 0);
+    return Math.max(totalReferrals - paidReferrals, 0);
+  };
+
+  const getCreatedAtTimestamp = (affiliate: Affiliate) => {
+    const createdAtTimestamp = new Date(affiliate.created_at).getTime();
+    return Number.isNaN(createdAtTimestamp) ? 0 : createdAtTimestamp;
+  };
+
+  const monthlyEarningsByAffiliate = useMemo(() => {
+    const monthlyEarnings = new Map<number, number>();
+
+    if (!Array.isArray(commissions) || commissions.length === 0) {
+      return monthlyEarnings;
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    commissions.forEach((commission) => {
+      const affiliateId = Number(commission.affiliate_id);
+      if (!Number.isFinite(affiliateId)) {
+        return;
+      }
+
+      if (String(commission.status || '').toLowerCase() === 'rejected') {
+        return;
+      }
+
+      const commissionDate = new Date(commission.order_date);
+      if (Number.isNaN(commissionDate.getTime())) {
+        return;
+      }
+
+      if (commissionDate.getMonth() !== currentMonth || commissionDate.getFullYear() !== currentYear) {
+        return;
+      }
+
+      const commissionAmount = Number(commission.commission_amount || 0);
+      if (!Number.isFinite(commissionAmount) || commissionAmount <= 0) {
+        return;
+      }
+
+      monthlyEarnings.set(affiliateId, (monthlyEarnings.get(affiliateId) || 0) + commissionAmount);
+    });
+
+    return monthlyEarnings;
+  }, [commissions]);
+
+  const getCurrentMonthEarnings = (affiliateId: number) => {
+    return Number(monthlyEarningsByAffiliate.get(affiliateId) || 0);
+  };
+
+  const getDisplayEarningsValue = (affiliate: Affiliate) => {
+    const totalEarnings = Number(affiliate.total_earnings || 0);
+    if (totalEarnings >= 0) {
+      return totalEarnings;
+    }
+
+    const monthlyEarnings = getCurrentMonthEarnings(affiliate.id);
+    return monthlyEarnings > 0 ? monthlyEarnings : 0;
   };
 
   const handleCreateAffiliate = async () => {
@@ -557,11 +679,113 @@ const AffiliateManagement: React.FC = () => {
     }
   };
 
+  const openReferralDialog = (affiliate: Affiliate) => {
+    setReferralAffiliate(affiliate);
+    setAffiliateSearchTerm('');
+    setIsReferralDialogOpen(true);
+  };
+
+  const closeReferralDialog = (open: boolean) => {
+    setIsReferralDialogOpen(open);
+    if (!open) {
+      setReferralAffiliate(null);
+      setAffiliateSearchTerm('');
+      setSavingAffiliateId(null);
+    }
+  };
+
+  const handleAssignAffiliateReferrer = async (parentAffiliate: AffiliateReferrerOption) => {
+    if (!referralAffiliate) {
+      return;
+    }
+
+    setSavingAffiliateId(parentAffiliate.id);
+    try {
+      const response = await superAdminApi.updateAffiliateReferrer(referralAffiliate.id, {
+        parentAffiliateId: parentAffiliate.id,
+      });
+      const updatedParentInfo = response.data?.data?.parent_info || {
+        first_name: parentAffiliate.first_name || '',
+        last_name: parentAffiliate.last_name || '',
+        email: parentAffiliate.email || null,
+      };
+      const updatedParentLabel = getAffiliateDisplayName(updatedParentInfo) || 'the selected affiliate';
+
+      setAffiliates((prev) => prev.map((affiliate) => (
+        affiliate.id === referralAffiliate.id
+          ? {
+              ...affiliate,
+              parent_affiliate_id: parentAffiliate.id,
+              parent_info: {
+                first_name: updatedParentInfo.first_name || '',
+                last_name: updatedParentInfo.last_name || '',
+                email: updatedParentInfo.email || null,
+              },
+            }
+          : affiliate
+      )));
+
+      toast({
+        title: 'Success',
+        description: `${referralAffiliate.first_name} ${referralAffiliate.last_name} is now referred by ${updatedParentLabel}`
+      });
+      closeReferralDialog(false);
+    } catch (error: any) {
+      console.error('Error updating affiliate referrer:', error);
+      toast({
+        title: 'Error',
+        description: error?.response?.data?.error || 'Failed to update affiliate referrer',
+        variant: 'destructive'
+      });
+    } finally {
+      setSavingAffiliateId(null);
+    }
+  };
+
+  const handleClearAffiliateReferrer = async () => {
+    if (!referralAffiliate?.parent_affiliate_id) {
+      return;
+    }
+
+    const currentAffiliateId = referralAffiliate.parent_affiliate_id;
+    const currentReferrerLabel = getAffiliateReferrerLabel(referralAffiliate) || 'the current affiliate';
+
+    setSavingAffiliateId(currentAffiliateId);
+    try {
+      await superAdminApi.clearAffiliateReferrer(referralAffiliate.id);
+
+      setAffiliates((prev) => prev.map((affiliate) => (
+        affiliate.id === referralAffiliate.id
+          ? {
+              ...affiliate,
+              parent_affiliate_id: null,
+              parent_info: null,
+            }
+          : affiliate
+      )));
+
+      toast({
+        title: 'Success',
+        description: `${referralAffiliate.first_name} ${referralAffiliate.last_name} is no longer referred by ${currentReferrerLabel}`
+      });
+      closeReferralDialog(false);
+    } catch (error: any) {
+      console.error('Error clearing affiliate referrer:', error);
+      toast({
+        title: 'Error',
+        description: error?.response?.data?.error || 'Failed to remove affiliate referrer',
+        variant: 'destructive'
+      });
+    } finally {
+      setSavingAffiliateId(null);
+    }
+  };
+
   const handlePayNow = (affiliate: Affiliate) => {
     setSelectedAffiliateForPayment(affiliate);
     setPaymentForm({
       affiliate_id: affiliate.id,
-      amount: Number(affiliate.total_earnings || 0),
+      amount: getDisplayEarningsValue(affiliate),
       transaction_id: '',
       payment_method: 'bank_transfer',
       notes: '',
@@ -715,6 +939,154 @@ const AffiliateManagement: React.FC = () => {
     return matchesSearch && matchesStatus;
   }) : [];
 
+  const sortedAffiliates = [...filteredAffiliates].sort((a, b) => {
+    const aCreatedAt = getCreatedAtTimestamp(a);
+    const bCreatedAt = getCreatedAtTimestamp(b);
+
+    const aTotalReferrals = Number(a.total_referrals || 0);
+    const bTotalReferrals = Number(b.total_referrals || 0);
+    const aPaidReferrals = Number(a.paid_referrals_count || 0);
+    const bPaidReferrals = Number(b.paid_referrals_count || 0);
+    const aUnpaidReferrals = getUnpaidReferralsCount(a);
+    const bUnpaidReferrals = getUnpaidReferralsCount(b);
+
+    if (sortBy === 'newest') {
+      return bCreatedAt - aCreatedAt;
+    }
+
+    if (sortBy === 'oldest') {
+      return aCreatedAt - bCreatedAt;
+    }
+
+    if (sortBy === 'most_paid_referrals') {
+      if (bPaidReferrals !== aPaidReferrals) {
+        return bPaidReferrals - aPaidReferrals;
+      }
+
+      if (bTotalReferrals !== aTotalReferrals) {
+        return bTotalReferrals - aTotalReferrals;
+      }
+
+      return bCreatedAt - aCreatedAt;
+    }
+
+    if (sortBy === 'most_unpaid_referrals') {
+      if (bUnpaidReferrals !== aUnpaidReferrals) {
+        return bUnpaidReferrals - aUnpaidReferrals;
+      }
+
+      if (bTotalReferrals !== aTotalReferrals) {
+        return bTotalReferrals - aTotalReferrals;
+      }
+
+      return bCreatedAt - aCreatedAt;
+    }
+
+    if (bTotalReferrals !== aTotalReferrals) {
+      return bTotalReferrals - aTotalReferrals;
+    }
+
+    return bCreatedAt - aCreatedAt;
+  });
+
+  const getAffiliateDisplayName = (affiliate: { first_name?: string; last_name?: string; email?: string | null }) => {
+    const fullName = [affiliate.first_name, affiliate.last_name].filter(Boolean).join(' ').trim();
+    return fullName || affiliate.email || '';
+  };
+
+  const getAffiliateReferrerLabel = (affiliate: Pick<Affiliate, 'parent_info'>) => {
+    if (!affiliate.parent_info) {
+      return null;
+    }
+
+    const parentName = getAffiliateDisplayName({
+      first_name: affiliate.parent_info.first_name || '',
+      last_name: affiliate.parent_info.last_name || '',
+      email: affiliate.parent_info.email || null,
+    });
+
+    return parentName || null;
+  };
+
+  const getAffiliateJoinedOnText = (affiliate: Affiliate) => {
+    return `Join On ${format(new Date(affiliate.created_at), 'MMM dd, yyyy')}`;
+  };
+
+  const currentReferralOption = referralAffiliate?.parent_affiliate_id
+    ? {
+        id: referralAffiliate.parent_affiliate_id,
+        first_name: referralAffiliate.parent_info?.first_name || '',
+        last_name: referralAffiliate.parent_info?.last_name || '',
+        email: referralAffiliate.parent_info?.email || '',
+        status: 'current',
+      }
+    : null;
+
+  const affiliateReferrerOptions: AffiliateReferrerOption[] = Array.isArray(affiliates)
+    ? affiliates
+        .filter((affiliate) => String(affiliate.status || '').toLowerCase() === 'active')
+        .map((affiliate) => ({
+          id: affiliate.id,
+          first_name: affiliate.first_name,
+          last_name: affiliate.last_name,
+          email: affiliate.email,
+          status: affiliate.status,
+        }))
+    : [];
+
+  const affiliateOptionsWithCurrent = currentReferralOption && !affiliateReferrerOptions.some((affiliate) => affiliate.id === currentReferralOption.id)
+    ? [currentReferralOption, ...affiliateReferrerOptions]
+    : affiliateReferrerOptions;
+
+  const filteredAffiliateOptions = affiliateOptionsWithCurrent.filter((affiliate) => {
+    if (referralAffiliate && affiliate.id === referralAffiliate.id) {
+      return false;
+    }
+
+    const normalizedSearch = affiliateSearchTerm.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    return [affiliate.first_name, affiliate.last_name, affiliate.email]
+      .filter((value): value is string => typeof value === 'string')
+      .some((value) => value.toLowerCase().includes(normalizedSearch));
+  });
+
+  const recentAffiliates = Array.isArray(affiliates)
+    ? [...affiliates]
+        .filter((affiliate) => affiliate.parent_affiliate_id != null || !!affiliate.parent_info)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 10)
+    : [];
+
+  const topPerformers = Array.isArray(affiliates)
+    ? [...affiliates]
+        .sort((a, b) => {
+          const paidReferralsDifference = (b.paid_referrals_count || 0) - (a.paid_referrals_count || 0);
+          if (paidReferralsDifference !== 0) {
+            return paidReferralsDifference;
+          }
+
+          const totalReferralsDifference = (b.total_referrals || 0) - (a.total_referrals || 0);
+          if (totalReferralsDifference !== 0) {
+            return totalReferralsDifference;
+          }
+
+          return getDisplayEarningsValue(b) - getDisplayEarningsValue(a);
+        })
+        .slice(0, 10)
+    : [];
+
+  const currentMonthEarningsTotal = Array.from(monthlyEarningsByAffiliate.values()).reduce(
+    (sum, value) => sum + value,
+    0,
+  );
+  const shouldUseMonthlyTotalEarnings = Number(stats.totalEarnings || 0) < 0;
+  const totalEarningsDisplay = shouldUseMonthlyTotalEarnings
+    ? currentMonthEarningsTotal
+    : Number(stats.totalEarnings || 0);
+
   return (
     <div className="space-y-6">
       {/* Stats Overview */}
@@ -738,10 +1110,12 @@ const AffiliateManagement: React.FC = () => {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${Number(stats.totalEarnings || 0).toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">
-              +{stats.monthlyGrowth}% from last month
-            </p>
+            <div className="text-2xl font-bold">${Number(totalEarningsDisplay || 0).toFixed(2)}</div>
+            {shouldUseMonthlyTotalEarnings ? (
+              <p className="text-xs text-muted-foreground">Showing current month earnings (total was negative)</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">+{stats.monthlyGrowth}% from last month</p>
+            )}
           </CardContent>
         </Card>
         
@@ -790,8 +1164,11 @@ const AffiliateManagement: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Array.isArray(affiliates) ? affiliates.slice(0, 5).map((affiliate) => (
-                    <div key={affiliate.id} className="flex items-center justify-between">
+                  {recentAffiliates.map((affiliate) => {
+                    const parentAffiliateLabel = getAffiliateReferrerLabel(affiliate);
+
+                    return (
+                    <div key={affiliate.id} className="flex items-start justify-between gap-3">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                           {affiliate.first_name?.charAt(0) || ''}{affiliate.last_name?.charAt(0) || ''}
@@ -801,11 +1178,17 @@ const AffiliateManagement: React.FC = () => {
                             {affiliate.first_name} {affiliate.last_name}
                           </p>
                           <p className="text-xs text-muted-foreground">{affiliate.email}</p>
+                          <p className="text-xs text-muted-foreground">{getAffiliateJoinedOnText(affiliate)}</p>
                         </div>
                       </div>
-                      {getStatusBadge(affiliate.status)}
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        {parentAffiliateLabel && (
+                          <Badge className="bg-blue-100 text-blue-800">Ref By {parentAffiliateLabel}</Badge>
+                        )}
+                        {getStatusBadge(affiliate.status)}
+                      </div>
                     </div>
-                  )) : []}
+                  )})}
                 </div>
               </CardContent>
             </Card>
@@ -817,11 +1200,12 @@ const AffiliateManagement: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Array.isArray(affiliates) ? affiliates
-                    .sort((a, b) => b.total_earnings - a.total_earnings)
-                    .slice(0, 5)
-                    .map((affiliate) => (
-                    <div key={affiliate.id} className="flex items-center justify-between">
+                  {topPerformers.map((affiliate) => {
+                    const parentAffiliateLabel = getAffiliateReferrerLabel(affiliate);
+                    const paidReferrals = affiliate.paid_referrals_count || 0;
+
+                    return (
+                    <div key={affiliate.id} className="flex items-start justify-between gap-3">
                       <div className="flex items-center space-x-3">
                         <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
                           {affiliate.first_name?.charAt(0) || ''}{affiliate.last_name?.charAt(0) || ''}
@@ -831,16 +1215,22 @@ const AffiliateManagement: React.FC = () => {
                             {affiliate.first_name} {affiliate.last_name}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {affiliate.total_referrals} referrals
+                            {paidReferrals} paid referrals{affiliate.total_referrals > paidReferrals ? ` • ${affiliate.total_referrals} total referrals` : ''}
                           </p>
+                          <p className="text-xs text-muted-foreground">{getAffiliateJoinedOnText(affiliate)}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                          <p className="text-sm font-medium">${Number(affiliate.total_earnings || 0).toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">{affiliate.commission_rate}% rate</p>
+                      <div className="flex items-center gap-3">
+                        {parentAffiliateLabel && (
+                          <Badge className="bg-blue-100 text-blue-800">Ref By {parentAffiliateLabel}</Badge>
+                        )}
+                        <div className="text-right">
+                          <p className="text-sm font-medium">${Number(getDisplayEarningsValue(affiliate) || 0).toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">{affiliate.commission_rate}% rate</p>
+                        </div>
                       </div>
                     </div>
-                  )) : []}
+                  )})}
                 </div>
               </CardContent>
             </Card>
@@ -870,6 +1260,18 @@ const AffiliateManagement: React.FC = () => {
                   <SelectItem value="inactive">Inactive</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="suspended">Suspended</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={(value) => setSortBy(value as AffiliateSortOption)}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Sort affiliates" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="most_referrals">More Referrals First</SelectItem>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                  <SelectItem value="most_paid_referrals">Most Paid Referrals</SelectItem>
+                  <SelectItem value="most_unpaid_referrals">Most Unpaid Referrals</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -973,7 +1375,7 @@ const AffiliateManagement: React.FC = () => {
                       <div className="space-y-1">
                         <Label htmlFor="elite_landing_page" className="cursor-pointer">Allow Elite Landing page</Label>
                         <p className="text-sm text-muted-foreground">
-                          When enabled, this affiliate&apos;s referral link can offer both The Capsol Pro and The Capsol Elite landing pages.
+                          When enabled, this affiliate&apos;s referral link can offer both Score Machine Pro and Score Machine Elite landing pages.
                         </p>
                       </div>
                     </div>
@@ -1017,21 +1419,21 @@ const AffiliateManagement: React.FC = () => {
                         Loading affiliates...
                       </TableCell>
                     </TableRow>
-                  ) : filteredAffiliates.length === 0 ? (
+                  ) : sortedAffiliates.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                         No affiliates found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAffiliates.map((affiliate) => (
-                      <TableRow key={affiliate.id}>
+                    sortedAffiliates.map((affiliate) => (
+                      <TableRow key={affiliate.id} className="group hover:bg-gray-50">
                         <TableCell>
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
                               {affiliate.first_name.charAt(0)}{affiliate.last_name.charAt(0)}
                             </div>
-                            <div>
+                            <div className="space-y-1">
                               <p
                                 className="font-medium cursor-pointer text-blue-600 hover:text-blue-800 hover:underline"
                                 onClick={() => openAffiliateProfile(affiliate)}
@@ -1044,6 +1446,31 @@ const AffiliateManagement: React.FC = () => {
                                   {affiliate.company_name}
                                 </p>
                               )}
+                              {(() => {
+                                const referrerLabel = getAffiliateReferrerLabel(affiliate);
+
+                                if (referrerLabel) {
+                                  return (
+                                    <button
+                                      type="button"
+                                      onClick={() => openReferralDialog(affiliate)}
+                                      className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                                    >
+                                      Ref By {referrerLabel}
+                                    </button>
+                                  );
+                                }
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => openReferralDialog(affiliate)}
+                                    className="hidden rounded-full border border-dashed border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-600 transition hover:border-blue-300 hover:bg-blue-50 group-hover:inline-flex"
+                                  >
+                                    Add Ref
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
                         </TableCell>
@@ -1064,7 +1491,7 @@ const AffiliateManagement: React.FC = () => {
                         <TableCell>
                           <div className="space-y-1">
                             <p className="text-sm font-medium">
-                              ${Number(affiliate.total_earnings || 0).toFixed(2)}
+                              ${Number(getDisplayEarningsValue(affiliate) || 0).toFixed(2)}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {affiliate.total_referrals} referrals
@@ -1298,13 +1725,13 @@ const AffiliateManagement: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">${Number(affiliate.total_earnings || 0).toFixed(2)}</p>
+                          <p className="font-medium">${Number(getDisplayEarningsValue(affiliate) || 0).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">{affiliate.commission_rate}% rate</p>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium text-orange-600">${Number(affiliate.total_earnings || 0).toFixed(2)}</p>
+                          <p className="font-medium text-orange-600">${Number(getDisplayEarningsValue(affiliate) || 0).toFixed(2)}</p>
                           <p className="text-xs text-muted-foreground">Unpaid</p>
                         </div>
                       </TableCell>
@@ -1384,6 +1811,82 @@ const AffiliateManagement: React.FC = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isReferralDialogOpen} onOpenChange={closeReferralDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="text-xl">
+              {referralAffiliate
+                ? `Choose Affiliate For ${referralAffiliate.first_name} ${referralAffiliate.last_name}`
+                : 'Choose Affiliate'}
+            </DialogTitle>
+            <DialogDescription>
+              Search affiliates and assign one as the referrer for this affiliate. Click the current referrer to remove it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                value={affiliateSearchTerm}
+                onChange={(e) => setAffiliateSearchTerm(e.target.value)}
+                placeholder="Search affiliates by name or email..."
+                className="pl-10"
+              />
+            </div>
+
+            <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+              {loading ? (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 py-12 text-sm text-gray-500">
+                  Loading affiliates...
+                </div>
+              ) : filteredAffiliateOptions.length === 0 ? (
+                <div className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 py-12 text-sm text-gray-500">
+                  No affiliates found.
+                </div>
+              ) : (
+                filteredAffiliateOptions.map((affiliate) => {
+                  const affiliateName = getAffiliateDisplayName(affiliate);
+                  const isCurrentReferrer = referralAffiliate?.parent_affiliate_id === affiliate.id;
+                  const isSavingThisAffiliate = savingAffiliateId === affiliate.id;
+
+                  return (
+                    <button
+                      key={affiliate.id}
+                      type="button"
+                      onClick={() => isCurrentReferrer ? handleClearAffiliateReferrer() : handleAssignAffiliateReferrer(affiliate)}
+                      disabled={savingAffiliateId !== null}
+                      className={`w-full rounded-xl border p-4 text-left transition ${
+                        isCurrentReferrer
+                          ? 'border-red-300 bg-red-50 hover:border-red-400 hover:bg-red-100'
+                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                      } ${savingAffiliateId !== null ? 'cursor-not-allowed opacity-70' : ''}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="font-medium text-gray-900">{affiliateName}</div>
+                          <div className="text-sm text-gray-500">{affiliate.email}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isCurrentReferrer && (
+                            <Badge variant="secondary" className="bg-red-100 text-red-700">
+                              Current Ref
+                            </Badge>
+                          )}
+                          <span className={`text-sm font-medium ${isCurrentReferrer ? 'text-red-600' : 'text-blue-600'}`}>
+                            {isSavingThisAffiliate ? (isCurrentReferrer ? 'Removing...' : 'Saving...') : isCurrentReferrer ? 'Delete Ref' : 'Choose'}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Affiliate Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

@@ -11,10 +11,10 @@ export default function CreditReadiness() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Credit Readiness Checklist & Insights | The Capsol</title>
+        <title>Credit Readiness Checklist & Insights | Score Machine</title>
         <meta
           name="description"
-          content="Review credit readiness with structured insights. The Capsol helps organize credit data, highlight indicators, and export summaries to support responsible decision making. No outcomes are guaranteed."
+          content="Review credit readiness with structured insights. Score Machine helps organize credit data, highlight indicators, and export summaries to support responsible decision making. No outcomes are guaranteed."
         />
         <link rel="canonical" href="https://scoremachine.com/credit-readiness" />
       </Helmet>
@@ -122,7 +122,7 @@ export default function CreditReadiness() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">What Is Credit Readiness?</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Credit readiness refers to the general preparedness of a credit profile for reviews and responsible decision-making. Professionals typically look at utilization, payment history, age of accounts, credit mix, derogatory marks, and inquiries. The Capsol organizes these items into clear categories and exports concise summaries. Tools are informational and do not guarantee approvals or outcomes.
+              Credit readiness refers to the general preparedness of a credit profile for reviews and responsible decision-making. Professionals typically look at utilization, payment history, age of accounts, credit mix, derogatory marks, and inquiries. Score Machine organizes these items into clear categories and exports concise summaries. Tools are informational and do not guarantee approvals or outcomes.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -152,18 +152,18 @@ export default function CreditReadiness() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto mt-4">
-              Answers to common questions about credit readiness and The Capsol’s Toolkit.
+              Answers to common questions about credit readiness and Score Machine’s Toolkit.
             </p>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Does The Capsol guarantee improvements or approvals?</CardTitle>
+                <CardTitle>Does Score Machine guarantee improvements or approvals?</CardTitle>
                 <CardDescription>No promises or guarantees</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700">
-                  No. The Capsol provides organizational insights and structured analysis of report data. We do not guarantee credit improvement, approvals, or specific outcomes. Decisions are made by lenders and depend on many factors.
+                  No. Score Machine provides organizational insights and structured analysis of report data. We do not guarantee credit improvement, approvals, or specific outcomes. Decisions are made by lenders and depend on many factors.
                 </p>
               </CardContent>
             </Card>
@@ -211,7 +211,7 @@ export default function CreditReadiness() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button size="lg" className="bg-gradient-to-r from-blue-600 to-emerald-600 text-white" asChild>
-                  <Link to="/register">Sign Up for The Capsol</Link>
+                  <Link to="/register">Sign Up for Score Machine</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="border-blue-600 text-blue-600" asChild>
                   <Link to="/pricing">See Plans</Link>
@@ -227,7 +227,7 @@ export default function CreditReadiness() {
 
       <div className="py-8 bg-gray-50 text-center px-4">
         <p className="text-xs text-gray-500 max-w-4xl mx-auto leading-relaxed">
-          The Capsol provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
+          Score Machine provides software tools for organizing and reviewing credit report information. It does not promise credit improvement, funding approval, or specific financial outcomes.
         </p>
       </div>
 

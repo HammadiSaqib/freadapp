@@ -7,11 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supportApi } from "@/lib/api";
-import { FileText as FileTextIcon, Image as ImageIcon, Loader2, Pencil, Plus, Trash2, CheckCircle2, Clock, ListTodo } from "lucide-react";
+import { AlertTriangle, CalendarClock, ChevronDown, FileText as FileTextIcon, Image as ImageIcon, Loader2, PauseCircle, Pencil, Plus, Trash2, CheckCircle2, Clock, ListTodo } from "lucide-react";
 
 type TaskStatus = "pending" | "in_progress" | "completed" | "rejected";
 type TaskPriority = "normal" | "medium" | "priority";
@@ -39,6 +42,39 @@ type Task = {
   updated_by_first_name?: string;
   updated_by_last_name?: string;
   updated_by_email?: string;
+};
+
+type TaskPauseControl = {
+  title: string;
+  description: string;
+  continue_anyway: boolean;
+  start_at: string;
+  end_at: string | null;
+  created_at: string;
+};
+
+type TaskControlState = {
+  control: TaskPauseControl | null;
+  active: boolean;
+  scheduled: boolean;
+  expired: boolean;
+  can_control: boolean;
+};
+
+const emptyTaskControlState: TaskControlState = {
+  control: null,
+  active: false,
+  scheduled: false,
+  expired: false,
+  can_control: false,
+};
+
+const toDateTimeLocalValue = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
 };
 
 const statusOptions: Array<{ value: TaskStatus; label: string }> = [
@@ -126,8 +162,22 @@ export default function SupportTasks() {
   const [editAttachmentPreviews, setEditAttachmentPreviews] = useState<AttachmentPreview[]>([]);
   const [editRejectionReason, setEditRejectionReason] = useState("");
   const [rejectedFilterMode, setRejectedFilterMode] = useState<"rejected" | "in_progress">("rejected");
+  const [taskControl, setTaskControl] = useState<TaskControlState>(emptyTaskControlState);
+  const [controlOpen, setControlOpen] = useState(false);
+  const [controlSaving, setControlSaving] = useState(false);
+  const [pauseTitle, setPauseTitle] = useState("");
+  const [pauseDescription, setPauseDescription] = useState("");
+  const [pauseContinueAnyway, setPauseContinueAnyway] = useState(false);
+  const [pauseIsScheduled, setPauseIsScheduled] = useState(false);
+  const [pauseStartNow, setPauseStartNow] = useState(true);
+  const [pauseNeverEnds, setPauseNeverEnds] = useState(true);
+  const [pauseStartAt, setPauseStartAt] = useState("");
+  const [pauseEndAt, setPauseEndAt] = useState("");
+  const [pauseAlertOpen, setPauseAlertOpen] = useState(false);
+  const [pendingPausedAction, setPendingPausedAction] = useState<{ type: "create" } | { type: "edit"; task: Task } | null>(null);
   const rejectedFilterClickCountRef = useRef(0);
   const rejectedFilterResetTimeoutRef = useRef<number | null>(null);
+  const pauseVersionRef = useRef<string | null>(null);
 
   const isImageUrl = (text: string) => {
     if (text.startsWith("data:image/")) {
@@ -282,9 +332,115 @@ export default function SupportTasks() {
     }
   };
 
+  const loadTaskControl = async (silent = false) => {
+    try {
+      const response = await supportApi.getTaskControl();
+      const nextState = { ...emptyTaskControlState, ...(response.data?.data || {}) } as TaskControlState;
+      const nextVersion = nextState.control?.created_at || null;
+      if (pauseVersionRef.current !== nextVersion) {
+        pauseVersionRef.current = nextVersion;
+        setPauseAlertOpen(false);
+        setPendingPausedAction(null);
+      }
+      if (!nextState.active) {
+        setPauseAlertOpen(false);
+        setPendingPausedAction(null);
+      }
+      setTaskControl(nextState);
+    } catch {
+      if (!silent) {
+        toast({
+          title: "Failed to load task control",
+          description: "Please refresh the page and try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   useEffect(() => {
     loadTasks();
+    void loadTaskControl();
+    const controlPoll = window.setInterval(() => void loadTaskControl(true), 30_000);
+    return () => window.clearInterval(controlPoll);
   }, []);
+
+  const openTaskControl = () => {
+    const current = taskControl.control;
+    setPauseTitle(current?.title || "");
+    setPauseDescription(current?.description || "");
+    setPauseContinueAnyway(current?.continue_anyway || false);
+    const scheduled = Boolean(current && (
+      current.end_at
+      || new Date(current.start_at).getTime() > new Date(current.created_at).getTime() + 5_000
+    ));
+    setPauseIsScheduled(scheduled);
+    setPauseStartNow(!scheduled);
+    setPauseNeverEnds(!current?.end_at);
+    setPauseStartAt(toDateTimeLocalValue(current?.start_at));
+    setPauseEndAt(toDateTimeLocalValue(current?.end_at));
+    setControlOpen(true);
+  };
+
+  const saveTaskControl = async () => {
+    if (!pauseTitle.trim() || !pauseDescription.trim()) {
+      toast({ title: "Add a pause title and description", variant: "destructive" });
+      return;
+    }
+    if (pauseIsScheduled && !pauseStartNow && !pauseStartAt) {
+      toast({ title: "Choose the pause start date and time", variant: "destructive" });
+      return;
+    }
+    if (pauseIsScheduled && !pauseNeverEnds && !pauseEndAt) {
+      toast({ title: "Choose the pause end date and time", variant: "destructive" });
+      return;
+    }
+
+    setControlSaving(true);
+    try {
+      const response = await supportApi.saveTaskControl({
+        title: pauseTitle.trim(),
+        description: pauseDescription.trim(),
+        continue_anyway: pauseContinueAnyway,
+        start_now: pauseIsScheduled ? pauseStartNow : true,
+        never_ends: pauseIsScheduled ? pauseNeverEnds : true,
+        start_at: pauseIsScheduled && !pauseStartNow ? new Date(pauseStartAt).toISOString() : undefined,
+        end_at: pauseIsScheduled && !pauseNeverEnds ? new Date(pauseEndAt).toISOString() : undefined,
+      });
+      const nextState = { ...emptyTaskControlState, ...(response.data?.data || {}) } as TaskControlState;
+      pauseVersionRef.current = nextState.control?.created_at || null;
+      setTaskControl(nextState);
+      setControlOpen(false);
+      toast({ title: nextState.scheduled ? "Task pause scheduled" : "Task pause added" });
+    } catch (error: any) {
+      toast({
+        title: "Failed to save task pause",
+        description: error?.response?.data?.error || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setControlSaving(false);
+    }
+  };
+
+  const removeTaskControl = async () => {
+    setControlSaving(true);
+    try {
+      await supportApi.removeTaskControl();
+      pauseVersionRef.current = null;
+      setTaskControl((current) => ({ ...emptyTaskControlState, can_control: current.can_control }));
+      setControlOpen(false);
+      toast({ title: "Task pause removed" });
+    } catch (error: any) {
+      toast({
+        title: "Failed to remove task pause",
+        description: error?.response?.data?.error || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setControlSaving(false);
+    }
+  };
 
   const filteredTasks = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -474,6 +630,37 @@ export default function SupportTasks() {
     setEditOpen(true);
   };
 
+  const shouldGuardTaskAction = taskControl.active && !taskControl.can_control;
+
+  const requestCreateTask = () => {
+    if (shouldGuardTaskAction) {
+      setPendingPausedAction({ type: "create" });
+      setPauseAlertOpen(true);
+      return;
+    }
+    setCreateOpen(true);
+  };
+
+  const requestEditTask = (task: Task) => {
+    if (shouldGuardTaskAction) {
+      setPendingPausedAction({ type: "edit", task });
+      setPauseAlertOpen(true);
+      return;
+    }
+    openEdit(task);
+  };
+
+  const continuePausedAction = () => {
+    const action = pendingPausedAction;
+    setPauseAlertOpen(false);
+    setPendingPausedAction(null);
+    if (action?.type === "create") {
+      setCreateOpen(true);
+    } else if (action?.type === "edit") {
+      openEdit(action.task);
+    }
+  };
+
   const handleEdit = async () => {
     if (!selectedTask) return;
     const title = editTitle.trim();
@@ -622,13 +809,18 @@ export default function SupportTasks() {
               <CardTitle>Tasks</CardTitle>
               <CardDescription>Create, update, and track task progress</CardDescription>
             </div>
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {taskControl.can_control && (
+                <Button type="button" variant="outline" className="gap-2" onClick={openTaskControl}>
+                  <PauseCircle className="h-4 w-4" />
+                  Control Task
+                </Button>
+              )}
+              <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <Button className="gap-2" onClick={requestCreateTask}>
                   <Plus className="h-4 w-4" />
                   New Task
                 </Button>
-              </DialogTrigger>
               <DialogContent className="sm:max-w-[640px]">
                 <DialogHeader>
                   <DialogTitle>Create Task</DialogTitle>
@@ -725,8 +917,165 @@ export default function SupportTasks() {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
           </CardHeader>
+          <Dialog open={controlOpen} onOpenChange={(open) => !controlSaving && setControlOpen(open)}>
+            <DialogContent className="sm:max-w-[620px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <PauseCircle className="h-5 w-5 text-amber-600" />
+                  Control Task
+                </DialogTitle>
+                <DialogDescription>
+                  Pause access to the support tasks page now or during a scheduled period.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-5">
+                {taskControl.control && (
+                  <div className={`rounded-lg border p-3 text-sm ${taskControl.active ? "border-red-200 bg-red-50 text-red-800" : taskControl.scheduled ? "border-blue-200 bg-blue-50 text-blue-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+                    <p className="font-semibold">
+                      {taskControl.active ? "Pause is active" : taskControl.scheduled ? "Pause is scheduled" : "Previous pause is inactive"}
+                    </p>
+                    <p className="mt-1">
+                      Starts {new Date(taskControl.control.start_at).toLocaleString()}
+                      {taskControl.control.end_at ? ` and ends ${new Date(taskControl.control.end_at).toLocaleString()}` : " and never ends"}.
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="task-pause-title">Pause Title</Label>
+                  <Input
+                    id="task-pause-title"
+                    value={pauseTitle}
+                    onChange={(event) => setPauseTitle(event.target.value)}
+                    placeholder="Tasks are temporarily paused"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="task-pause-description">Pause Description</Label>
+                  <Textarea
+                    id="task-pause-description"
+                    value={pauseDescription}
+                    onChange={(event) => setPauseDescription(event.target.value)}
+                    placeholder="Explain why tasks are paused and when users should return."
+                    rows={4}
+                  />
+                </div>
+
+                <div className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+                  <Checkbox
+                    id="task-pause-continue"
+                    checked={pauseContinueAnyway}
+                    onCheckedChange={(checked) => setPauseContinueAnyway(checked === true)}
+                  />
+                  <div>
+                    <Label htmlFor="task-pause-continue" className="cursor-pointer">Continue Anyway</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Allow users to dismiss the pause alert and continue to the Tasks page.
+                    </p>
+                  </div>
+                </div>
+
+                {pauseIsScheduled && (
+                  <div className="space-y-4 rounded-lg border-2 border-blue-200 bg-blue-50/50 p-4">
+                    <div className="flex items-center gap-2 font-semibold text-blue-900">
+                      <CalendarClock className="h-4 w-4" /> Schedule
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label htmlFor="task-pause-start">Start Date</Label>
+                          <div className="flex items-center gap-2">
+                            <Checkbox id="task-pause-now" checked={pauseStartNow} onCheckedChange={(checked) => setPauseStartNow(checked === true)} />
+                            <Label htmlFor="task-pause-now" className="cursor-pointer text-xs font-normal">Now</Label>
+                          </div>
+                        </div>
+                        <Input
+                          id="task-pause-start"
+                          type="datetime-local"
+                          value={pauseStartAt}
+                          onChange={(event) => setPauseStartAt(event.target.value)}
+                          disabled={pauseStartNow}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <Label htmlFor="task-pause-end">End Date</Label>
+                          <div className="flex items-center gap-2">
+                            <Checkbox id="task-pause-never" checked={pauseNeverEnds} onCheckedChange={(checked) => setPauseNeverEnds(checked === true)} />
+                            <Label htmlFor="task-pause-never" className="cursor-pointer text-xs font-normal">Never</Label>
+                          </div>
+                        </div>
+                        <Input
+                          id="task-pause-end"
+                          type="datetime-local"
+                          value={pauseEndAt}
+                          onChange={(event) => setPauseEndAt(event.target.value)}
+                          disabled={pauseNeverEnds}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-between">
+                <div>
+                  {taskControl.control && (
+                    <Button type="button" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700" disabled={controlSaving} onClick={() => void removeTaskControl()}>
+                      Remove Pause
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button type="button" variant="outline" disabled={controlSaving} onClick={() => setControlOpen(false)}>
+                    Cancel
+                  </Button>
+                  <div className="flex items-center">
+                    <Button type="button" className="rounded-r-none" disabled={controlSaving} onClick={() => void saveTaskControl()}>
+                      {controlSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PauseCircle className="mr-2 h-4 w-4" />}
+                      {pauseIsScheduled ? "Schedule Pause" : "Add Pause"}
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button type="button" className="rounded-l-none border-l border-white/30 px-2" disabled={controlSaving} aria-label="Choose pause timing">
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        side="top"
+                        sideOffset={8}
+                        className="z-[9999] min-w-[180px] border-slate-200 bg-white shadow-2xl"
+                        style={{ zIndex: 9999 }}
+                      >
+                        <DropdownMenuItem onClick={() => {
+                          setPauseIsScheduled(false);
+                          setPauseStartNow(true);
+                          setPauseNeverEnds(true);
+                        }}>
+                          Add Pause Now
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setPauseIsScheduled(true);
+                          setPauseStartNow(false);
+                          setPauseNeverEnds(false);
+                          if (!pauseStartAt) setPauseStartAt(toDateTimeLocalValue(new Date(Date.now() + 5 * 60_000).toISOString()));
+                          if (!pauseEndAt) setPauseEndAt(toDateTimeLocalValue(new Date(Date.now() + 65 * 60_000).toISOString()));
+                        }}>
+                          Schedule
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card>
@@ -1045,7 +1394,7 @@ export default function SupportTasks() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" onClick={() => openEdit(task)}>
+                            <Button variant="outline" size="sm" onClick={() => requestEditTask(task)}>
                               <Pencil className="h-4 w-4" />
                             </Button>
                             <Button variant="outline" size="sm" onClick={() => handleDelete(task)}>
@@ -1247,6 +1596,45 @@ export default function SupportTasks() {
               {previewStatusSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </Button>
             <Button onClick={() => setPreviewOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pauseAlertOpen && taskControl.active && !taskControl.can_control}
+        onOpenChange={(open) => {
+          if (open) setPauseAlertOpen(true);
+        }}
+      >
+        <DialogContent
+          className="border-2 border-red-300 bg-red-50 sm:max-w-[560px] [&>button]:hidden"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+              <AlertTriangle className="h-7 w-7" />
+            </div>
+            <DialogTitle className="text-center text-xl text-red-900">
+              {taskControl.control?.title || "Tasks Are Temporarily Paused"}
+            </DialogTitle>
+            <DialogDescription className="whitespace-pre-wrap text-center text-sm leading-6 text-red-800">
+              {taskControl.control?.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-200 bg-white/70 p-3 text-center text-sm text-red-800">
+            If anything is urgent, please contact the developer.
+          </div>
+          <DialogFooter className="gap-2 sm:justify-center">
+            <Button variant="outline" className="border-red-300 text-red-700 hover:bg-red-100 hover:text-red-800" asChild>
+              <a href="mailto:munibahmeed@gmail.com">Contact Developer</a>
+            </Button>
+            {taskControl.control?.continue_anyway && (
+              <Button className="bg-red-600 text-white hover:bg-red-700" onClick={continuePausedAction}>
+                Continue Anyway
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

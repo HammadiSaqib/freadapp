@@ -5,7 +5,7 @@ interface LoadingScreenProps {
   message?: string;
 }
 
-const LoadingScreen = ({ message = "Loading The Capsol..." }: LoadingScreenProps) => {
+const LoadingScreen = ({ message = "Loading CapSol..." }: LoadingScreenProps) => {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -50,8 +50,8 @@ const LoadingScreen = ({ message = "Loading The Capsol..." }: LoadingScreenProps
           />
           
           <img
-            src="/image.png"
-            alt="The Capsol Logo"
+            src="/capsol-fav.png"
+            alt="CapSol Logo"
             className="w-32 h-32 md:w-40 md:h-40 object-contain relative z-10"
           />
         </motion.div>

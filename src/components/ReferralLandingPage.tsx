@@ -1,26 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, Star, Users, ArrowRight, Shield, BarChart3, Menu, Play, Zap, FileText, TrendingUp, Mail, DollarSign, Sparkles, Globe, Phone, Target } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import FallingMoney from '@/components/ui/FallingMoney'; // Assuming this is available as in Index.tsx
+import React, { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
-import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { useGSAP } from "@gsap/react";
-import ReferralEliteLandingPage from './ReferralEliteLandingPage';
+import { useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowRight,
+  BarChart3,
+  Bot,
+  Check,
+  ChevronDown,
+  CircleAlert,
+  FileSearch,
+  Goal,
+  Menu,
+  MonitorCheck,
+  ShieldCheck,
+  Sparkles,
+  Users,
+  Workflow,
+  X,
+} from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  buildAliasUrl,
   buildReferralLandingUrl,
   buildReferralPricingUrl,
   buildReferralRegisterUrl,
-  getPublicAliasOrigin,
 } from "@/lib/hostRouting";
-
-gsap.registerPlugin(ScrollTrigger);
+import dashboardImage from "../../score-machine-affilate-main/images/Main-Software.png";
+import goodScoreImage from "../../score-machine-affilate-main/images/I have a good score but still get denied.png";
+import understandingImage from "../../score-machine-affilate-main/images/Lack of Understanding.jpg";
+import directionImage from "../../score-machine-affilate-main/images/No Direction on What to Do Next.png";
+import fundingImage from "../../score-machine-affilate-main/images/Not Positioned for Funding.png";
+import repairImage from "../../score-machine-affilate-main/images/Credit Reapir.png";
+import "./ReferralLandingPage.css";
 
 interface AffiliateData {
   id: string;
@@ -33,8 +44,6 @@ interface AffiliateData {
   commissionRate: number;
   logoUrl?: string;
   status: string;
-  eliteLandingPage?: boolean;
-  elite_landing_page?: 'allow' | 'deny';
 }
 
 interface PricingPlan {
@@ -42,77 +51,69 @@ interface PricingPlan {
   name: string;
   description: string;
   price: number;
-  billing_cycle: string;
+  billing_cycle: "monthly" | "yearly" | "lifetime";
   features: string[];
-  max_users?: number;
-  max_clients?: number;
+  max_users?: number | null;
+  max_clients?: number | null;
   sort_order?: number;
 }
 
-const ReferralFooter: React.FC<{ affiliate: AffiliateData }> = ({ affiliate }) => {
-  return (
-    <footer className="relative z-10 bg-black !bg-black border-t border-slate-800 pt-16 pb-8 px-4 text-slate-300" style={{ backgroundColor: 'black' }}>
-      <div className="container mx-auto">
-        <div className="flex flex-col md:flex-row justify-between gap-12 mb-12">
-          {/* Brand Column */}
-          <div className="max-w-sm space-y-4">
-            <div className="flex items-center space-x-2">
-              <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
-              <span className="text-xl font-bold text-white">The Capsol</span>
-            </div>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Empowering financial futures through AI-driven credit intelligence and professional management tools.
-            </p>
-            <div className="flex items-center gap-4 pt-2">
-              <a
-                href="tel:+14752598768"
-                className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800"
-                aria-label="Call (475) 259-8768"
-              >
-                <Phone className="w-4 h-4" />
-              </a>
-              <a
-                href="/contact"
-                className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-slate-400 border border-slate-800"
-                aria-label="Contact The Capsol support"
-              >
-                <Mail className="w-4 h-4" />
-              </a>
-            </div>
-          </div>
+const features = [
+  { icon: BarChart3, title: "Full Profile Analysis", text: "Organized analysis that helps users review more than a single score." },
+  { icon: FileSearch, title: "Underwriting-Style Evaluation", text: "A structured look at profile characteristics that may matter during third-party evaluations." },
+  { icon: CircleAlert, title: "Negative & Limiting Factors", text: "Highlight profile information that may deserve further review." },
+  { icon: Workflow, title: "Multi-Bureau Profile Overview", text: "View and compare supported profile information in one organized experience." },
+  { icon: Bot, title: "AI-Assisted Workflow", text: "Use AI-assisted tools to organize information and support parts of the review workflow." },
+  { icon: Sparkles, title: "Self-Service Credit Tools", text: "Access included software tools that users can operate themselves." },
+  { icon: Goal, title: "Goal Tracking", text: "Create goals and monitor progress over time." },
+  { icon: MonitorCheck, title: "Monitoring Tools", text: "Monitor supported profile information and changes made available through the platform." },
+  { icon: Users, title: "Multi-User Management", text: "Manage users and clients according to the selected subscription plan." },
+];
 
-          {/* Referral Badge Column */}
-          <div>
-            <h4 className="font-semibold text-white mb-4">Referred By</h4>
-            <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800 backdrop-blur-sm">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-teal-500/10 rounded-full flex items-center justify-center border border-teal-500/20">
-                  <Users className="w-5 h-5 text-teal-400" />
-                </div>
-                <div>
-                  <p className="font-medium text-white">{affiliate.firstName} {affiliate.lastName}</p>
-                  <p className="text-xs text-slate-400">Official Partner</p>
-                </div>
-              </div>
-              {affiliate.companyName && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 mt-2 pt-2 border-t border-slate-800">
-                  <Shield className="w-3 h-3" />
-                  <span>{affiliate.companyName}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+const faqs = [
+  ["Is The Score Machine a lender?", "No. The Score Machine is a software and educational platform. It does not issue loans, make lending decisions, or control third-party approval decisions."],
+  ["Does The Score Machine guarantee approvals?", "No. Approval decisions are made independently by third parties. The platform provides tools and organized information, but it does not guarantee approvals, offers, limits, rates, or other outcomes."],
+  ["Does The Score Machine guarantee a score increase?", "No. Results vary based on the information in each profile, user actions, third-party reporting, and other factors. No specific score change is guaranteed."],
+  ["Does The Score Machine remove items automatically?", "The platform provides analysis and self-service workflow tools. Users review their information and decide what actions to take. The software does not automatically remove accurate information."],
+  ["Can I use it for clients?", "Yes, depending on the selected subscription plan. Each plan includes a stated user and client capacity."],
+  ["What is included in each plan?", "Each plan includes core profile-analysis and self-service software tools. The primary differences are user capacity, client capacity, and support level."],
+  ["How does annual billing work?", "Annual plans are billed once per year according to the price displayed at checkout."],
+  ["Will my subscription renew automatically?", "Subscriptions renew according to the billing cadence selected at checkout unless canceled under the applicable subscription terms."],
+] as const;
 
-        <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-slate-500 text-sm">
-            © {new Date().getFullYear()} The Capsol. All rights reserved.
-          </p>
-        </div>
-      </div>
-    </footer>
-  );
-};
+const problemCards = [
+  {
+    number: "01",
+    title: "A Good Score, But Still No Approval",
+    text: "A score may look strong while other profile details still affect an application. Review the broader profile instead of relying on one number alone.",
+    image: goodScoreImage,
+    tags: ["Utilization", "Recent inquiries", "Account age", "Payment history", "Profile depth"],
+  },
+  {
+    number: "02",
+    title: "Not Understanding What Is On The Profile",
+    text: "Credit reports contain a large amount of information. The platform turns it into a clearer visual overview.",
+    image: understandingImage,
+  },
+  {
+    number: "03",
+    title: "No Direction On What To Do Next",
+    text: "Turn complex profile data into an organized view of factors, goals, and available self-service tools.",
+    image: directionImage,
+  },
+  {
+    number: "04",
+    title: "Not Positioned For Funding",
+    text: "See the profile characteristics that may influence third-party evaluations before submitting another application.",
+    image: fundingImage,
+  },
+  {
+    number: "05",
+    title: "Credit Repair Without Clear Visibility",
+    text: "Track supported profile information and progress in one place while managing your own workflow.",
+    image: repairImage,
+  },
+];
 
 const ReferralLandingPage: React.FC = () => {
   const { affiliateId: routeAffiliateId, publicId } = useParams<{ affiliateId?: string; publicId?: string }>();
@@ -123,57 +124,21 @@ const ReferralLandingPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [plansLoading, setPlansLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [billingFilter, setBillingFilter] = useState<'monthly' | 'yearly'>('monthly');
+  const [billingFilter, setBillingFilter] = useState<"monthly" | "yearly">("monthly");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [selectedLandingExperience, setSelectedLandingExperience] = useState<'pro' | 'elite' | null>(null);
-  const ctaRef = React.useRef<HTMLDivElement>(null);
-  const slugOrId = (affiliateId && affiliateId.trim().length > 0) ? affiliateId : (affiliate?.id ? String(affiliate.id) : '');
-  const referralLink = slugOrId ? buildReferralLandingUrl(slugOrId) : getPublicAliasOrigin('ref');
-  const heroImageSrc = affiliate?.logoUrl && affiliate.logoUrl.trim().length > 0
-    ? affiliate.logoUrl
-    : "https://images.pexels.com/photos/7688336/pexels-photo-7688336.jpeg";
-  const heroImageClassName = affiliate?.logoUrl && affiliate.logoUrl.trim().length > 0
-    ? "w-full h-auto object-contain bg-white"
-    : "w-full h-auto object-cover";
-
-  useGSAP(() => {
-    const el = ctaRef.current;
-    if (!el) return;
-
-    const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: el,
-        start: "top 80%",
-        toggleActions: "play none none reverse"
-      }
-    });
-
-    tl.fromTo(".cta-content", 
-      { y: 50, opacity: 0 },
-      { y: 0, opacity: 1, duration: 1, ease: "power3.out", stagger: 0.2 }
-    )
-    .fromTo(".cta-glow",
-      { opacity: 0, scale: 0.8 },
-      { opacity: 1, scale: 1, duration: 1.5, ease: "power2.out" },
-      "-=0.8"
-    );
-
-  }, { scope: ctaRef });
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
     const fetchPricingPlans = async (refCandidate?: string | number) => {
       try {
-        const refQuery = refCandidate ? `?ref=${encodeURIComponent(String(refCandidate))}` : '';
-        const response = await fetch(`/api/pricing/plans${refQuery}`);
+        const query = refCandidate ? `?ref=${encodeURIComponent(String(refCandidate))}` : "";
+        const response = await fetch(`/api/pricing/plans${query}`);
         const result = await response.json();
-
-        if (result.success) {
-          setPlans(result.data);
-        } else {
-          console.error('Failed to load pricing plans:', result.error);
-        }
-      } catch (err) {
-        console.error('Error fetching pricing plans:', err);
+        if (result.success) setPlans(result.data || []);
+      } catch (requestError) {
+        console.error("Error fetching pricing plans:", requestError);
       } finally {
         setPlansLoading(false);
       }
@@ -181,7 +146,7 @@ const ReferralLandingPage: React.FC = () => {
 
     const fetchAffiliateData = async () => {
       if (!affiliateId) {
-        setError('Invalid referral link');
+        setError("Invalid referral link");
         setLoading(false);
         await fetchPricingPlans();
         return;
@@ -190,704 +155,264 @@ const ReferralLandingPage: React.FC = () => {
       try {
         const response = await fetch(`/api/landing/affiliate/${encodeURIComponent(affiliateId)}/info`);
         const result = await response.json();
-        console.log('[ReferralLandingPage] RAW API response:', result);
-
-        if (result.success) {
-          const data = result.data || {};
-          const eliteAllowed =
-            data.eliteLandingPage === true ||
-            String(data.elite_landing_page || '').toLowerCase() === 'allow';
-          console.log('[ReferralLandingPage] data.eliteLandingPage =', data.eliteLandingPage,
-            '| data.elite_landing_page =', data.elite_landing_page,
-            '| computed eliteAllowed =', eliteAllowed);
-          setAffiliate({ ...data, eliteLandingPage: eliteAllowed });
-          await fetchPricingPlans(data.id || affiliateId);
-        } else {
-          setError(result.error || 'Affiliate not found');
-          await fetchPricingPlans();
-        }
-      } catch (err) {
-        console.error('Error fetching affiliate data:', err);
-        setError('Failed to load referral information');
+        if (!result.success) throw new Error(result.error || "Affiliate not found");
+        setAffiliate(result.data);
+        await fetchPricingPlans(result.data.id || affiliateId);
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Failed to load referral information");
         await fetchPricingPlans();
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAffiliateData();
+    void fetchAffiliateData();
   }, [affiliateId]);
 
   useEffect(() => {
-    if (!affiliate) {
-      return;
-    }
+    const reveal = new IntersectionObserver(
+      (entries) => entries.forEach((entry) => entry.isIntersecting && entry.target.classList.add("is-visible")),
+      { threshold: 0.08 },
+    );
+    document.querySelectorAll(".affiliate-v2 .reveal").forEach((element) => reveal.observe(element));
+    return () => reveal.disconnect();
+  }, [loading]);
 
-    const next = affiliate.eliteLandingPage ? null : 'pro';
-    console.log('[ReferralLandingPage] effect - affiliate.eliteLandingPage =', affiliate.eliteLandingPage,
-      '=> selectedLandingExperience =', next);
-    setSelectedLandingExperience(next);
-  }, [affiliate?.eliteLandingPage, affiliate?.id]);
+  const visiblePlans = useMemo(
+    () => plans
+      .filter((plan) => plan.billing_cycle === billingFilter || plan.billing_cycle === "lifetime")
+      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    [billingFilter, plans],
+  );
+
+  const slugOrId = affiliateId?.trim() || affiliate?.id || "";
+  const referralLink = slugOrId ? buildReferralLandingUrl(slugOrId) : buildReferralPricingUrl(affiliate?.id);
+  const loginUrl = buildAliasUrl("admin", "/login");
+
+  const storeReferral = () => {
+    if (!affiliate) return;
+    localStorage.setItem("referralAffiliateId", affiliate.id);
+    localStorage.setItem("referralAffiliateName", affiliate.name);
+    localStorage.setItem("referralCommissionRate", String(affiliate.commissionRate));
+  };
 
   const handleGetStarted = (planId?: number) => {
-    if (affiliate) {
-      localStorage.setItem('referralAffiliateId', affiliate.id);
-      localStorage.setItem('referralAffiliateName', affiliate.name);
-      localStorage.setItem('referralCommissionRate', affiliate.commissionRate.toString());
-    }
-
-    const targetUrl = planId
+    storeReferral();
+    window.location.href = planId
       ? buildReferralRegisterUrl({ affiliateId: affiliate?.id, planId })
       : buildReferralPricingUrl(affiliate?.id);
-
-    window.location.href = targetUrl;
   };
 
-  const handleLearnMore = () => {
-    if (affiliate) {
-      localStorage.setItem('referralAffiliateId', affiliate.id);
-      localStorage.setItem('referralAffiliateName', affiliate.name);
-    }
-    setDemoOpen(true);
-  };
-
-  const scrollToPricing = () => {
-    const pricingSection = document.getElementById('pricing');
-    if (pricingSection) {
-      pricingSection.scrollIntoView({ behavior: 'smooth' });
-    }
+  const scrollTo = (id: string) => {
+    setMobileMenuOpen(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-          <p className="text-slate-600">Loading referral information...</p>
-        </div>
-      </div>
-    );
+    return <div className="affiliate-v2 affiliate-state"><span className="affiliate-spinner" /><p>Loading your referral experience…</p></div>;
   }
 
   if (error || !affiliate) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Card className="w-full max-w-md border-slate-200 shadow-xl">
-          <CardHeader className="text-center">
-            <CardTitle className="text-red-600">Invalid Referral Link</CardTitle>
-            <CardDescription>{error || 'This referral link is not valid or has expired.'}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <Button onClick={() => navigate('/')} variant="outline">
-              Go to Homepage
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="affiliate-v2 affiliate-state">
+        <div className="affiliate-error-card">
+          <CircleAlert size={34} />
+          <h1>Invalid referral link</h1>
+          <p>{error || "This referral link is not valid or has expired."}</p>
+          <button className="av2-button av2-button-primary" onClick={() => navigate("/")}>Go to homepage</button>
+        </div>
       </div>
     );
   }
 
-  if (affiliate.eliteLandingPage && selectedLandingExperience === 'elite') {
-    return (
-      <ReferralEliteLandingPage
-        affiliate={affiliate}
-        plans={plans}
-        plansLoading={plansLoading}
-        referralLink={referralLink}
-        onOpenDemo={handleLearnMore}
-        onGetStarted={handleGetStarted}
-      />
-    );
-  }
+  const organization = affiliate.companyName?.trim() || "Official Score Machine Partner";
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden font-sans selection:bg-teal-400/20 text-slate-600">
+    <div className="affiliate-v2" id="top">
       <Helmet>
-        <title>The Capsol - Referred by {affiliate.firstName}</title>
-        <meta name="description" content={`Special offer from ${affiliate.name} to join The Capsol.`} />
+        <title>The Score Machine | Referred by {affiliate.name}</title>
+        <meta name="description" content={`${affiliate.name} invites you to explore The Score Machine credit-intelligence and profile-analysis platform.`} />
+        <meta property="og:title" content={`The Score Machine | Recommended by ${affiliate.name}`} />
+        <meta property="og:description" content="See more than a score. Understand the full profile." />
       </Helmet>
 
       <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="w-[98vw] sm:w-[96vw] lg:w-[92vw] xl:w-[88vw] 2xl:w-[85vw] max-w-none m-0 p-0 overflow-hidden bg-white rounded-xl">
-          <DialogHeader className="px-4 py-3 border-b border-slate-100 hidden sm:flex">
-            <DialogTitle>The Capsol Demo</DialogTitle>
-          </DialogHeader>
-          <div className="w-full bg-black h-[88dvh] sm:h-auto sm:aspect-video sm:max-h-[92vh]">
-            {demoOpen && (
-              <iframe
-                className="w-full h-full"
-                src="https://www.youtube.com/embed/4KwPYMarpbo?autoplay=1&rel=0"
-                title="The Capsol Pro Full Walkthrough"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            )}
+        <DialogContent className="w-[96vw] max-w-6xl overflow-hidden p-0">
+          <DialogHeader className="border-b px-5 py-3"><DialogTitle>Score Machine Demo</DialogTitle></DialogHeader>
+          <div className="aspect-video bg-black">
+            {demoOpen && <iframe className="h-full w-full" src="https://www.youtube.com/embed/4KwPYMarpbo?autoplay=1&rel=0" title="Score Machine product demo" allow="autoplay; encrypted-media; picture-in-picture" allowFullScreen />}
           </div>
         </DialogContent>
       </Dialog>
 
-      {(() => {
-        console.log('[ReferralLandingPage] RENDER - affiliate.eliteLandingPage =', affiliate.eliteLandingPage,
-          '| selectedLandingExperience =', selectedLandingExperience,
-          '| chooser visible =', (affiliate.eliteLandingPage && selectedLandingExperience === null));
-        return null;
-      })()}
-      {affiliate.eliteLandingPage && selectedLandingExperience === null && (
-        <div
-          data-debug-chooser="true"
-          ref={(el) => {
-            if (el) {
-              const rect = el.getBoundingClientRect();
-              console.log('[ReferralLandingPage] CHOOSER DOM NODE MOUNTED', {
-                rect,
-                computedDisplay: getComputedStyle(el).display,
-                computedVisibility: getComputedStyle(el).visibility,
-                computedOpacity: getComputedStyle(el).opacity,
-                computedZIndex: getComputedStyle(el).zIndex,
-                computedPosition: getComputedStyle(el).position,
-                parent: el.parentElement?.tagName,
-              });
-            }
-          }}
-          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2147483647 }}
-          className="flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
-        >
-          <div className="w-full max-w-5xl rounded-[2rem] border border-white/10 bg-white p-6 shadow-[0_30px_80px_rgba(0,0,0,0.35)] md:p-8">
-            <div className="mb-8 text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.25em] text-slate-500">
-                Choose Your Experience
-              </div>
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900 md:text-4xl">
-                {affiliate.firstName}&apos;s Referral Link Has Two Landing Pages
-              </h2>
-              <p className="mt-3 text-base text-slate-600 md:text-lg">
-                Pick the experience you want to open: the current The Capsol Pro landing page, or the new The Capsol Elite landing page.
-              </p>
-            </div>
+      <div className="av2-background" aria-hidden="true"><span /><span /><span /></div>
 
-            <div className="grid gap-6 md:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setSelectedLandingExperience('pro')}
-                className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-300 hover:shadow-[0_20px_45px_rgba(20,184,166,0.18)]"
-              >
-                <div className="border-b border-slate-200 bg-gradient-to-br from-teal-500 via-emerald-500 to-cyan-500 p-6 text-white">
-                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-white/80">The Capsol Pro</div>
-                  <div className="mt-3 text-3xl font-black tracking-tight">Current Landing Page</div>
-                  <div className="mt-2 max-w-sm text-sm text-white/90">
-                    Keep the referral experience exactly as it works today.
-                  </div>
-                </div>
-                <div className="space-y-4 p-6">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-900">Professional Credit Intelligence</div>
-                      <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-teal-700">Live Now</span>
-                    </div>
-                    <div className="grid gap-2">
-                      <div className="h-3 w-2/3 rounded-full bg-slate-200"></div>
-                      <div className="h-3 w-full rounded-full bg-slate-100"></div>
-                      <div className="h-3 w-4/5 rounded-full bg-slate-100"></div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Show Pro</div>
-                      <div className="text-sm text-slate-500">Current layout, pricing flow, and messaging.</div>
-                    </div>
-                    <span className="rounded-full bg-teal-50 px-4 py-2 text-sm font-bold text-teal-700 transition-colors group-hover:bg-teal-100">
-                      Open Pro
-                    </span>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setSelectedLandingExperience('elite')}
-                className="group overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-violet-300 hover:shadow-[0_20px_45px_rgba(139,92,246,0.2)]"
-              >
-                <div className="border-b border-slate-200 bg-[#0f172a] p-6 text-white">
-                  <div className="text-xs font-bold uppercase tracking-[0.3em] text-violet-200">The Capsol Elite</div>
-                  <div className="mt-3 bg-gradient-to-r from-violet-300 via-fuchsia-300 to-orange-300 bg-clip-text text-3xl font-black tracking-tight text-transparent">
-                    New Elite Landing Page
-                  </div>
-                  <div className="mt-2 max-w-sm text-sm text-slate-300">
-                    Open the premium Elite referral experience from your separate design server.
-                  </div>
-                </div>
-                <div className="space-y-4 p-6">
-                  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 p-5">
-                    <div className="absolute left-[-20%] top-[-30%] h-40 w-40 rounded-full bg-violet-500/30 blur-3xl"></div>
-                    <div className="absolute bottom-[-20%] right-[-10%] h-32 w-32 rounded-full bg-orange-400/20 blur-3xl"></div>
-                    <div className="relative z-10 rounded-[1.5rem] border border-white/10 bg-white/10 p-5 backdrop-blur-xl">
-                      <div className="mb-4 h-3 w-24 rounded-full bg-white/30"></div>
-                      <div className="mb-3 h-10 w-3/4 rounded-2xl bg-gradient-to-r from-violet-500/80 to-orange-500/80"></div>
-                      <div className="grid gap-2">
-                        <div className="h-3 w-full rounded-full bg-white/10"></div>
-                        <div className="h-3 w-4/5 rounded-full bg-white/10"></div>
-                        <div className="h-3 w-2/3 rounded-full bg-white/10"></div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-semibold text-slate-900">Show Elite</div>
-                      <div className="text-sm text-slate-500">Bold premium UI with the new imported Elite presentation.</div>
-                    </div>
-                    <span className="rounded-full bg-violet-50 px-4 py-2 text-sm font-bold text-violet-700 transition-colors group-hover:bg-violet-100">
-                      Open Elite
-                    </span>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- GLOBAL BACKGROUND PATTERN --- */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-slate-50"></div>
-        <div 
-          className="absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px), 
-                             linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px)`,
-            backgroundSize: '40px 40px'
-          }}
-        ></div>
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-teal-200/20 rounded-full blur-[120px] animate-pulse"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-emerald-200/20 rounded-full blur-[120px] animate-pulse delay-1000"></div>
-        <div className="absolute top-[40%] left-[20%] w-[30vw] h-[30vw] bg-indigo-200/20 rounded-full blur-[100px]"></div>
+      <div className="av2-disclosure">
+        You were referred by <strong>{affiliate.name}</strong>. The referring affiliate may receive compensation from qualifying purchases.
+        <button onClick={() => setDisclosureOpen(true)}>Learn more</button>
       </div>
 
-      {/* Header */}
-      <header className="fixed w-full z-50 top-0 start-0 border-b border-white/20 bg-white/80 backdrop-blur-md transition-all duration-300">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center space-x-2 cursor-pointer" onClick={() => navigate('/')}>
-             {/* Logo */}
-             <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
-            <span className="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-              The Capsol
-            </span>
-          </div>
-
-          {/* Desktop actions */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50/80 rounded-full border border-blue-100">
-                <Users className="w-4 h-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-700">
-                    Referred by {affiliate.firstName}
-                </span>
-            </div>
-            <Button 
-                onClick={scrollToPricing}
-                className="rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-500 hover:to-emerald-500 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300"
-            >
-              Get Started
-            </Button>
-          </div>
-
-          {/* Mobile menu */}
-          <div className="md:hidden ml-auto">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="Open menu">
-                  <Menu className="h-5 w-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80">
-                <SheetHeader>
-                  <SheetTitle>
-                     <div className="flex items-center space-x-2">
-                        <img src="/image.png" alt="The Capsol" className="w-16 h-10" />
-                        <span className="font-bold text-slate-900">The Capsol</span>
-                     </div>
-                  </SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div className="px-3 py-2 bg-blue-50 rounded-lg border border-blue-100 text-center">
-                    <p className="text-sm text-blue-800 font-medium">Referred by {affiliate.firstName}</p>
-                  </div>
-                  <div className="grid gap-3">
-                    <Button className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white" onClick={scrollToPricing}>Get Started</Button>
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+      <header className="av2-nav">
+        <a href="#top" className="av2-brand" aria-label="The Score Machine home">
+          <img src="/image.png" alt="The Score Machine" />
+          <span>The Score Machine</span>
+        </a>
+        <nav className="av2-nav-links" aria-label="Primary navigation">
+          <button onClick={() => scrollTo("platform")}>Platform</button>
+          <button onClick={() => scrollTo("problems")}>Problems Solved</button>
+          <button onClick={() => scrollTo("how")}>How It Works</button>
+          <button onClick={() => scrollTo("features")}>Features</button>
+          <button onClick={() => scrollTo("pricing")}>Pricing</button>
+          <button onClick={() => scrollTo("faq")}>FAQ</button>
+        </nav>
+        <div className="av2-nav-actions">
+          <span>Recommended by <strong>{affiliate.firstName}</strong></span>
+          <a href={loginUrl}>Log in</a>
+          <button className="av2-button av2-button-primary av2-button-small" onClick={() => scrollTo("pricing")}>Explore plans</button>
         </div>
+        <button className="av2-menu-button" aria-label="Toggle navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen((open) => !open)}>
+          {mobileMenuOpen ? <X /> : <Menu />}
+        </button>
+        {mobileMenuOpen && (
+          <nav className="av2-mobile-menu" aria-label="Mobile navigation">
+            {["platform", "problems", "how", "features", "pricing", "faq"].map((item) => <button key={item} onClick={() => scrollTo(item)}>{item === "how" ? "How It Works" : item.replace(/^./, (letter) => letter.toUpperCase())}</button>)}
+            <a href={loginUrl}>Log in</a>
+          </nav>
+        )}
       </header>
 
-      {/* --- HERO SECTION --- */}
-      <section className="relative min-h-[100vh] flex items-center pt-20 lg:pt-0 overflow-hidden">
-        
-        {/* Animated Background Layer */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
-          {/* Attempt to use FallingMoney if available, else fallback provided by parent div styles */}
-          <FallingMoney />
-          <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-slate-50 to-transparent z-20"></div>
-        </div>
-
-        <div className="container mx-auto px-4 relative z-30">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Text Content */}
-            <div className="space-y-8 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm backdrop-blur-md">
-                <Sparkles className="h-4 w-4 text-emerald-500 fill-emerald-500 animate-pulse" />
-                <span className="text-sm font-medium text-slate-700">
-                    Recommended by {affiliate.firstName} {affiliate.lastName}
-                </span>
-              </div>
-
-              <h1 className="text-5xl lg:text-7xl font-bold leading-[1.1] tracking-tight text-slate-900">
-                <span className="block">Professional</span>
-                <span className="pb- 3block bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 bg-clip-text text-transparent">
-                  Credit Intelligence
-                </span>
-                <span className="block text-4xl lg:text-5xl mt-2 text-slate-700">Platform</span>
-              </h1>
-
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 shadow-sm max-w-xl mx-auto lg:mx-0">
-                  <p className="text-lg text-slate-700 mb-2">
-                    <span className="font-semibold text-teal-700">{affiliate.firstName}</span> has invited you to experience The Capsol.
-                  </p>
-                  <p className="text-slate-600 leading-relaxed">
-                     Access advanced credit insights, automated dispute tools, and professional-grade monitoring.
-                  </p>
-                  {affiliate.companyName && (
-                    <div className="mt-3 flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500">
-                        <Shield className="w-4 h-4" />
-                        <span>Partner: {affiliate.companyName}</span>
-                    </div>
-                  )}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-2">
-                <Button
-                  size="lg"
-                  className="h-14 px-8 text-lg rounded-full bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-lg shadow-teal-500/20 transition-all duration-300 border-0"
-                  onClick={scrollToPricing}
-                >
-                  Start Today <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-14 px-8 text-lg rounded-full border-slate-300 text-slate-700 hover:text-slate-900 hover:bg-slate-100 hover:border-slate-400 transition-all duration-300 bg-white/50 backdrop-blur-sm"
-                  onClick={handleLearnMore}
-                >
-                  <Play className="mr-2 h-5 w-5 fill-current" />
-                  View Demo
-                </Button>
-              </div>
-              
-              <div className="mt-6 flex items-center gap-4 justify-center lg:justify-start">
-                <div className="bg-white/90 border border-slate-200 rounded-xl p-3 shadow-sm flex items-center gap-3">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(referralLink)}`}
-                    alt="Referral QR"
-                    className="w-20 h-20"
-                  />
-                  <div className="text-sm">
-                    <div className="font-semibold text-slate-800">Scan to open referral link</div>
-                    <div className="text-slate-500">Or visit: <span className="text-teal-700">{referralLink}</span></div>
-                  </div>
-                </div>
-              </div>
-              
-              <p className="text-xs text-slate-500 italic max-w-md mx-auto lg:mx-0 leading-relaxed">
-                Join other users who were referred by {affiliate.firstName} and chose to explore The Capsol. No credit card required for signup.
-              </p>
+      <main>
+        <section className="av2-hero av2-shell">
+          <div className="reveal">
+            <div className="av2-recommended"><span className="av2-dot" /> Recommended by <strong>{affiliate.name}</strong></div>
+            <h1>See More Than a Score.<span>Understand the Full Profile.</span></h1>
+            <p className="av2-lead">The Score Machine organizes complex credit-profile information into a clearer view of strengths, negative factors, limiting factors, and potential next steps.</p>
+            <div className="av2-bullets">
+              <span><i className="av2-dot" />Multi-Bureau Profile Overview</span>
+              <span><i className="av2-dot cyan" />Underwriting-Style Evaluation</span>
+              <span><i className="av2-dot violet" />Action-Focused Insights</span>
             </div>
-
-            {/* Visual Content - Keeping the image but styling like Index.tsx 3D element */}
-            <div className="relative perspective-1000">
-               <div className="relative rounded-[2.5rem] overflow-hidden shadow-2xl border-[8px] border-white bg-white transform transition-transform hover:scale-[1.02] duration-500">
-                  <img
-                    src={heroImageSrc}
-                    alt="Dashboard Preview"
-                    className={heroImageClassName}
-                  />
-                  {/* Overlay Gradient */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"></div>
-                  
-                  {/* Floating Elements */}
-                  <div className="absolute bottom-8 left-8 right-8">
-                     <div className="bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-white/50 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                           <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                              <CheckCircle className="w-6 h-6 text-emerald-600" />
-                           </div>
-                           <div>
-                              <p className="text-sm font-semibold text-slate-900">Verified Results</p>
-                              <p className="text-xs text-slate-500">Results reported by users. Your results may differ.</p>
-                           </div>
-                        </div>
-                        <div className="text-2xl font-bold text-slate-900">Verified</div>
-                     </div>
-                  </div>
-                  
-                  <div className="absolute top-6 right-6 z-30 bg-white/95 backdrop-blur-md rounded-xl p-3 shadow-lg border border-white/50 flex flex-col items-center">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(referralLink)}`}
-                      alt="Referral QR"
-                      className="w-24 h-24"
-                    />
-                    <div className="mt-2 text-xs text-slate-700 font-medium">Scan to open</div>
-                    <div className="mt-1 text-[10px] text-slate-500 break-all max-w-[180px]">{referralLink}</div>
-                  </div>
-               </div>
-
-               {/* Decorative blobs behind */}
-               <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-br from-teal-500/20 to-purple-500/20 rounded-full blur-3xl opacity-60"></div>
+            <div className="av2-button-row">
+              <button className="av2-button av2-button-primary" onClick={() => scrollTo("pricing")}>Explore plans <ArrowRight size={18} /></button>
+              <button className="av2-button av2-button-ghost" onClick={() => setDemoOpen(true)}>Watch the demo</button>
             </div>
+            <p className="av2-smallprint">The Score Machine provides software tools and educational information. Outcomes and third-party decisions are never guaranteed.</p>
           </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-32 bg-slate-50 relative z-10 overflow-hidden">
-        {/* Background Decorations */}
-        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-           <div className="absolute top-[10%] left-[5%] w-64 h-64 bg-teal-200/20 rounded-full blur-[80px] mix-blend-multiply"></div>
-           <div className="absolute bottom-[10%] right-[5%] w-80 h-80 bg-emerald-200/20 rounded-full blur-[80px] mix-blend-multiply"></div>
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-24 max-w-3xl mx-auto">
-            <Badge variant="outline" className="mb-6 border-teal-200 text-teal-700 bg-teal-50/50 px-4 py-1 text-sm font-medium rounded-full">
-              Why Choose The Capsol
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-bold mb-8 text-slate-900 tracking-tight leading-tight">
-              Complete
-              <span className="bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent px-3">
-                Credit Management
-              </span>
-            </h2>
-            <p className="text-xl text-slate-600 leading-relaxed font-light mt-6 mb-6">
-              Professional tools powered by AI to help you understand, track, and improve your credit health with confidence.
-            </p>
+          <div className="av2-hero-visual reveal">
+            <div className="av2-image-glow" />
+            <img src={dashboardImage} alt="The Score Machine profile analysis dashboard" />
+            <div className="av2-hero-chip"><ShieldCheck /><span><strong>Secure profile view</strong>Organized for clarity</span></div>
           </div>
+        </section>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[
-              { icon: Users, title: "Expert Guidance", desc: "Professional tools frequently used by credit professionals and recommended by some industry users." },
-              { icon: BarChart3, title: "Advanced Analytics", desc: "Visualize your credit progress with detailed charts and score tracking." },
-              { icon: Zap, title: "AI Automation", desc: "AI-assisted dispute drafting and automated credit monitoring tools." },
-              { icon: Shield, title: "Enterprise-Grade Security", desc: "Enterprise-grade security features to protect your data." },
-              { icon: Target, title: "Goal Tracking", desc: "Set and track personalized credit score goals with milestones." },
-              { icon: Globe, title: "24/7 Monitoring", desc: "Real-time alerts for changes to your credit report across all bureaus." }
-            ].map((feature, i) => (
-              <div key={i} className="group relative bg-white rounded-[2rem] p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(20,184,166,0.15)] transition-all duration-500 hover:-translate-y-2 overflow-hidden">
-                {/* Gradient Border Effect on Hover */}
-                <div className="absolute inset-0 bg-gradient-to-br from-teal-500 to-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500 p-[1px] -z-10 rounded-[2rem]">
-                   <div className="w-full h-full bg-white rounded-[2rem]"></div>
+        <section className="av2-trust-strip">
+          {['AI-Assisted Analysis', 'Multi-Bureau Profile View', 'Secure Data Experience', 'Built for Individuals and Professionals'].map((item) => <span key={item}>{item}</span>)}
+        </section>
+
+        <section id="platform" className="av2-shell av2-split av2-section">
+          <div className="reveal">
+            <p className="av2-eyebrow">What is The Score Machine?</p>
+            <h2>A clearer way to <span>understand and manage</span> profile information.</h2>
+            <p>The Score Machine is a credit-intelligence and workflow platform designed to help individuals and professionals organize, review, and monitor credit-profile information.</p>
+            <p>Instead of focusing only on a single score, the platform surfaces the broader information that may affect how a profile is evaluated.</p>
+          </div>
+          <div className="av2-profile-card reveal">
+            <div className="av2-card-heading"><strong>Profile Overview</strong><span>● Live</span></div>
+            <div className="av2-stat-grid">
+              {[['Overall', '715'], ['Negative Factors', '4'], ['Limiting Factors', '3'], ['Utilization', '34%'], ['Inquiries', '7'], ['Monitoring', 'Active']].map(([label, value], index) => <div key={label} className={`stat-${index}`}><small>{label}</small><strong>{value}</strong></div>)}
+            </div>
+            <div className="av2-progress-label"><span>Goal progress</span><strong>64%</strong></div>
+            <div className="av2-progress"><span /></div>
+          </div>
+        </section>
+
+        <section id="problems" className="av2-shell av2-section">
+          <div className="av2-section-heading reveal">
+            <p className="av2-eyebrow cyan">Problems solved</p>
+            <h2>Five Problems a Score Alone <span>Cannot Explain</span></h2>
+            <p>A score is only one part of a much larger profile. The Score Machine helps organize the information behind the number.</p>
+          </div>
+          <div className="av2-problem-grid">
+            {problemCards.map((problem, index) => (
+              <article className={`av2-problem-card reveal ${index === 0 ? "featured" : ""}`} key={problem.number}>
+                <div className="av2-problem-copy">
+                  <span className="av2-number">{problem.number}</span>
+                  <div><h3>{problem.title}</h3><p>{problem.text}</p>{problem.tags && <div className="av2-tags">{problem.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}</div>
                 </div>
-
-                {/* Subtle Background Decoration */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-50/50 to-emerald-50/50 rounded-bl-[4rem] opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-50 group-hover:bg-gradient-to-br group-hover:from-teal-500 group-hover:to-emerald-600 flex items-center justify-center mb-6 transition-all duration-500 shadow-sm group-hover:shadow-lg group-hover:shadow-teal-500/30 group-hover:scale-110">
-                    <feature.icon className="h-8 w-8 text-teal-600 group-hover:text-white transition-colors duration-500" />
-                  </div>
-                  
-                  <h3 className="text-2xl font-bold text-slate-900 mb-4 group-hover:text-teal-900 transition-colors duration-300">
-                    {feature.title}
-                  </h3>
-                  
-                  <p className="text-slate-500 leading-relaxed group-hover:text-slate-600 transition-colors duration-300 flex-grow">
-                    {feature.desc}
-                  </p>
-
-                  
-                </div>
-              </div>
+                <img src={problem.image} alt={problem.title} />
+              </article>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Pricing Plans Section */}
-      <section id="pricing" className="py-24 bg-slate-50 relative z-10 overflow-hidden">
-        {/* Ambient Background Effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
-            {/* Top Left Blob */}
-            <div className="absolute top-0 -left-20 w-[500px] h-[500px] bg-teal-200/30 rounded-full blur-[80px] mix-blend-multiply animate-pulse"></div>
-            
-            {/* Bottom Right Blob */}
-            <div className="absolute bottom-0 -right-20 w-[500px] h-[500px] bg-emerald-200/30 rounded-full blur-[80px] mix-blend-multiply animate-pulse delay-1000"></div>
-            
-            {/* Center Decorative Circle */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-slate-200/50 rounded-full"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] border border-slate-200/50 rounded-full opacity-70"></div>
-            
-            {/* Floating Geometric Shapes */}
-            <div className="absolute top-20 right-20 w-24 h-24 bg-gradient-to-br from-teal-100 to-emerald-100 rounded-2xl rotate-12 blur-sm opacity-60"></div>
-            <div className="absolute bottom-40 left-20 w-32 h-32 bg-gradient-to-tr from-blue-100 to-teal-100 rounded-full blur-sm opacity-60"></div>
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-slate-900 tracking-tight">
-              Simple, Transparent <span className="bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Pricing</span>
-            </h2>
-            <p className="text-xl text-slate-600 max-w-2xl mx-auto font-light">
-              Choose the perfect plan to accelerate your credit journey. Transparent pricing, no hidden fees.
-            </p>
-          </div>
-
-          {/* Billing Cycle Tabs */}
-          <div className="flex justify-center mb-16">
-            <Tabs value={billingFilter} onValueChange={(val) => setBillingFilter(val as 'monthly' | 'yearly')} className="w-full max-w-md">
-              <TabsList className="grid w-full grid-cols-2 p-1.5 bg-teal-50/50 border border-teal-100 rounded-full h-16 shadow-lg">
-                <TabsTrigger 
-                  value="monthly" 
-                  className="rounded-full h-full text-slate-600 data-[state=active]:bg-white data-[state=active]:text-teal-700 data-[state=active]:shadow-sm transition-all duration-300 font-medium text-base"
-                >
-                  Monthly
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="yearly" 
-                  className="group rounded-full h-full text-slate-600 data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-600 data-[state=active]:to-emerald-600 data-[state=active]:!text-white data-[state=active]:font-semibold data-[state=active]:shadow-md transition-all duration-300 font-medium text-base relative overflow-hidden"
-                >
-                  Yearly <span className="ml-2 text-xs bg-teal-100/50 text-teal-800 group-data-[state=active]:bg-white/20 group-data-[state=active]:!text-white px-2 py-0.5 rounded-full transition-colors duration-300">2 months free</span>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {plansLoading ? (
-             <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-             </div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto items-center">
-              {plans.filter(p => p.billing_cycle === billingFilter).map((plan, index) => (
-                <Card key={plan.id} className={`relative border transition-all duration-500 flex flex-col h-full ${
-                  index === 1 
-                    ? 'border-teal-500 shadow-[0_20px_60px_-15px_rgba(20,184,166,0.3)] bg-white scale-105 z-10' 
-                    : 'border-slate-200 bg-white/50 backdrop-blur-sm hover:border-teal-200 hover:shadow-xl'
-                }`}>
-                  {index === 1 && (
-                    <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 w-full text-center">
-                      <div className="inline-block bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-600 text-white px-6 py-1.5 text-sm font-bold uppercase tracking-wider rounded-full shadow-lg shadow-emerald-600/30 animate-shimmer bg-[length:200%_100%]">
-                        Most Popular
-                      </div>
-                    </div>
-                  )}
-                  
-                  <CardHeader className={`text-center pb-2 ${index === 1 ? 'pt-10' : 'pt-8'}`}>
-                    <CardTitle className="text-2xl font-bold text-slate-900 mb-2">
-                      {plan.name}
-                    </CardTitle>
-                    <CardDescription className="text-slate-500 text-base min-h-[48px] flex items-center justify-center">
-                      {plan.description}
-                    </CardDescription>
-                    <div className="mt-8 flex items-baseline justify-center text-slate-900">
-                      <span className="text-lg text-slate-500 mr-1">$</span>
-                      <span className="text-6xl font-bold tracking-tighter">{plan.price}</span>
-                      <span className="text-lg text-slate-500 ml-1">/{plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}</span>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="px-8 pb-8 pt-6 flex-grow flex flex-col">
-                    <div className="w-full h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent mb-8"></div>
-                    
-                    <div className="space-y-5 mb-8 flex-grow">
-                      {plan.features.map((feature, i) => (
-                        <div key={i} className="flex items-start group">
-                          <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5 mr-3 transition-colors ${
-                             index === 1 ? 'bg-teal-100 text-teal-600 group-hover:bg-teal-600 group-hover:text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200 group-hover:text-slate-700'
-                          }`}>
-                            <CheckCircle className="w-4 h-4" />
-                          </div>
-                          <span className={`text-sm leading-relaxed transition-colors ${
-                            index === 1 ? 'text-slate-600 group-hover:text-slate-900' : 'text-slate-500 group-hover:text-slate-700'
-                          }`}>{feature}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="border-t border-slate-200 pt-6 mb-8 space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Max Users:</span>
-                        <span className="font-semibold text-slate-900">{plan.max_users ?? 'Unlimited'}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-500">Max Clients:</span>
-                        <span className="font-semibold text-slate-900">{plan.max_clients ?? 'Unlimited'}</span>
-                      </div>
-                    </div>
-                    
-                    <Button 
-                      onClick={() => handleGetStarted(plan.id)}
-                      className={`w-full py-7 text-lg font-semibold rounded-2xl transition-all duration-300 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white shadow-lg shadow-teal-600/20 hover:shadow-teal-600/30 hover:-translate-y-1 ${
-                        index === 1 ? 'shadow-teal-600/40 ring-2 ring-teal-500/20' : ''
-                      }`}
-                    >
-                      Choose {plan.name}
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+        <section id="how" className="av2-section av2-how">
+          <div className="av2-shell">
+            <div className="av2-section-heading reveal"><p className="av2-eyebrow">How it works</p><h2>From Complex Information to a <span>Clearer View</span></h2></div>
+            <div className="av2-steps">
+              {[['1', 'Connect', 'Bring supported profile information into one organized experience.'], ['2', 'Analyze', 'The platform organizes data and highlights important information.'], ['3', 'Understand', 'Review strengths, negative information, limiting factors, and differences.'], ['4', 'Track & Manage', 'Use monitoring, goal tracking, education, and self-service tools.']].map(([number, title, text]) => <article className="reveal" key={number}><span>{number}</span><h3>{title}</h3><p>{text}</p></article>)}
             </div>
-          )}
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section ref={ctaRef} className="py-32 relative overflow-hidden bg-black">
-        {/* Animated Background Elements */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-black to-black opacity-80"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22><filter id=%22n%22><feTurbulence type=%22fractalNoise%22 baseFrequency=%220.85%22 numOctaves=%222%22 stitchTiles=%22stitch%22/></filter><rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/></svg>')] opacity-10 mix-blend-overlay"></div>
-        
-        {/* Glowing Orbs */}
-        <div className="cta-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-500/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none"></div>
-        <div className="cta-glow absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[100px] mix-blend-screen pointer-events-none delay-150"></div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-5xl mx-auto text-center">
-            
-            <div className="cta-content mb-8 inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/50 border border-slate-800 backdrop-blur-md">
-              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span className="text-sm font-medium text-white">
-                Exclusive Invitation
-              </span>
-            </div>
-
-            <h2 className="cta-content text-5xl md:text-7xl font-bold mb-8 tracking-tight text-white leading-tight">
-              Start Your Journey <br />
-              <span className="text-white">
-                With The Capsol
-              </span>
-            </h2>
-            
-            <p className="cta-content text-xl md:text-2xl text-slate-200 mb-12 max-w-3xl mx-auto leading-relaxed font-light">
-              Join <span className="text-white font-medium">{affiliate.firstName}</span> and others who are working to improve their credit management using The Capsol tools. Outcomes vary and are not guaranteed.
-            </p>
-
-            <div className="cta-content flex flex-col sm:flex-row items-center justify-center gap-6">
-              <Button 
-                onClick={scrollToPricing}
-                size="lg" 
-                className="group relative h-16 px-12 text-lg font-semibold rounded-full bg-white text-black hover:bg-slate-100 transition-all duration-300 shadow-[0_0_40px_-10px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_-15px_rgba(255,255,255,0.5)] hover:-translate-y-1"
-              >
-                Get Started Now
-                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </Button>
-            </div>
-
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Footer */}
-      <ReferralFooter affiliate={affiliate} />
-      
-     
+        <section id="features" className="av2-shell av2-section">
+          <div className="av2-section-heading reveal"><p className="av2-eyebrow">Features</p><h2>One Platform. <span>A More Complete View.</span></h2></div>
+          <div className="av2-feature-grid">
+            {features.map(({ icon: Icon, title, text }) => <article className="reveal" key={title}><div><Icon /></div><h3>{title}</h3><p>{text}</p></article>)}
+          </div>
+        </section>
+
+        <section className="av2-shell av2-section av2-audiences">
+          <div className="av2-section-heading reveal"><h2>Built for <span>Different Stages of Growth</span></h2></div>
+          <div>{[['Individual Users', 'A clearer understanding of your own profile.'], ['Growing Professionals', 'Organize and manage multiple clients.'], ['Established Teams', 'Greater user and client capacity.'], ['High-Volume Operations', 'Broad access for larger organizations.']].map(([title, text]) => <article className="reveal" key={title}><h3>{title}</h3><p>{text}</p></article>)}</div>
+        </section>
+
+        <section id="pricing" className="av2-section av2-pricing">
+          <div className="av2-shell">
+            <div className="av2-section-heading reveal"><p className="av2-eyebrow cyan">Pricing</p><h2>Choose the Capacity That <span>Fits Your Workflow</span></h2><p>Every available plan includes the platform’s core profile-analysis and self-service tools.</p></div>
+            <div className="av2-toggle reveal" role="group" aria-label="Billing period">
+              <button className={billingFilter === "monthly" ? "active" : ""} onClick={() => setBillingFilter("monthly")}>Monthly</button>
+              <button className={billingFilter === "yearly" ? "active" : ""} onClick={() => setBillingFilter("yearly")}>Yearly</button>
+            </div>
+            {plansLoading ? <div className="affiliate-spinner" /> : visiblePlans.length ? (
+              <div className="av2-plan-grid">
+                {visiblePlans.map((plan, index) => (
+                  <article className={`av2-plan reveal ${index === 1 ? "popular" : ""}`} key={plan.id}>
+                    {index === 1 && <span className="av2-plan-badge">Most popular</span>}
+                    <small>{plan.name}</small><p>{plan.description}</p>
+                    <div className="av2-price"><strong>${Number(plan.price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong><span>/{plan.billing_cycle === "monthly" ? "month" : plan.billing_cycle === "yearly" ? "year" : "once"}</span></div>
+                    <div className="av2-capacity"><span>{plan.max_users ?? "Unlimited"} {plan.max_users === 1 ? "user" : "users"}</span><span>{plan.max_clients ?? "Unlimited"} {plan.max_clients === 1 ? "client" : "clients"}</span></div>
+                    <ul>{plan.features.map((feature) => <li key={feature}><Check />{feature}</li>)}</ul>
+                    <button className={`av2-button ${index === 1 ? "av2-button-primary" : "av2-button-ghost"}`} onClick={() => handleGetStarted(plan.id)}>Choose {plan.name}</button>
+                  </article>
+                ))}
+              </div>
+            ) : <p className="av2-no-plans">No {billingFilter} plans are currently available. Try the other billing option.</p>}
+          </div>
+        </section>
+
+        <section className="av2-shell av2-section">
+          <div className="av2-recommendation reveal">
+            <div><p className="av2-eyebrow">Personal recommendation</p><h2>Recommended by <span>{affiliate.name}</span></h2><p>{affiliate.firstName} invited you to explore The Score Machine and determine whether its tools and subscription options fit your needs.</p><div className="av2-partner"><strong>{affiliate.name}</strong><span>{organization}</span><small>Official Affiliate</small></div><div className="av2-button-row"><button className="av2-button av2-button-primary" onClick={() => scrollTo("pricing")}>See plans</button><a className="av2-button av2-button-ghost" href={referralLink}>Open referral link</a></div></div>
+            <div className="av2-qr"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(referralLink)}`} alt={`QR code for ${affiliate.name}'s referral link`} /><span>Scan to visit the referral link</span></div>
+          </div>
+        </section>
+
+        <section id="faq" className="av2-shell av2-section av2-faq">
+          <div className="av2-section-heading reveal"><p className="av2-eyebrow violet">FAQ</p><h2>Frequently <span>Asked Questions</span></h2></div>
+          <div className="reveal">{faqs.map(([question, answer], index) => <article className={openFaq === index ? "open" : ""} key={question}><button aria-expanded={openFaq === index} onClick={() => setOpenFaq(openFaq === index ? null : index)}><span>{question}</span><ChevronDown /></button><div><p>{answer}</p></div></article>)}</div>
+        </section>
+
+        <section className="av2-final-cta">
+          <div className="reveal"><p className="av2-eyebrow">Your profile is more than one number</p><h2>Get a Clearer View of <span>What Is On Your Profile.</span></h2><p>Explore The Score Machine’s analysis, monitoring, workflow, and self-service tools through the plan that fits your needs.</p><div className="av2-button-row"><button className="av2-button av2-button-primary" onClick={() => scrollTo("pricing")}>Compare plans</button><button className="av2-button av2-button-ghost" onClick={() => handleGetStarted()}>Get started</button></div></div>
+        </section>
+      </main>
+
+      <footer className="av2-footer">
+        <div className="av2-shell av2-footer-grid"><div><div className="av2-brand"><img src="/image.png" alt="" /><span>The Score Machine</span></div><p>A credit-intelligence and workflow platform for organizing, analyzing, and monitoring profile information.</p></div><div><strong>Platform</strong><button onClick={() => scrollTo("platform")}>Platform</button><button onClick={() => scrollTo("pricing")}>Pricing</button><button onClick={() => scrollTo("faq")}>FAQ</button></div><div><strong>Policies</strong><a href="/privacy">Privacy Policy</a><a href="/terms">Terms & Conditions</a><a href="/refund">Refund Policy</a></div><div><strong>Referred by</strong><span>{affiliate.name}</span><small>{organization}</small></div></div>
+        <div className="av2-shell av2-footer-legal"><p>The Score Machine is a software and educational platform. It is not a lender, law firm, credit bureau, or financial adviser. The platform does not guarantee score changes, removals, approvals, funding, rates, limits, or other third-party outcomes.</p><p>This page contains affiliate links. The referring affiliate may receive compensation from qualifying purchases.</p><span>© {new Date().getFullYear()} The Score Machine. All rights reserved.</span></div>
+      </footer>
+
+      {disclosureOpen && <div className="av2-modal" role="dialog" aria-modal="true" aria-labelledby="disclosure-title" onMouseDown={(event) => event.target === event.currentTarget && setDisclosureOpen(false)}><div><button className="av2-modal-close" aria-label="Close disclosure" onClick={() => setDisclosureOpen(false)}><X /></button><h2 id="disclosure-title">Affiliate Disclosure</h2><p>This page contains an affiliate link. {affiliate.name} may receive compensation when a qualifying purchase is made.</p><p>You were referred by <strong>{affiliate.name}</strong> of {organization}. Your decision to explore or purchase The Score Machine is entirely your own.</p><button className="av2-button av2-button-primary" onClick={() => setDisclosureOpen(false)}>Close</button></div></div>}
     </div>
   );
 };

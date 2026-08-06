@@ -9,6 +9,8 @@ import { Dispute } from '../database/enhancedSchema.js';
 import { AuthRequest } from '../middleware/securityMiddleware.js';
 import { sanitizeInput } from '../config/security.js';
 import { appendClientDocumentsToPdf, loadClientDocumentsForClient } from '../utils/disputeLetterClientDocuments.js';
+import { selectDisputeLetterCategoryRoundRows } from '../utils/disputeLetterContentLookup.js';
+import { sendDisputeLetterGeneratedNotificationInBackground } from '../services/disputeLetterNotificationService.js';
 
 const ACTIVE_EMPLOYEE_STATUS = 'active';
 const DISPUTE_CONTENT_TYPES = ['BASIC', 'STANDARD', 'ENHANCED', 'ELITE', 'UNLIMITED'] as const;
@@ -225,6 +227,10 @@ const FLAT_CATEGORY_LOOKUP_ALIASES: Partial<Record<CategoryKey, readonly string[
   PUBLIC_RECORDS: ['Public Record', 'Public Records'],
 };
 
+const BASIC_FLAT_CATEGORY_LOOKUP_ALIASES: Partial<Record<CategoryKey, readonly string[]>> = {
+  CHARGE_OFFS: ['Charge Off Collection Repossession'],
+};
+
 const detectCategoryKeyFromText = (value: string): CategoryKey => {
   const text = String(value || '').toLowerCase();
   if (text.includes('inquir')) return 'INQUIRIES';
@@ -252,7 +258,11 @@ const mapCategoryNameToKey = (value: string | null | undefined): CategoryKey => 
   return 'OTHER';
 };
 
-const getFlatCategoryLookupNames = (resolvedName: string, categoryKey: CategoryKey) => {
+const getFlatCategoryLookupNames = (
+  resolvedName: string,
+  categoryKey: CategoryKey,
+  contentType: string,
+) => {
   const lookupNames = new Map<string, string>();
 
   const addName = (value: string | null | undefined) => {
@@ -267,6 +277,11 @@ const getFlatCategoryLookupNames = (resolvedName: string, categoryKey: CategoryK
   addName(resolvedName);
   for (const alias of FLAT_CATEGORY_LOOKUP_ALIASES[categoryKey] || []) {
     addName(alias);
+  }
+  if (contentType === 'BASIC') {
+    for (const alias of BASIC_FLAT_CATEGORY_LOOKUP_ALIASES[categoryKey] || []) {
+      addName(alias);
+    }
   }
 
   return Array.from(lookupNames.values());
@@ -635,6 +650,8 @@ const parseFlatTableItems = (value: any): FlatTableItemPayload[] => {
 type FlatTableRow = {
   id: number;
   bureau: string;
+  round: number;
+  category: string;
   block: string;
   clause_content: string;
 };
@@ -2181,19 +2198,29 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
       const flatBureauCode = normalizeSupportBureau(dispute.bureau || '').code;
       const flatRound = Number(disputeRound) || 1;
       const flatContentType = normalizeDisputeContentType(q.content_type);
-      const flatCategoryLookupNames = getFlatCategoryLookupNames(flatCategoryName, categoryKey);
+      const flatCategoryLookupNames = getFlatCategoryLookupNames(
+        flatCategoryName,
+        categoryKey,
+        flatContentType,
+      );
 
       console.log(`[generateDisputeLetter] 🔍 FLAT TABLE LOOKUP: category_hint="${q.category_hint}", resolved="${flatCategoryName}", lookup_names="${flatCategoryLookupNames.join(' | ')}", bureau="${flatBureauCode}", round=${flatRound}, type=${flatContentType}`);
 
       if (flatCategoryLookupNames.length > 0) {
         try {
           const categoryPlaceholders = flatCategoryLookupNames.map(() => '?').join(', ');
-          const flatRows = (await allQuery(
-            `SELECT * FROM dispute_letter_content WHERE bureau IN (?, ?) AND round = ? AND category IN (${categoryPlaceholders}) AND \`type\` = ?`,
+          const queriedFlatRows = (await allQuery(
+            `SELECT * FROM dispute_letter_content WHERE bureau IN (?, ?) AND round IN (?, 0) AND category IN (${categoryPlaceholders}) AND \`type\` = ?`,
             [flatBureauCode, 'ALL', flatRound, ...flatCategoryLookupNames, flatContentType]
           )) as FlatTableRow[];
+          const selectedFlatContent = selectDisputeLetterCategoryRoundRows(
+            queriedFlatRows,
+            flatRound,
+            flatCategoryLookupNames,
+          );
+          const flatRows = selectedFlatContent.rows;
 
-          console.log(`[generateDisputeLetter] 🔍 FLAT TABLE RESULT: bureau=${flatBureauCode}/ALL, categories=${flatCategoryLookupNames.join(' | ')}, type=${flatContentType}, ${flatRows.length} rows found`);
+          console.log(`[generateDisputeLetter] 🔍 FLAT TABLE RESULT: bureau=${flatBureauCode}/ALL, requested_round=${flatRound}, selected_round=${flatRows[0]?.round ?? 'none'}, requested_category="${flatCategoryName}", selected_category="${selectedFlatContent.category || 'none'}", category_priority=${flatCategoryLookupNames.join(' | ')}, type=${flatContentType}, ${flatRows.length} selected rows (${queriedFlatRows.length} queried)`);
 
           if (flatRows.length > 0) {
             const slotBuckets = buildFlatTableSlotBuckets(flatRows, flatBureauCode);
@@ -2292,7 +2319,7 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
               contentHtml = containsHtmlMarkup(processed) ? processed : '';
               selectedClauseIds = pickedIds;
               usedFlatTable = true;
-              console.log(`[generateDisputeLetter] ✅ Used dispute_letter_content: bureau=${flatBureauCode}/ALL, round=${flatRound}, category="${flatCategoryName}", type=${flatContentType}, intro_slot=${introSlotUsed || 'none'}, picked_slots=${pickedNonHeaderSlots}, total_rows=${flatRows.length}`);
+              console.log(`[generateDisputeLetter] ✅ Used dispute_letter_content: bureau=${flatBureauCode}/ALL, round=${flatRound}, requested_category="${flatCategoryName}", selected_category="${selectedFlatContent.category}", type=${flatContentType}, intro_slot=${introSlotUsed || 'none'}, picked_slots=${pickedNonHeaderSlots}, total_rows=${flatRows.length}`);
             }
           }
         } catch (flatErr: any) {
@@ -2305,7 +2332,7 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
         const flatBureauCode2 = normalizeSupportBureau(dispute.bureau || '').code;
         const flatRound2 = Number(disputeRound) || 1;
         const flatContentType2 = normalizeDisputeContentType(q.content_type);
-        const noContentMsg = `<p><strong>No letter content found.</strong></p><p>No content exists in the dispute_letter_content table for: requested bureau=<strong>${flatBureauCode2}</strong> or shared bureau=<strong>ALL</strong>, round=<strong>${flatRound2}</strong>, category=<strong>${flatCategoryName || '(none)'}</strong>, type=<strong>${flatContentType2}</strong>.</p><p>Please add content for this combination in the Super Admin → Letters page.</p>`;
+        const noContentMsg = `<p><strong>No letter content found.</strong></p><p>No content exists in the dispute_letter_content table for: requested bureau=<strong>${flatBureauCode2}</strong> or shared bureau=<strong>ALL</strong>, round=<strong>${flatRound2}</strong> or shared round=<strong>All Rounds</strong>, category=<strong>${flatCategoryName || '(none)'}</strong>, type=<strong>${flatContentType2}</strong>.</p><p>Please add content for this combination in the Super Admin → Letters page.</p>`;
         content = noContentMsg;
         contentHtml = noContentMsg;
         console.warn(`[generateDisputeLetter] ⚠️ NO flat-table content for bureau=${flatBureauCode2}, round=${flatRound2}, category="${flatCategoryName}", type=${flatContentType2}`);
@@ -2420,13 +2447,14 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
     const output = String(q.format || q.output || '').toLowerCase();
 
     let historyRecordId: number | null = null;
+    let createdHistoryRecord = false;
 
     // ── Save letter history (skip for PDF — JSON call already saved) ────
     if (output !== 'pdf') {
       try {
         const recentRecord = await getQuery(
-          `SELECT * FROM dispute_letter_history WHERE user_id = ? AND dispute_round = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND) ORDER BY created_at DESC LIMIT 1`,
-          [req.user!.id, disputeRound]
+          `SELECT * FROM dispute_letter_history WHERE user_id = ? AND client_id = ? AND dispute_round = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND) ORDER BY created_at DESC LIMIT 1`,
+          [req.user!.id, dispute.client_id, disputeRound]
         );
         if (recentRecord) {
           historyRecordId = Number(recentRecord.id);
@@ -2434,11 +2462,26 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
           const mergedBureaus = Array.from(new Set([...safeJsonParse(recentRecord.bureaus, []), bureauConfig.name]));
           await runQuery(`UPDATE dispute_letter_history SET bureaus = ? WHERE id = ?`, [JSON.stringify(mergedBureaus), recentRecord.id]);
         } else {
-          const insertResult = await runQuery(
-            `INSERT INTO dispute_letter_history (user_id, client_id, dispute_id, bureaus, negative_item_types, dispute_round, templates_used, template_count, template_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [req.user!.id, dispute.client_id || null, disputeId, JSON.stringify([bureauConfig.name]), JSON.stringify([tradelineTypeValue].filter(Boolean)), disputeRound, '[]', 0, effectiveTemplateSource]
-          );
+          const historyValues = [req.user!.id, dispute.client_id || null, disputeId, JSON.stringify([bureauConfig.name]), JSON.stringify([tradelineTypeValue].filter(Boolean)), disputeRound, '[]', 0, effectiveTemplateSource];
+          let insertResult;
+          try {
+            insertResult = await runQuery(
+              `INSERT INTO dispute_letter_history (user_id, client_id, dispute_id, bureaus, negative_item_types, dispute_round, templates_used, template_count, template_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              historyValues
+            );
+          } catch (insertError: any) {
+            const missingIdDefault = insertError?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+              && String(insertError?.message || insertError?.sqlMessage || '').includes("Field 'id'");
+            if (!missingIdDefault) throw insertError;
+
+            insertResult = await runQuery(
+              `INSERT INTO dispute_letter_history (id, user_id, client_id, dispute_id, bureaus, negative_item_types, dispute_round, templates_used, template_count, template_source)
+               SELECT COALESCE(MAX(id), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM dispute_letter_history`,
+              historyValues
+            );
+          }
           historyRecordId = Number((insertResult as any).insertId || (insertResult as any).lastID || 0) || null;
+          createdHistoryRecord = Boolean(historyRecordId);
         }
       } catch (histErr) {
         console.error('Failed to save dispute letter history:', histErr);
@@ -2467,6 +2510,10 @@ export async function generateDisputeLetter(req: AuthRequest, res: Response) {
       res.setHeader('Content-Disposition', 'inline; filename="dispute-letter.pdf"');
       res.end(finalPdf);
       return;
+    }
+
+    if (createdHistoryRecord && dispute.client_id) {
+      sendDisputeLetterGeneratedNotificationInBackground({ clientId: Number(dispute.client_id) });
     }
 
     // ── JSON output (default) ────────────────────────────────────────────
@@ -2857,6 +2904,10 @@ export async function generateCreditRepairLetters(req: AuthRequest, res: Respons
 
     if (letters.length === 0 && errors.length > 0) {
       return res.status(400).json({ success: false, error: 'Letter generation failed', errors });
+    }
+
+    if (letters.length > 0) {
+      sendDisputeLetterGeneratedNotificationInBackground({ clientId: Number(client.id) });
     }
 
     return res.json({

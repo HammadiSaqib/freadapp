@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,13 @@ import AddClientDialog from "@/components/AddClientDialog";
 import PaymentForm from "@/components/PaymentForm";
 import EliteSchool from "@/components/EliteSchool";
 import BasicSchool from "@/components/BasicSchool";
+
+import BasicMapsTab from "@/components/BasicMapsTab";
+import BasicAboutTab from "@/components/BasicAboutTab";
+import BasicDirectoryTab from "@/components/BasicDirectoryTab";
+import BasicCommunityTab from "@/components/BasicCommunityTab";
+import BasicAdminCalendar from "@/components/BasicAdminCalendar";
+
 import { CommunityFeed } from "@/components/community/CommunityFeed";
 import Groups from "@/components/community/Groups";
 import AdminCalendar from "@/components/AdminCalendar";
@@ -157,8 +164,28 @@ interface BusinessDirectory {
   business_email: string;
   business_phone_number: string;
   business_address: string;
+  description: string;
   logo_url: string | null;
+  status?: "pending" | "approved" | "rejected";
+  created_at?: string | null;
+  updated_at?: string | null;
 }
+
+interface DirectoryApplicationFormState {
+  business_name: string;
+  business_email: string;
+  business_phone_number: string;
+  business_address: string;
+  description: string;
+}
+
+const EMPTY_DIRECTORY_APPLICATION_FORM: DirectoryApplicationFormState = {
+  business_name: "",
+  business_email: "",
+  business_phone_number: "",
+  business_address: "",
+  description: "",
+};
 
 interface Badge {
   id: number;
@@ -323,6 +350,9 @@ export default function School() {
   const subscriptionStatus = useSubscriptionStatus();
   const { userProfile } = useAuthContext();
   const { isEliteActive } = useScoreMachineEliteStatus();
+  const isAdminUser = userProfile?.role === "admin";
+  const canApplyForDirectory = isAdminUser;
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
@@ -412,6 +442,15 @@ export default function School() {
   const [businessDirectories, setBusinessDirectories] = useState<BusinessDirectory[]>([]);
   const [businessDirectoriesLoading, setBusinessDirectoriesLoading] = useState<boolean>(true);
   const [businessDirectoriesError, setBusinessDirectoriesError] = useState<string | null>(null);
+  const [myDirectoryApplications, setMyDirectoryApplications] = useState<BusinessDirectory[]>([]);
+  const [myDirectoryApplicationsLoading, setMyDirectoryApplicationsLoading] = useState<boolean>(false);
+  const [isDirectoryApplicationDialogOpen, setIsDirectoryApplicationDialogOpen] = useState(false);
+  const [isSubmittingDirectoryApplication, setIsSubmittingDirectoryApplication] = useState(false);
+  const [directoryApplicationForm, setDirectoryApplicationForm] = useState<DirectoryApplicationFormState>(
+    EMPTY_DIRECTORY_APPLICATION_FORM,
+  );
+  const [directoryApplicationLogoFile, setDirectoryApplicationLogoFile] = useState<File | null>(null);
+  const [selectedBusinessDirectory, setSelectedBusinessDirectory] = useState<BusinessDirectory | null>(null);
   const [userStats, setUserStats] = useState<UserStats>({
     totalPoints: 0,
     currentStreak: 0,
@@ -499,6 +538,49 @@ export default function School() {
     skills: ''
   });
 
+  const normalizeBusinessDirectoryStatus = (
+    status: BusinessDirectory['status'] | undefined,
+  ): 'pending' | 'approved' | 'rejected' => {
+    if (status === 'pending' || status === 'rejected') {
+      return status;
+    }
+
+    return 'approved';
+  };
+
+  const getBusinessDirectoryStatusBadgeClassName = (
+    status: 'pending' | 'approved' | 'rejected',
+  ): string => {
+    if (status === 'pending') {
+      return 'border-amber-300 bg-amber-50 text-amber-800';
+    }
+    if (status === 'rejected') {
+      return 'border-red-300 bg-red-50 text-red-700';
+    }
+    return 'border-emerald-300 bg-emerald-50 text-emerald-700';
+  };
+
+  const resetDirectoryApplicationForm = () => {
+    setDirectoryApplicationForm(EMPTY_DIRECTORY_APPLICATION_FORM);
+    setDirectoryApplicationLogoFile(null);
+  };
+
+  const handleDirectoryApplicationFieldChange = (
+    field: keyof DirectoryApplicationFormState,
+    value: string,
+  ) => {
+    setDirectoryApplicationForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleDirectoryApplicationLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0] || null;
+    setDirectoryApplicationLogoFile(nextFile);
+    event.target.value = '';
+  };
+
   const computeLearningPaths = (sourceCourses: Course[]): LearningPath[] => {
     const groups: Record<string, Course[]> = {};
     for (const c of sourceCourses) {
@@ -538,6 +620,184 @@ export default function School() {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     return `${h}h ${m}m`;
+  };
+
+  const normalizeMediaUrl = (value: unknown, fallback = '/placeholder.png'): string => {
+    const rawValue = String(value || '').trim();
+
+    if (!rawValue || rawValue === '/placeholder-course.jpg' || rawValue === 'uploads/school/default_thumbnil.png') {
+      return fallback;
+    }
+
+    if (/^(?:https?:)?\/\//i.test(rawValue) || rawValue.startsWith('data:') || rawValue.startsWith('blob:')) {
+      return rawValue;
+    }
+
+    if (rawValue.startsWith('/')) {
+      return rawValue;
+    }
+
+    return `/${rawValue.replace(/^\.?\/+/, '')}`;
+  };
+
+  const formatCourseDuration = (course: any): string => {
+    const rawDuration = String(course?.duration || '').trim();
+
+    if (rawDuration) {
+      return rawDuration;
+    }
+
+    const hours = Number(course?.duration_hours || 0);
+    const minutes = Number(course?.duration_minutes || 0);
+
+    if (hours > 0 || minutes > 0) {
+      return [hours > 0 ? `${hours}h` : '', minutes > 0 ? `${minutes}m` : ''].filter(Boolean).join(' ');
+    }
+
+    return '0 mins';
+  };
+
+  const formatFileSize = (value: unknown): string => {
+    const size = Number(value || 0);
+
+    if (!Number.isFinite(size) || size <= 0) {
+      return 'Unknown size';
+    }
+
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    if (size >= 1024) {
+      return `${Math.max(1, Math.round(size / 1024))} KB`;
+    }
+
+    return `${size} B`;
+  };
+
+  const normalizeDocumentType = (value: unknown): 'pdf' | 'doc' | 'ppt' | 'other' => {
+    switch (String(value || '').toLowerCase()) {
+      case 'pdf':
+        return 'pdf';
+      case 'document':
+      case 'doc':
+      case 'docx':
+        return 'doc';
+      case 'ppt':
+      case 'pptx':
+      case 'presentation':
+        return 'ppt';
+      default:
+        return 'other';
+    }
+  };
+
+  const buildFallbackQuizQuestions = (): QuizQuestion[] => [
+    {
+      id: 1,
+      question: 'What is the most important factor in credit scoring?',
+      type: 'multiple-choice',
+      options: ['Payment history', 'Credit utilization', 'Length of credit history', 'Types of credit'],
+      correctAnswer: 0,
+      explanation: 'Payment history accounts for 35% of your credit score and is the most important factor.',
+      points: 10,
+    },
+    {
+      id: 2,
+      question: 'Credit utilization should be kept below what percentage?',
+      type: 'multiple-choice',
+      options: ['10%', '30%', '50%', '70%'],
+      correctAnswer: 1,
+      explanation: 'Keeping credit utilization below 30% is recommended for a good credit score.',
+      points: 10,
+    },
+    {
+      id: 3,
+      question: 'Closing old credit cards always improves your credit score.',
+      type: 'true-false',
+      options: ['True', 'False'],
+      correctAnswer: 1,
+      explanation: 'False. Closing old cards can actually hurt your score by reducing your credit history length and available credit.',
+      points: 10,
+    },
+  ];
+
+  const normalizeSchoolCourse = (
+    courseSummary: any,
+    courseDetails: any,
+    enrollmentState: { isEnrolled: boolean; progress: number },
+  ): Course => {
+    const source = {
+      ...courseSummary,
+      ...courseDetails,
+    };
+    const materials = Array.isArray(courseDetails?.materials)
+      ? courseDetails.materials
+      : Array.isArray(source?.materials)
+        ? source.materials
+        : [];
+    const videos = Array.isArray(courseDetails?.videos)
+      ? courseDetails.videos
+      : Array.isArray(source?.videos)
+        ? source.videos
+        : [];
+    const quizzes = Array.isArray(courseDetails?.quizzes)
+      ? courseDetails.quizzes
+      : Array.isArray(source?.quizzes)
+        ? source.quizzes
+        : [];
+    const thumbnailUrl = normalizeMediaUrl(
+      source.thumbnail_url || source.thumbnail || source.image_url,
+      '/placeholder.png',
+    );
+    const previewVideoUrl = String(
+      source.preview_video_url || videos[0]?.video_url || source.video_url || '',
+    ).trim();
+    const normalizedVideoUrl = previewVideoUrl ? normalizeMediaUrl(previewVideoUrl, '') : '';
+    const instructorName = String(
+      source.instructor_name || source.instructor || source.creator_name || 'Instructor',
+    ).trim() || 'Instructor';
+    const difficulty = String(source.level || source.difficulty || 'beginner').toLowerCase() as Course['difficulty'];
+    const categoryName = String(source.category_name || source.category || 'General').trim() || 'General';
+    const price = Number(source.price || 0);
+    const isFree = source.is_free === true || source.is_free === 1 || price <= 0;
+
+    return {
+      id: Number(source.id),
+      title: String(source.title || 'Untitled Course'),
+      description: String(source.description || ''),
+      instructor: instructorName,
+      duration: formatCourseDuration(source),
+      difficulty: ['beginner', 'intermediate', 'advanced'].includes(difficulty) ? difficulty : 'beginner',
+      rating: Number(source.rating || 0) || 4.5,
+      enrolled: Number(source.enrollment_count || source.enrolled || 0),
+      chapters: Number(source.modules_count || source.chapters || 0),
+      progress: enrollmentState.progress,
+      points: Number(source.points || 0),
+      image: thumbnailUrl,
+      isEnrolled: enrollmentState.isEnrolled,
+      isCompleted: enrollmentState.progress >= 100,
+      featured: Boolean(source.featured),
+      price,
+      originalPrice: source.original_price ? Number(source.original_price) : undefined,
+      isPaid: !isFree,
+      thumbnail: thumbnailUrl,
+      videoUrl: normalizedVideoUrl || undefined,
+      documents: materials.map((material: any) => ({
+        id: Number(material.id),
+        title: String(material.title || material.file_name || 'Course Material'),
+        url: normalizeMediaUrl(material.file_url, ''),
+        type: normalizeDocumentType(material.file_type),
+        size: formatFileSize(material.file_size),
+      })),
+      hasQuiz: quizzes.length > 0 || Number(source.quizzes_count || 0) > 0 || Boolean(source.has_quiz),
+      quizCompleted: Boolean(source.quiz_completed),
+      quizScore: source.quiz_score ? Number(source.quiz_score) : undefined,
+      category: categoryName,
+      quizQuestions: Array.isArray(source.quiz_questions) && source.quiz_questions.length > 0
+        ? source.quiz_questions
+        : buildFallbackQuizQuestions(),
+    };
   };
 
   const computeCourseMaps = (sourceCourses: Course[]): CourseMap[] => {
@@ -714,111 +974,75 @@ export default function School() {
     fetchBusinessDirectories();
   }, []);
 
+  const fetchMyDirectoryApplications = async () => {
+    if (!canApplyForDirectory) {
+      setMyDirectoryApplications([]);
+      return;
+    }
+
+    try {
+      setMyDirectoryApplicationsLoading(true);
+      const response = await schoolManagementApi.getMyBusinessDirectoryApplications();
+      const payload: any = response?.data || response;
+      const nextApplications = payload?.directories ?? payload?.data?.directories ?? [];
+      setMyDirectoryApplications(Array.isArray(nextApplications) ? nextApplications : []);
+    } catch (error) {
+      console.error('Failed to load my business directory applications:', error);
+      setMyDirectoryApplications([]);
+    } finally {
+      setMyDirectoryApplicationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchMyDirectoryApplications();
+  }, [canApplyForDirectory]);
+
   // Fetch courses from backend
   const fetchCourses = async () => {
       try {
         console.log('🔄 Starting course fetch...');
         setCoursesLoading(true);
-    const response = await coursesApi.getCourses();
+    const response = await schoolManagementApi.getCourses({ page: 1, limit: 100 });
     console.log('📡 API Response:', response);
     
-    // coursesApi.getCourses uses fetch() and returns raw JSON with { success, data: { courses } }
-    const coursesArray = (response && response.success && response.data?.courses && Array.isArray(response.data.courses))
-      ? response.data.courses
-      : (Array.isArray((response as any)?.courses) ? (response as any).courses : []);
+    const payload: any = response?.data;
+    const coursesArray = payload?.success && Array.isArray(payload?.data?.courses)
+      ? payload.data.courses
+      : Array.isArray(payload?.courses)
+        ? payload.courses
+        : Array.isArray(payload)
+          ? payload
+          : [];
     
     if (Array.isArray(coursesArray) && coursesArray.length >= 0) {
       console.log('✅ Valid response data received:', coursesArray.length, 'courses');
       
       // Transform backend data to match frontend interface and check enrollment status
-      const transformedCourses = await Promise.all(coursesArray.map(async (course: any) => {
-        // Check enrollment status for each course
+      const transformedCourses = await Promise.all(coursesArray.map(async (courseSummary: any) => {
+        const [enrollmentResult, courseDetailResult] = await Promise.allSettled([
+          coursesApi.checkEnrollment(Number(courseSummary.id)),
+          schoolManagementApi.getCourse(String(courseSummary.id)),
+        ]);
+
         let isEnrolled = false;
         let progress = 0;
-        try {
-          const enrollmentResponse = await coursesApi.checkEnrollment(course.id);
-          // coursesApi.checkEnrollment uses fetch() and returns raw JSON { isEnrolled, enrollment }
-          isEnrolled = (enrollmentResponse as any)?.isEnrolled || false;
-          progress = (enrollmentResponse as any)?.enrollment?.progress || 0;
-        } catch (error) {
-          console.warn(`Failed to check enrollment for course ${course.id}:`, error);
-          // Default to false if check fails
-          isEnrolled = false;
+
+        if (enrollmentResult.status === 'fulfilled') {
+          isEnrolled = Boolean((enrollmentResult.value as any)?.isEnrolled);
+          progress = Number((enrollmentResult.value as any)?.enrollment?.progress || 0);
+        } else {
+          console.warn(`Failed to check enrollment for course ${courseSummary.id}:`, enrollmentResult.reason);
         }
 
-            const transformed = {
-              id: course.id,
-              title: course.title,
-              description: course.description,
-              instructor: course.instructor,
-              duration: course.duration?.toString() || '0 mins',
-              difficulty: course.difficulty,
-              rating: 4.5, // Default rating since not in backend
-              enrolled: 0, // Default enrolled count
-              chapters: course.chapters || 0,
-              progress: progress, // Use actual progress from enrollment
-              points: course.points || 0,
-              // Prefer backend thumbnail_url; fall back to image_url; finally to a valid local placeholder
-              image: (course.thumbnail_url && course.thumbnail_url !== '/placeholder-course.jpg')
-                ? course.thumbnail_url
-                : (course.image_url && course.image_url !== '/placeholder-course.jpg')
-                  ? course.image_url
-                  : 'uploads/school/default_thumbnil.png',
-              isEnrolled: isEnrolled, // Use actual enrollment status
-              isCompleted: progress >= 100, // Mark as completed if progress is 100%
-              featured: Boolean(course.featured),
-              // New fields for enhanced functionality
-              price: course.price || 0,
-              originalPrice: course.original_price,
-              isPaid: !course.is_free, // Backend returns is_free, so we invert it to get isPaid
-              // Use thumbnail_url when available; avoid broken '/placeholder-course.jpg' by falling back to '/placeholder.png'
-              thumbnail: (course.thumbnail_url && course.thumbnail_url !== '/placeholder-course.jpg')
-                ? course.thumbnail_url
-                : (course.thumbnail && course.thumbnail !== '/placeholder-course.jpg')
-                  ? course.thumbnail
-                  : (course.image_url && course.image_url !== '/placeholder-course.jpg')
-                    ? course.image_url
-                    : 'uploads/school/default_thumbnil.png',
-              videoUrl: course.video_url,
-              documents: course.documents || [],
-              hasQuiz: course.has_quiz || false,
-              quizCompleted: course.quiz_completed || false,
-              quizScore: course.quiz_score,
-              category: course.category || 'General',
-              // Sample quiz questions for demonstration
-              quizQuestions: course.quiz_questions || [
-                {
-                  id: 1,
-                  question: "What is the most important factor in credit scoring?",
-                  type: 'multiple-choice' as const,
-                  options: ["Payment history", "Credit utilization", "Length of credit history", "Types of credit"],
-                  correctAnswer: 0,
-                  explanation: "Payment history accounts for 35% of your credit score and is the most important factor.",
-                  points: 10
-                },
-                {
-                  id: 2,
-                  question: "Credit utilization should be kept below what percentage?",
-                  type: 'multiple-choice' as const,
-                  options: ["10%", "30%", "50%", "70%"],
-                  correctAnswer: 1,
-                  explanation: "Keeping credit utilization below 30% is recommended for a good credit score.",
-                  points: 10
-                },
-                {
-                  id: 3,
-                  question: "Closing old credit cards always improves your credit score.",
-                  type: 'true-false' as const,
-                  options: ["True", "False"],
-                  correctAnswer: 1,
-                  explanation: "False. Closing old cards can actually hurt your score by reducing your credit history length and available credit.",
-                  points: 10
-                }
-              ]
-            };
-            console.log(`Course ${course.title}: enrolled=${isEnrolled}, progress=${progress}%`);
-            return transformed;
-          }));
+        const courseDetails = courseDetailResult.status === 'fulfilled'
+          ? courseDetailResult.value?.data?.data || courseSummary
+          : courseSummary;
+
+        const transformed = normalizeSchoolCourse(courseSummary, courseDetails, { isEnrolled, progress });
+        console.log(`Course ${transformed.title}: enrolled=${isEnrolled}, progress=${progress}%`);
+        return transformed;
+      }));
           
           console.log('📚 Setting courses state with', transformedCourses.length, 'courses');
           console.log('⭐ Featured courses:', transformedCourses.filter(c => c.featured).length);
@@ -827,11 +1051,12 @@ export default function School() {
       console.warn('❌ Invalid response structure:', response);
       // Ensure courses is always an array, even on error
       setCourses([]);
-      if (response.error) {
-        console.error('🚨 API Error:', response.error);
+      const payloadError = ((response as any)?.data?.['error'] ?? undefined) as string | undefined;
+      if (payloadError) {
+        console.error('🚨 API Error:', payloadError);
         toast({
           title: "Error",
-          description: response.error || "Failed to load courses",
+          description: payloadError || "Failed to load courses",
           variant: "destructive",
         });
       }
@@ -1024,48 +1249,7 @@ export default function School() {
         });
         setIsCreateCourseOpen(false);
         
-        // Refresh courses list
-        const coursesResponse = await coursesApi.getCourses();
-        const refreshedCourses = (coursesResponse && (coursesResponse as any).success && (coursesResponse as any).data?.courses && Array.isArray((coursesResponse as any).data.courses))
-          ? (coursesResponse as any).data.courses
-          : (Array.isArray((coursesResponse as any)?.courses) ? (coursesResponse as any).courses : []);
-        if (Array.isArray(refreshedCourses)) {
-          const transformedCourses = refreshedCourses.map((course: any) => ({
-            id: course.id,
-            title: course.title,
-            description: course.description,
-            instructor: course.instructor,
-            duration: course.duration?.toString() || '0 mins',
-            difficulty: course.difficulty,
-            rating: 4.5,
-            enrolled: 0,
-            chapters: course.chapters || 0,
-            progress: 0,
-            points: course.points || 0,
-            // Keep image consistent with thumbnail handling
-            image: (course.thumbnail_url && course.thumbnail_url !== '/placeholder-course.jpg')
-              ? course.thumbnail_url
-              : (course.image_url && course.image_url !== '/placeholder-course.jpg')
-                ? course.image_url
-                : '/placeholder.png',
-            // Ensure thumbnail is set for newly created courses
-            thumbnail: (course.thumbnail_url && course.thumbnail_url !== '/placeholder-course.jpg')
-              ? course.thumbnail_url
-              : (course.image_url && course.image_url !== '/placeholder-course.jpg')
-                ? course.image_url
-                : '/placeholder.png',
-            isEnrolled: false,
-            isCompleted: false,
-            featured: Boolean(course.featured),
-            price: course.price || 0,
-            isPaid: !course.is_free,
-            documents: course.documents || [],
-            hasQuiz: course.has_quiz || false,
-            quizCompleted: course.quiz_completed || false,
-            category: course.category || 'General',
-          }));
-          setCourses(transformedCourses);
-        }
+        await fetchCourses();
       } else if ((response as any)?.error) {
         toast({
           title: "Error",
@@ -1082,6 +1266,54 @@ export default function School() {
       });
     } finally {
       setIsSubmittingCourse(false);
+    }
+  };
+
+  const handleDirectoryApplicationDialogOpenChange = (open: boolean) => {
+    setIsDirectoryApplicationDialogOpen(open);
+    if (!open) {
+      resetDirectoryApplicationForm();
+    }
+  };
+
+  const handleDirectoryApplicationSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!canApplyForDirectory) {
+      return;
+    }
+
+    try {
+      setIsSubmittingDirectoryApplication(true);
+
+      const formData = new FormData();
+      formData.append('business_name', directoryApplicationForm.business_name.trim());
+      formData.append('business_email', directoryApplicationForm.business_email.trim());
+      formData.append('business_phone_number', directoryApplicationForm.business_phone_number.trim());
+      formData.append('business_address', directoryApplicationForm.business_address.trim());
+      formData.append('description', directoryApplicationForm.description.trim());
+
+      if (directoryApplicationLogoFile) {
+        formData.append('logo', directoryApplicationLogoFile);
+      }
+
+      await schoolManagementApi.submitBusinessDirectoryApplication(formData);
+
+      toast({
+        title: 'Application submitted',
+        description: 'Your directory application is pending super-admin approval.',
+      });
+
+      handleDirectoryApplicationDialogOpenChange(false);
+      await fetchMyDirectoryApplications();
+    } catch (error: any) {
+      toast({
+        title: 'Unable to submit application',
+        description: error?.response?.data?.error || 'Please review the form and try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmittingDirectoryApplication(false);
     }
   };
 
@@ -1644,7 +1876,7 @@ export default function School() {
     }
   };
 
-  const communityTabContent = (
+  const communityTabContent = isBasicAdminPortalUser && !isEliteActive ? <BasicCommunityTab currentUser={currentUser} userLoading={userLoading} /> : (
     <div className="space-y-6 elite-nested-wrapper">
       {userLoading ? (
         <div className="flex items-center justify-center py-12">
@@ -1672,13 +1904,13 @@ export default function School() {
     </div>
   );
 
-  const calendarTabContent = (
+  const calendarTabContent = isBasicAdminPortalUser && !isEliteActive ? <BasicAdminCalendar /> : (
     <div className="space-y-6 elite-nested-wrapper">
       <AdminCalendar />
     </div>
   );
 
-  const mapsTabContent = (
+  const mapsTabContent = isBasicAdminPortalUser && !isEliteActive ? <BasicMapsTab learningPaths={learningPaths} courseMaps={courseMaps} setIsCreatePathOpen={setIsCreatePathOpen} /> : (
     <div className="space-y-6 elite-nested-wrapper">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-700">
@@ -1963,14 +2195,14 @@ export default function School() {
     </div>
   );
 
-  const aboutTabContent = (
+  const aboutTabContent = isBasicAdminPortalUser && !isEliteActive ? <BasicAboutTab academyStats={academyStats} /> : (
     <div className="space-y-6 elite-nested-wrapper">
       <div className="grid lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="gradient-text-primary">
-                About The Capsol Academy
+                About Score Machine Academy
               </CardTitle>
               <CardDescription>
                 Empowering professionals with knowledge and expertise
@@ -2072,7 +2304,199 @@ export default function School() {
     </div>
   );
 
-  const businessDirectoryTabContent = (
+  const pendingDirectoryApplicationsCount = myDirectoryApplications.filter(
+    (application) => normalizeBusinessDirectoryStatus(application.status) === 'pending',
+  ).length;
+
+  const directoryApplicationDialog = canApplyForDirectory ? (
+    <Dialog open={isDirectoryApplicationDialogOpen} onOpenChange={handleDirectoryApplicationDialogOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Apply for Business Directory</DialogTitle>
+          <DialogDescription>
+            Fill out the same business directory form. Your submission will stay pending until a super admin approves it.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form className="space-y-6" onSubmit={handleDirectoryApplicationSubmit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="directory_application_business_name">Business Name</Label>
+              <Input
+                id="directory_application_business_name"
+                value={directoryApplicationForm.business_name}
+                onChange={(event) => handleDirectoryApplicationFieldChange('business_name', event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="directory_application_business_email">Business Email</Label>
+              <Input
+                id="directory_application_business_email"
+                type="email"
+                value={directoryApplicationForm.business_email}
+                onChange={(event) => handleDirectoryApplicationFieldChange('business_email', event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="directory_application_business_phone">Business Phone Number</Label>
+              <Input
+                id="directory_application_business_phone"
+                value={directoryApplicationForm.business_phone_number}
+                onChange={(event) => handleDirectoryApplicationFieldChange('business_phone_number', event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="directory_application_business_address">Business Address</Label>
+              <Input
+                id="directory_application_business_address"
+                value={directoryApplicationForm.business_address}
+                onChange={(event) => handleDirectoryApplicationFieldChange('business_address', event.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="directory_application_description">Description (Optional)</Label>
+              <Textarea
+                id="directory_application_description"
+                value={directoryApplicationForm.description}
+                onChange={(event) => handleDirectoryApplicationFieldChange('description', event.target.value)}
+                placeholder="Describe your business, services, and who you help."
+                rows={5}
+                maxLength={5000}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="directory_application_logo">Business Logo (Optional)</Label>
+            <Input
+              id="directory_application_logo"
+              type="file"
+              accept="image/*"
+              onChange={handleDirectoryApplicationLogoChange}
+            />
+            {directoryApplicationLogoFile ? (
+              <p className="text-xs text-muted-foreground">Selected file: {directoryApplicationLogoFile.name}</p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => handleDirectoryApplicationDialogOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" className="gradient-primary hover:opacity-90" disabled={isSubmittingDirectoryApplication}>
+              {isSubmittingDirectoryApplication ? 'Submitting...' : 'Submit Application'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  ) : null;
+
+  const businessDirectoryDetailsDialog = (
+    <Dialog
+      open={Boolean(selectedBusinessDirectory)}
+      onOpenChange={(open) => {
+        if (!open) setSelectedBusinessDirectory(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl">
+        {selectedBusinessDirectory ? (
+          <>
+            <DialogHeader>
+              <div className="flex items-start gap-4 pr-8">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/60 bg-slate-50">
+                  {selectedBusinessDirectory.logo_url ? (
+                    <img
+                      src={selectedBusinessDirectory.logo_url}
+                      alt={selectedBusinessDirectory.business_name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <Building className="h-8 w-8 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="min-w-0 pt-1">
+                  <DialogTitle className="text-2xl">{selectedBusinessDirectory.business_name}</DialogTitle>
+                  <DialogDescription className="mt-1">Business Directory Details</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-lg border border-border/60 bg-slate-50/70 p-4">
+                <h3 className="mb-2 text-sm font-semibold text-foreground">Description</h3>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                  {selectedBusinessDirectory.description || 'No description provided.'}
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <a
+                  href={`mailto:${selectedBusinessDirectory.business_email}`}
+                  className="flex items-start gap-3 rounded-lg border border-border/60 p-4 transition-colors hover:bg-slate-50"
+                >
+                  <Mail className="mt-0.5 h-5 w-5 shrink-0 text-ocean-blue" />
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">Email</div>
+                    <div className="break-all text-sm font-medium text-foreground">{selectedBusinessDirectory.business_email}</div>
+                  </div>
+                </a>
+                <a
+                  href={`tel:${selectedBusinessDirectory.business_phone_number}`}
+                  className="flex items-start gap-3 rounded-lg border border-border/60 p-4 transition-colors hover:bg-slate-50"
+                >
+                  <Phone className="mt-0.5 h-5 w-5 shrink-0 text-ocean-blue" />
+                  <div>
+                    <div className="text-xs font-semibold uppercase text-muted-foreground">Phone</div>
+                    <div className="text-sm font-medium text-foreground">{selectedBusinessDirectory.business_phone_number}</div>
+                  </div>
+                </a>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-lg border border-border/60 p-4">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-ocean-blue" />
+                <div>
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">Address</div>
+                  <div className="text-sm font-medium text-foreground">{selectedBusinessDirectory.business_address}</div>
+                </div>
+              </div>
+
+              {selectedBusinessDirectory.created_at ? (
+                <p className="text-xs text-muted-foreground">
+                  Listed {new Date(selectedBusinessDirectory.created_at).toLocaleDateString()}
+                </p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+
+  const businessDirectoryTabContent = isBasicAdminPortalUser && !isEliteActive ? (
+    <div className="space-y-4">
+      <BasicDirectoryTab
+        businessDirectories={businessDirectories}
+        businessDirectoriesLoading={businessDirectoriesLoading}
+        businessDirectoriesError={businessDirectoriesError}
+        canApplyForDirectory={canApplyForDirectory}
+        onApplyForDirectory={() => setIsDirectoryApplicationDialogOpen(true)}
+        myDirectoryApplications={myDirectoryApplications}
+        myDirectoryApplicationsLoading={myDirectoryApplicationsLoading}
+        onSelectDirectory={(directory) => setSelectedBusinessDirectory(directory as BusinessDirectory)}
+      />
+      {directoryApplicationDialog}
+      {businessDirectoryDetailsDialog}
+    </div>
+  ) : (
     <div className="space-y-6 elite-nested-wrapper">
       <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -2085,11 +2509,51 @@ export default function School() {
               Discover the business listings created by the super-admin team for every Academy member.
             </CardDescription>
           </div>
-          <Badge variant="outline" className="w-fit px-3 py-1">
-            {businessDirectories.length} {businessDirectories.length === 1 ? 'Business' : 'Businesses'}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {canApplyForDirectory ? (
+              <Button type="button" onClick={() => setIsDirectoryApplicationDialogOpen(true)} className="gradient-primary hover:opacity-90">
+                <Plus className="mr-2 h-4 w-4" />
+                Apply for Directory
+              </Button>
+            ) : null}
+            <Badge variant="outline" className="w-fit px-3 py-1">
+              {businessDirectories.length} {businessDirectories.length === 1 ? 'Business' : 'Businesses'}
+            </Badge>
+            {canApplyForDirectory ? (
+              <Badge variant="outline" className="w-fit border-amber-300 bg-amber-50 px-3 py-1 text-amber-800">
+                {pendingDirectoryApplicationsCount} Pending
+              </Badge>
+            ) : null}
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {canApplyForDirectory ? (
+            <div className="rounded-xl border border-border/60 bg-slate-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">Your directory applications</h3>
+              </div>
+              {myDirectoryApplicationsLoading ? (
+                <p className="mt-2 text-sm text-muted-foreground">Loading your applications...</p>
+              ) : myDirectoryApplications.length === 0 ? (
+                <p className="mt-2 text-sm text-muted-foreground">No applications submitted yet.</p>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {myDirectoryApplications.slice(0, 4).map((application) => {
+                    const status = normalizeBusinessDirectoryStatus(application.status);
+                    return (
+                      <div key={application.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-white p-3">
+                        <div className="font-medium text-foreground">{application.business_name}</div>
+                        <Badge variant="outline" className={getBusinessDirectoryStatusBadgeClassName(status)}>
+                          {status === 'pending' ? 'Pending Approval' : status === 'rejected' ? 'Rejected' : 'Approved'}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {businessDirectoriesLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
@@ -2125,7 +2589,19 @@ export default function School() {
                 </TableHeader>
                 <TableBody>
                   {businessDirectories.map((directory) => (
-                    <TableRow key={directory.id} className="align-middle">
+                    <TableRow
+                      key={directory.id}
+                      role="button"
+                      tabIndex={0}
+                      className="cursor-pointer align-middle hover:bg-slate-50/80 dark:hover:bg-slate-900/40"
+                      onClick={() => setSelectedBusinessDirectory(directory)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedBusinessDirectory(directory);
+                        }
+                      }}
+                    >
                       <TableCell>
                         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-border/60 bg-gradient-to-br from-slate-100 via-white to-slate-50 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900">
                           {directory.logo_url ? (
@@ -2168,10 +2644,12 @@ export default function School() {
           )}
         </CardContent>
       </Card>
+      {directoryApplicationDialog}
+      {businessDirectoryDetailsDialog}
     </div>
   );
 
-  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
 
   if (isBasicAdminPortalUser && !isEliteActive) {
     return (
@@ -2203,7 +2681,7 @@ export default function School() {
   if (isEliteActive) {
     return (
       <DashboardLayout
-        title="The Capsol Academy"
+        title="Score Machine Academy"
         description="Learn, grow, and earn points in our gamified learning platform"
         onAddClient={() => setShowAddClient(true)}
       >
@@ -2231,7 +2709,7 @@ export default function School() {
 
   return (
     <DashboardLayout
-      title="The Capsol Academy"
+      title="Score Machine Academy"
       description="Learn, grow, and earn points in our gamified learning platform"
       onAddClient={() => setShowAddClient(true)}
     >
@@ -3192,7 +3670,7 @@ export default function School() {
               <Card className="border-0 shadow-xl bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="gradient-text-primary">
-                    About The Capsol Academy
+                    About Score Machine Academy
                   </CardTitle>
                   <CardDescription>
                     Empowering professionals with knowledge and expertise
@@ -3291,21 +3769,21 @@ export default function School() {
                     <Mail className="h-4 w-4 text-ocean-blue" />
                     <div>
                       <div className="text-sm font-medium">Email</div>
-                      <div className="text-xs text-muted-foreground">support@thecapsol.com</div>
+                      <div className="text-xs text-muted-foreground">support@thescoremachine.com</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <Phone className="h-4 w-4 text-emerald-600" />
                     <div>
                       <div className="text-sm font-medium">Phone</div>
-                      <div className="text-xs text-muted-foreground">{currentUser?.phone || "(704) 966-9919"}</div>
+                      <div className="text-xs text-muted-foreground">{currentUser?.phone || "(475) 259-8768"}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
                     <MapPin className="h-4 w-4 text-purple-600" />
                     <div>
                       <div className="text-sm font-medium">Headquarters</div>
-                      <div className="text-xs text-muted-foreground">{currentUser?.address || "525 North Tryon St., Ste 1600, Charlotte, North Carolina 28202 USA"}</div>
+                      <div className="text-xs text-muted-foreground">{currentUser?.address || "New York, NY"}</div>
                     </div>
                   </div>
                   <Button

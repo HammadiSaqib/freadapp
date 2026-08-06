@@ -118,7 +118,11 @@ describe('convertMFSNToLegacyFormat', () => {
     expect(out.reportData.Name).toHaveLength(3);
     expect(out.reportData.Address.filter((a) => a.AddressType === 'Current')).toHaveLength(3);
     expect(out.reportData.Address.filter((a) => a.AddressType === 'Previous')).toHaveLength(3);
-    expect(out.reportData.DOB).toHaveLength(3);
+    expect(out.reportData.DOB).toEqual([
+      { BureauId: 3, DOB: '--/--/1990' },
+      { BureauId: 2, DOB: '--/--/1990' },
+      { BureauId: 1, DOB: '--/--/1990' },
+    ]);
     expect(out.reportData.Employer).toHaveLength(3);
     expect(out.reportData.Accounts).toHaveLength(3);
     expect(out.reportData.Inquiries).toHaveLength(3);

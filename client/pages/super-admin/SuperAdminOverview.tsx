@@ -195,7 +195,9 @@ interface StripeTopCustomer {
 interface StripeRevenueSummary {
   grossVolume: number;
   mrr: number;
+  yearlySubscriptionRevenue: number;
   netVolume: number;
+  chargebackAmount: number;
   failedPayments: number;
   newCustomers: number;
   activeSubscribers: number;
@@ -206,6 +208,8 @@ interface StripeRevenueSummary {
     newCustomers: number;
     activeSubscribers: number;
     mrr: number;
+    yearlySubscriptionRevenue: number;
+    chargebackAmount: number;
     failedPayments: number;
   }>;
   failedPaymentList: Array<{
@@ -241,7 +245,7 @@ const StripeMetricGraphCard = ({
   value: string;
   color: string;
   data: StripeRevenueSummary["summarySeries"];
-  dataKey: "grossVolume" | "mrr" | "netVolume" | "newCustomers" | "activeSubscribers";
+  dataKey: "grossVolume" | "mrr" | "yearlySubscriptionRevenue" | "netVolume" | "chargebackAmount" | "newCustomers" | "activeSubscribers" | "failedPayments";
   formatValue?: (value: number) => string;
 }) => (
   <Card className="overflow-hidden border-slate-200/70 bg-white/90 shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
@@ -482,7 +486,9 @@ export default function SuperAdminOverview() {
   const [stripeSummary, setStripeSummary] = useState<StripeRevenueSummary>({
     grossVolume: 0,
     mrr: 0,
+    yearlySubscriptionRevenue: 0,
     netVolume: 0,
+    chargebackAmount: 0,
     failedPayments: 0,
     newCustomers: 0,
     activeSubscribers: 0,
@@ -494,7 +500,7 @@ export default function SuperAdminOverview() {
   const [activeStripeTooltip, setActiveStripeTooltip] = useState<StripeTooltipState | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+    to: new Date(),
   });
   const [clientStats, setClientStats] = useState<ClientStatistics | null>(null);
   const [salesChatData, setSalesChatData] = useState<any[]>([]);
@@ -564,8 +570,11 @@ export default function SuperAdminOverview() {
   // Silently load/refresh only Stripe revenue (no full page reload)
   const loadStripeRevenue = async () => {
     try {
-      const from = dateRange?.from ? dateRange.from.toISOString() : startOfMonth(new Date()).toISOString();
-      const to = dateRange?.to ? dateRange.to.toISOString() : endOfMonth(new Date()).toISOString();
+      // Send the picked calendar day as yyyy-MM-dd so the server uses the exact
+      // day the user selected. Using toISOString() here would convert local
+      // midnight to UTC and shift the range by a day in non-UTC timezones.
+      const from = format(dateRange?.from ?? startOfMonth(new Date()), 'yyyy-MM-dd');
+      const to = format(dateRange?.to ?? new Date(), 'yyyy-MM-dd');
       const [stripeRevenueResp, stripePaymentsResp] = await Promise.all([
         superAdminApi.getStripeRevenue({ from, to, group_by: 'day' }),
         superAdminApi.getStripePayments({ from, to })
@@ -610,7 +619,9 @@ export default function SuperAdminOverview() {
       setStripeSummary({
         grossVolume: Number(revenueData?.summary?.grossVolume) || 0,
         mrr: Number(revenueData?.summary?.mrr) || 0,
+        yearlySubscriptionRevenue: Number(revenueData?.summary?.yearlySubscriptionRevenue) || 0,
         netVolume: Number(revenueData?.summary?.netVolume) || 0,
+        chargebackAmount: Number(revenueData?.summary?.chargebackAmount) || 0,
         failedPayments: Number(revenueData?.summary?.failedPayments) || 0,
         newCustomers: Number(revenueData?.summary?.newCustomers) || 0,
         activeSubscribers: Number(revenueData?.summary?.activeSubscribers) || 0,
@@ -642,8 +653,8 @@ export default function SuperAdminOverview() {
         setStripeLoading(true);
       }
 
-      const from = dateRange?.from ? dateRange.from.toISOString() : startOfMonth(new Date()).toISOString();
-      const to = dateRange?.to ? dateRange.to.toISOString() : endOfMonth(new Date()).toISOString();
+      const from = format(dateRange?.from ?? startOfMonth(new Date()), 'yyyy-MM-dd');
+      const to = format(dateRange?.to ?? new Date(), 'yyyy-MM-dd');
 
       const [_, salesChatResp, reportPullingResp, errorAnalysisResp] = await Promise.all([
         loadStripeRevenue(),
@@ -1907,6 +1918,7 @@ export default function SuperAdminOverview() {
                     onSelect={(range) => {
                       setDateRange(range);
                     }}
+                    disabled={{ after: new Date() }}
                     initialFocus
                   />
                 </PopoverContent>
@@ -1960,11 +1972,19 @@ export default function SuperAdminOverview() {
                 formatValue={(raw) => `$${Math.round(raw)}`}
               />
               <StripeMetricGraphCard
-                title="MRR"
+                title="Monthly MRR"
                 value={formatStripeCurrency(stripeSummary.mrr)}
                 color="#8b5cf6"
                 data={stripeSummary.summarySeries}
                 dataKey="mrr"
+                formatValue={(raw) => `$${Math.round(raw)}`}
+              />
+              <StripeMetricGraphCard
+                title="Yearly Subscription Revenue"
+                value={formatStripeCurrency(stripeSummary.yearlySubscriptionRevenue)}
+                color="#0f766e"
+                data={stripeSummary.summarySeries}
+                dataKey="yearlySubscriptionRevenue"
                 formatValue={(raw) => `$${Math.round(raw)}`}
               />
               <StripeMetricGraphCard
@@ -1973,6 +1993,14 @@ export default function SuperAdminOverview() {
                 color="hsl(var(--sea-green))"
                 data={stripeSummary.summarySeries}
                 dataKey="netVolume"
+                formatValue={(raw) => `$${Math.round(raw)}`}
+              />
+              <StripeMetricGraphCard
+                title="Chargebacks / Disputes"
+                value={formatStripeCurrency(stripeSummary.chargebackAmount)}
+                color="#dc2626"
+                data={stripeSummary.summarySeries}
+                dataKey="chargebackAmount"
                 formatValue={(raw) => `$${Math.round(raw)}`}
               />
               <StripeMetricGraphCard
@@ -1988,6 +2016,13 @@ export default function SuperAdminOverview() {
                 color="#f59e0b"
                 data={stripeSummary.summarySeries}
                 dataKey="activeSubscribers"
+              />
+              <StripeMetricGraphCard
+                title="Failed Payments"
+                value={stripeSummary.failedPayments.toLocaleString('en-US')}
+                color="#ef4444"
+                data={stripeSummary.summarySeries}
+                dataKey="failedPayments"
               />
             </div>
 

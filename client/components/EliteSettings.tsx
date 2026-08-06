@@ -1,11 +1,16 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings as SettingsIcon } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface EliteSettingsProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   children?: React.ReactNode;
+  notifyClientAfterReportPull?: boolean;
+  notifyClientAfterReportPullSaving?: boolean;
+  onNotifyClientAfterReportPullChange?: (enabled: boolean) => void;
 }
 
 export default function EliteSettings(props: EliteSettingsProps) {
@@ -30,14 +35,25 @@ export default function EliteSettings(props: EliteSettingsProps) {
           
           {/* HEADER */}
           <motion.div variants={itemVariants} className="bg-white p-8 rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#00d4ff]/20 to-[#7000ff]/20 rounded-full blur-3xl"></div>
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#77dd77]/20 to-[#004225]/20 rounded-full blur-3xl"></div>
             <div className="relative z-10">
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] tracking-tight flex items-center gap-2 mb-2">
-                <SettingsIcon className="h-8 w-8 text-[#7000ff]" /> System Configurations
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#004225] to-[#77dd77] tracking-tight flex items-center gap-2 mb-2">
+                <SettingsIcon className="h-8 w-8 text-[#004225]" /> System Configurations
               </h1>
               <p className="text-sm font-semibold text-slate-500 max-w-xl">
                 Manage your VIP preferences, deep integrations, and advanced system behaviors.
               </p>
+            </div>
+            <div className="relative z-10 flex max-w-md items-center gap-3 rounded-lg border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+              <Label htmlFor="notify-client-after-report-pull" className="cursor-pointer text-sm font-semibold leading-snug text-slate-700">
+                Notify client via email after successful report pulled.
+              </Label>
+              <Switch
+                id="notify-client-after-report-pull"
+                checked={props.notifyClientAfterReportPull !== false}
+                disabled={props.notifyClientAfterReportPullSaving}
+                onCheckedChange={props.onNotifyClientAfterReportPullChange}
+              />
             </div>
           </motion.div>
 
@@ -80,9 +96,9 @@ export default function EliteSettings(props: EliteSettingsProps) {
               box-shadow: 0 1px 2px 0 rgba(2, 6, 23, 0.4) !important;
             }
             .dark .elite-nested-wrapper [role="tab"][data-state="active"] {
-              background: linear-gradient(to right, #06b6d4, #7c3aed) !important;
+              background: linear-gradient(to right, #004225, #77dd77) !important;
               color: #f8fafc !important;
-              box-shadow: 0 0 18px rgba(34, 211, 238, 0.2) !important;
+              box-shadow: 0 0 18px rgba(119, 221, 119, 0.22) !important;
             }
             .dark .elite-nested-wrapper [role="tab"]:not([data-state="active"]):hover {
               background: #111827 !important;
@@ -107,7 +123,7 @@ export default function EliteSettings(props: EliteSettingsProps) {
               -webkit-text-fill-color: transparent;
             }
             .dark .elite-nested-wrapper .gradient-text-primary {
-              background: linear-gradient(to right, #f8fafc, #c084fc);
+              background: linear-gradient(to right, #f8fafc, #77dd77);
               -webkit-background-clip: text;
               -webkit-text-fill-color: transparent;
             }
@@ -116,7 +132,7 @@ export default function EliteSettings(props: EliteSettingsProps) {
               color: white !important;
             }
             .dark .elite-nested-wrapper .gradient-primary {
-              background: linear-gradient(to right, #06b6d4, #7c3aed) !important;
+              background: linear-gradient(to right, #004225, #77dd77) !important;
               color: #f8fafc !important;
             }
             .elite-nested-wrapper .gradient-primary:hover {

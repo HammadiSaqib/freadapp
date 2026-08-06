@@ -85,19 +85,19 @@ export default function ScoreMachineElitePrompt({
         setSignatureDataUrl(data.signature_image_url || null);
       } else {
         setAgreement(null);
-        setError("No The Capsol Elite agreement is available right now.");
+        setError("No Score Machine Elite agreement is available right now.");
       }
     } catch (err: any) {
       if (err?.response?.status === 404) {
         setAgreement(null);
-        setError("No active The Capsol Elite agreement is available right now.");
+        setError("No active Score Machine Elite agreement is available right now.");
       } else if (err?.response?.status === 403) {
         setAgreement(null);
-        setError("The Capsol Elite is not enabled for this admin account.");
+        setError("Score Machine Elite is not enabled for this admin account.");
       } else {
         console.error("ScoreMachineElitePrompt: failed to fetch agreement", err);
         setAgreement(null);
-        setError("Failed to load The Capsol Elite agreement.");
+        setError("Failed to load the Score Machine Elite agreement.");
       }
     } finally {
       setLoading(false);
@@ -205,8 +205,8 @@ export default function ScoreMachineElitePrompt({
       });
 
       toast({
-        title: "The Capsol Elite unlocked",
-        description: "The Capsol Elite agreement has been completed successfully.",
+        title: "Score Machine Elite unlocked",
+        description: "The Score Machine Elite agreement has been completed successfully.",
       });
 
       setAgreement((prev) => (prev ? { ...prev, status: "signed", signature_image_url: signatureDataUrl } : prev));
@@ -216,7 +216,7 @@ export default function ScoreMachineElitePrompt({
       onOpenChange(false);
     } catch (err: any) {
       console.error("ScoreMachineElitePrompt: sign failed", err);
-      const message = err?.response?.data?.error || "Failed to complete The Capsol Elite agreement.";
+      const message = err?.response?.data?.error || "Failed to complete the Score Machine Elite agreement.";
       toast({ title: "Error", description: message });
     } finally {
       setSubmitting(false);
@@ -248,15 +248,15 @@ export default function ScoreMachineElitePrompt({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
-            {agreement?.title || "The Capsol Elite Agreement"}
+            {agreement?.title || "The Score Machine Elite Agreement"}
           </DialogTitle>
           <DialogDescription>
-            Review and complete this agreement to get access to The Capsol Elite.
+            Review and complete this agreement to get access to Score Machine Elite.
           </DialogDescription>
         </DialogHeader>
 
         {loading && (
-          <div className="text-sm text-muted-foreground">Loading The Capsol Elite agreement...</div>
+          <div className="text-sm text-muted-foreground">Loading Score Machine Elite agreement...</div>
         )}
 
         {!loading && error && (
@@ -266,7 +266,7 @@ export default function ScoreMachineElitePrompt({
         {!loading && agreement && (
           <div className="space-y-4">
             <div>
-              <Label className="text-sm">The Capsol Elite Contracts</Label>
+              <Label className="text-sm">Score Machine Elite Contracts</Label>
               <ScrollArea className="mt-2 h-48 rounded-md border p-3 bg-slate-50 dark:bg-slate-800">
                 {agreement.content ? (
                   looksLikeHtml(agreement.content) ? (
@@ -285,7 +285,7 @@ export default function ScoreMachineElitePrompt({
             {isSigned ? (
               <div className="space-y-3">
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
-                  This The Capsol Elite agreement has already been completed.
+                  This Score Machine Elite agreement has already been completed.
                 </div>
                 {agreement.signature_image_url && (
                   <div className="grid gap-2">
@@ -293,7 +293,7 @@ export default function ScoreMachineElitePrompt({
                     <div className="rounded-md border bg-white p-3">
                       <img
                         src={agreement.signature_image_url}
-                        alt="The Capsol Elite signature"
+                        alt="Score Machine Elite signature"
                         className="max-h-24 w-auto object-contain"
                       />
                     </div>

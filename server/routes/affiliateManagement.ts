@@ -46,6 +46,57 @@ const normalizeEliteLandingPageValue = (value: any): 'allow' | 'deny' => {
     : 'deny';
 };
 
+const syncAffiliateHierarchyLevels = async (rootAffiliateId: number) => {
+  const normalizedRootId = Number(rootAffiliateId);
+  if (!Number.isFinite(normalizedRootId) || normalizedRootId <= 0) {
+    return;
+  }
+
+  const rootRows: any[] = await executeQuery(
+    `SELECT a.id, a.parent_affiliate_id, parent.affiliate_level AS parent_level
+       FROM affiliates a
+       LEFT JOIN affiliates parent ON parent.id = a.parent_affiliate_id
+      WHERE a.id = ?
+      LIMIT 1`,
+    [normalizedRootId]
+  );
+
+  if (!rootRows || rootRows.length === 0) {
+    return;
+  }
+
+  const rootParentId = rootRows[0].parent_affiliate_id != null ? Number(rootRows[0].parent_affiliate_id) : null;
+  const rootLevel = rootParentId ? Number(rootRows[0].parent_level || 0) + 1 : 1;
+  const queue: Array<{ id: number; level: number }> = [{ id: normalizedRootId, level: Math.max(1, rootLevel) }];
+  const visited = new Set<number>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || visited.has(current.id)) {
+      continue;
+    }
+
+    visited.add(current.id);
+
+    await executeQuery(
+      'UPDATE affiliates SET affiliate_level = ?, updated_at = NOW() WHERE id = ?',
+      [current.level, current.id]
+    );
+
+    const childRows: any[] = await executeQuery(
+      'SELECT id FROM affiliates WHERE parent_affiliate_id = ?',
+      [current.id]
+    );
+
+    for (const child of Array.isArray(childRows) ? childRows : []) {
+      const childId = Number(child.id);
+      if (Number.isFinite(childId) && !visited.has(childId)) {
+        queue.push({ id: childId, level: current.level + 1 });
+      }
+    }
+  }
+};
+
 // Middleware to ensure only super admin can access affiliate management
 const requireSuperAdminRole = (req: any, res: any, next: any) => {
   if (req.user?.role !== 'super_admin') {
@@ -108,6 +159,7 @@ router.get('/', authenticateToken, requireSuperAdminRole, async (req, res) => {
         a.parent_commission_rate,
         a.affiliate_level,
         a.total_earnings,
+        a.paid_referrals_count,
         a.total_referrals,
         a.status,
         a.email_verified,
@@ -133,6 +185,7 @@ router.get('/', authenticateToken, requireSuperAdminRole, async (req, res) => {
         pa.last_name as parent_last_name,
         pa.email as parent_email,
         COALESCE(acsum.total_commission, 0) - COALESCE(cpsum.total_paid, 0) AS computed_total_earnings,
+        COALESCE(pfrsum.paid_referrals_count, a.paid_referrals_count) AS computed_paid_referrals_count,
         COALESCE(rfsum.total_referrals, a.total_referrals) AS computed_total_referrals
       FROM affiliates a
       LEFT JOIN users u ON a.admin_id = u.id
@@ -148,6 +201,12 @@ router.get('/', authenticateToken, requireSuperAdminRole, async (req, res) => {
         WHERE status = 'completed'
         GROUP BY affiliate_id
       ) cpsum ON cpsum.affiliate_id = a.id
+      LEFT JOIN (
+        SELECT affiliate_id, COUNT(*) AS paid_referrals_count
+        FROM affiliate_referrals
+        WHERE status = 'paid'
+        GROUP BY affiliate_id
+      ) pfrsum ON pfrsum.affiliate_id = a.id
       LEFT JOIN (
         SELECT affiliate_id, COUNT(*) AS total_referrals
         FROM affiliate_referrals
@@ -188,6 +247,9 @@ router.get('/', authenticateToken, requireSuperAdminRole, async (req, res) => {
       total_earnings: (affiliate.computed_total_earnings != null
         ? parseFloat(affiliate.computed_total_earnings)
         : parseFloat(affiliate.total_earnings)) || 0,
+      paid_referrals_count: (affiliate.computed_paid_referrals_count != null
+        ? parseInt(affiliate.computed_paid_referrals_count)
+        : parseInt(affiliate.paid_referrals_count)) || 0,
       total_referrals: (affiliate.computed_total_referrals != null
         ? parseInt(affiliate.computed_total_referrals)
         : parseInt(affiliate.total_referrals)) || 0,
@@ -541,6 +603,160 @@ router.put('/:id', authenticateToken, requireSuperAdminRole, async (req, res) =>
       ip: req.ip
     });
     res.status(500).json({ error: 'Failed to update affiliate' });
+  }
+});
+
+router.put('/:id/referrer', authenticateToken, requireSuperAdminRole, async (req, res) => {
+  try {
+    const updatedBy = req.user.id;
+    const affiliateId = Number(String(req.params.id).replace('AFF-', ''));
+    const parentAffiliateId = Number(req.body?.parentAffiliateId ?? req.body?.parent_affiliate_id);
+
+    if (!Number.isFinite(affiliateId) || affiliateId <= 0) {
+      return res.status(400).json({ error: 'Valid affiliate ID is required' });
+    }
+
+    if (!Number.isFinite(parentAffiliateId) || parentAffiliateId <= 0) {
+      return res.status(400).json({ error: 'Valid parent affiliate ID is required' });
+    }
+
+    if (affiliateId === parentAffiliateId) {
+      return res.status(400).json({ error: 'An affiliate cannot refer itself' });
+    }
+
+    const affiliateRows: any[] = await executeQuery(
+      'SELECT id, parent_affiliate_id FROM affiliates WHERE id = ? LIMIT 1',
+      [affiliateId]
+    );
+
+    if (!affiliateRows || affiliateRows.length === 0) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+
+    const parentRows: any[] = await executeQuery(
+      'SELECT id, first_name, last_name, email, status FROM affiliates WHERE id = ? LIMIT 1',
+      [parentAffiliateId]
+    );
+
+    if (!parentRows || parentRows.length === 0) {
+      return res.status(404).json({ error: 'Parent affiliate not found' });
+    }
+
+    if (String(parentRows[0].status || '').toLowerCase() !== 'active') {
+      return res.status(400).json({ error: 'Only active affiliates can be assigned as referrers' });
+    }
+
+    let currentAncestorId = parentAffiliateId;
+    const visited = new Set<number>();
+    while (Number.isFinite(currentAncestorId) && currentAncestorId > 0) {
+      if (visited.has(currentAncestorId)) {
+        break;
+      }
+
+      if (currentAncestorId === affiliateId) {
+        return res.status(400).json({ error: 'This change would create a referral loop' });
+      }
+
+      visited.add(currentAncestorId);
+
+      const ancestorRows: any[] = await executeQuery(
+        'SELECT parent_affiliate_id FROM affiliates WHERE id = ? LIMIT 1',
+        [currentAncestorId]
+      );
+
+      if (!ancestorRows || ancestorRows.length === 0 || ancestorRows[0].parent_affiliate_id == null) {
+        break;
+      }
+
+      currentAncestorId = Number(ancestorRows[0].parent_affiliate_id);
+    }
+
+    await executeQuery(
+      'UPDATE affiliates SET parent_affiliate_id = ?, updated_at = NOW() WHERE id = ?',
+      [parentAffiliateId, affiliateId]
+    );
+
+    await syncAffiliateHierarchyLevels(affiliateId);
+
+    securityLogger.logSecurityEvent('affiliate_referrer_updated', {
+      updatedBy,
+      affiliateId,
+      parentAffiliateId,
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      data: {
+        affiliate_id: affiliateId,
+        parent_affiliate_id: parentAffiliateId,
+        parent_info: {
+          first_name: parentRows[0].first_name || null,
+          last_name: parentRows[0].last_name || null,
+          email: parentRows[0].email || null,
+        }
+      }
+    });
+  } catch (error: any) {
+    console.error('Error updating affiliate referrer:', error);
+    securityLogger.logSecurityEvent('affiliate_referrer_update_error', {
+      userId: req.user?.id,
+      affiliateId: req.params.id,
+      error: error.message,
+      ip: req.ip
+    });
+    res.status(500).json({ error: 'Failed to update affiliate referrer' });
+  }
+});
+
+router.delete('/:id/referrer', authenticateToken, requireSuperAdminRole, async (req, res) => {
+  try {
+    const updatedBy = req.user.id;
+    const affiliateId = Number(String(req.params.id).replace('AFF-', ''));
+
+    if (!Number.isFinite(affiliateId) || affiliateId <= 0) {
+      return res.status(400).json({ error: 'Valid affiliate ID is required' });
+    }
+
+    const affiliateRows: any[] = await executeQuery(
+      'SELECT id FROM affiliates WHERE id = ? LIMIT 1',
+      [affiliateId]
+    );
+
+    if (!affiliateRows || affiliateRows.length === 0) {
+      return res.status(404).json({ error: 'Affiliate not found' });
+    }
+
+    await executeQuery(
+      'UPDATE affiliates SET parent_affiliate_id = NULL, updated_at = NOW() WHERE id = ?',
+      [affiliateId]
+    );
+
+    await syncAffiliateHierarchyLevels(affiliateId);
+
+    securityLogger.logSecurityEvent('affiliate_referrer_cleared', {
+      updatedBy,
+      affiliateId,
+      ip: req.ip
+    });
+
+    res.json({
+      success: true,
+      data: {
+        affiliate_id: affiliateId,
+        parent_affiliate_id: null,
+        parent_info: null,
+      }
+    });
+  } catch (error: any) {
+    console.error('Error clearing affiliate referrer:', error);
+    securityLogger.logSecurityEvent('affiliate_referrer_clear_error', {
+      userId: req.user?.id,
+      affiliateId: req.params.id,
+      error: error.message,
+      ip: req.ip
+    });
+    res.status(500).json({ error: 'Failed to clear affiliate referrer' });
   }
 });
 

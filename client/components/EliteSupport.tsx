@@ -51,10 +51,10 @@ export default function EliteSupport({
           
           {/* HEADER */}
           <motion.div variants={itemVariants} className="bg-white p-8 rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#00d4ff]/20 to-[#7000ff]/20 rounded-full blur-3xl"></div>
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#77dd77]/20 to-[#004225]/20 rounded-full blur-3xl"></div>
             <div className="relative z-10">
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] tracking-tight flex items-center gap-2 mb-2">
-                <Crown className="h-8 w-8 text-[#7000ff]" /> VIP Support Center
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#1B8B00] to-[#77dd77] tracking-tight flex items-center gap-2 mb-2">
+                <Crown className="h-8 w-8 text-[#1B8B00]" /> VIP Support Center
               </h1>
               <p className="text-sm font-semibold text-slate-500 max-w-xl">
                 Welcome to your Elite concierge. Enjoy priority routing, dedicated agents, and lightning-fast resolution times.
@@ -62,7 +62,7 @@ export default function EliteSupport({
             </div>
             
             <div className="flex items-center gap-4 relative z-10 shrink-0">
-              <Button onClick={() => setActiveTab("livechat")} className="bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] border-0 text-xs font-black uppercase tracking-wider rounded-xl h-12 px-6 transition-all">
+              <Button onClick={() => setActiveTab("livechat")} className="bg-gradient-to-r from-[#004225] to-[#77dd77] text-white shadow-[0_0_15px_rgba(27,139,0,0.28)] hover:shadow-[0_0_25px_rgba(119,221,119,0.28)] border-0 text-xs font-black uppercase tracking-wider rounded-xl h-12 px-6 transition-all">
                 <MessageSquare className="w-4 h-4 mr-2" /> Start VIP Chat
               </Button>
             </div>

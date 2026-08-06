@@ -222,8 +222,8 @@ const BillingHistory: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Billing History</h1>
-          <p className="text-gray-600">Manage your subscription and view payment history</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Billing History</h1>
+          <p className="text-gray-600 dark:text-gray-300">Manage your subscription and view payment history</p>
         </div>
         <Button
           onClick={handleRefresh}
@@ -252,22 +252,22 @@ const BillingHistory: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <p className="text-sm font-medium text-gray-500">Plan</p>
-                <p className="text-lg font-semibold">{subscription.plan_name}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Plan</p>
+                <p className="text-lg font-semibold dark:text-white">{subscription.plan_name}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Type</p>
-                <p className="text-lg font-semibold capitalize">{subscription.plan_type}</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Type</p>
+                <p className="text-lg font-semibold capitalize dark:text-white">{subscription.plan_type}</p>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Status</p>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</p>
                 <Badge className={getStatusColor(subscription.status)}>
                   {subscription.status}
                 </Badge>
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-500">Next Billing</p>
-                <p className="text-lg font-semibold">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Next Billing</p>
+                <p className="text-lg font-semibold dark:text-white">
                   {formatDate(subscription.current_period_end)}
                 </p>
               </div>
@@ -337,33 +337,35 @@ const BillingHistory: React.FC = () => {
               {transactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                 >
                   <div className="flex items-center space-x-4">
                     <div className="flex-shrink-0">
                       <CreditCard className="h-8 w-8 text-gray-400" />
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-gray-900 dark:text-white">
                         {transaction.description || `Payment for ${transaction.plan_name}`}
                       </p>
-                      <p className="text-sm text-gray-500">
-                        {transaction.plan_name} • {transaction.plan_type}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {formatDate(transaction.created_at)}
-                      </p>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        <span>{formatDate(transaction.created_at)}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span className="capitalize">{transaction.plan_type} plan</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900">
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
                         {formatCurrency(transaction.amount, transaction.currency)}
                       </p>
                       <Badge className={getStatusColor(transaction.status)}>
                         {transaction.status}
                       </Badge>
                     </div>
+                    <Button variant="ghost" size="icon" className="hidden sm:flex">
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -400,14 +402,14 @@ const BillingHistory: React.FC = () => {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Payment Methods</h4>
-                <p className="text-gray-600">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Payment Methods</h4>
+                <p className="text-gray-600 dark:text-gray-400">
                   We accept all major credit cards and process payments securely through Stripe.
                 </p>
               </div>
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Billing Cycle</h4>
-                <p className="text-gray-600">
+                <h4 className="font-medium text-gray-900 dark:text-white mb-2">Billing Cycle</h4>
+                <p className="text-gray-600 dark:text-gray-400">
                   Subscriptions are billed automatically based on your selected plan frequency.
                 </p>
               </div>

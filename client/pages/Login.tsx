@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { authApi, setAuthToken } from "@/lib/api";
 import { clearPortalReturnContext } from "@/lib/authStorage";
 import { usePortalLoginRedirect } from "@/hooks/usePortalLoginRedirect";
-import { isBasicAdminPortalHost, resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
+import { isAdminPrimaryPortalHost, isBasicAdminPortalHost, resolveAdminPortalTarget } from "@/lib/adminPortalAccess";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import BasicLogin from "@/components/BasicLogin";
@@ -394,10 +394,10 @@ export default function Login() {
 
       console.log("Login response:", response);
 
-      if (response.data?.error) {
+      if (response.error) {
         toast({
           title: "Login Failed",
-          description: response.data.error,
+          description: response.error,
           variant: "destructive",
         });
         return;
@@ -408,17 +408,11 @@ export default function Login() {
         "Welcome back!",
         "Successfully logged in to your dashboard.",
       );
-    } catch (error: any) {
+    } catch (error) {
       console.error("Login error:", error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        error.message ||
-        "An unexpected error occurred. Please try again.";
-
       toast({
         title: "Login Error",
-        description: errorMessage,
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -589,7 +583,7 @@ export default function Login() {
         
         toast({
           title: "Account Created!",
-          description: "Welcome to The Capsol. Your account has been created successfully.",
+          description: "Welcome to CapSol. Your account has been created successfully.",
         });
         
         // Navigate to admin dashboard after successful verification and auto-login
@@ -802,7 +796,7 @@ export default function Login() {
     {
       icon: Users,
       title: "Client Management",
-      description: "Complete CRM for funding professionals with The Capsol",
+      description: "CapSol access for capital strategy and funding operations",
     },
     {
       icon: BarChart3,
@@ -815,7 +809,7 @@ export default function Login() {
     {
       name: "Sarah Rodriguez",
       company: "Credit Solutions Inc.",
-      text: "The Capsol improved our workflow efficiency significantly.",
+      text: "CapSol helped us streamline our capital workflow significantly.",
       rating: 5,
     },
     {
@@ -832,7 +826,10 @@ export default function Login() {
     },
   ];
 
-  if (isBasicAdminPortalHost(window.location.hostname, window.location.port)) {
+  if (
+    isBasicAdminPortalHost(window.location.hostname, window.location.port) ||
+    isAdminPrimaryPortalHost(window.location.hostname, window.location.port)
+  ) {
     return (
       <BasicLogin
         loginData={loginData}
@@ -859,11 +856,11 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 dark:from-slate-900 dark:via-slate-800/95 dark:to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-[#02170d] dark:via-[#0a2416]/95 dark:to-[#041a10] relative overflow-hidden">
       {/* Animated background elements with images */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Background image overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 via-white/40 to-emerald-50/60 dark:from-slate-800/90 dark:via-slate-700/80 dark:to-slate-800/90"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-green-50/60 via-white/40 to-emerald-50/60 dark:from-[#0a2416]/90 dark:via-[#123321]/80 dark:to-[#0b2e1b]/90"></div>
 
         {/* Floating business images */}
         <div className="absolute top-20 right-20 w-64 h-40 rounded-2xl overflow-hidden shadow-2xl opacity-10 rotate-12 hover:opacity-20 transition-opacity duration-500">
@@ -891,16 +888,16 @@ export default function Login() {
         </div>
 
         {/* Animated gradient orbs */}
-        <div className="absolute -top-40 -left-40 w-80 h-80 bg-ocean-blue/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-sea-green/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-purple-300/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        <div className="absolute -top-40 -left-40 w-80 h-80 bg-[#77dd77]/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-[#004225]/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-[#1B8B00]/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
 
       <div className="relative z-10 flex min-h-screen">
         {/* Left Side - Enhanced Branding & Features */}
-        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-ocean-blue via-cyan-blue to-sea-green dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 p-8 xl:p-12 text-white relative overflow-hidden">
+        <div className="hidden lg:flex lg:w-1/2 bg-[linear-gradient(145deg,#02170d_0%,#06311d_48%,#0f4a2c_100%)] dark:from-[#02170d] dark:via-[#0a2416] dark:to-[#0f4a2c] p-8 xl:p-12 text-white relative overflow-hidden border-r border-green-900/30">
           {/* Background pattern with credit-themed imagery */}
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-700/20 dark:from-slate-600/20 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-[#77dd77]/10 dark:from-[#77dd77]/10 to-transparent"></div>
 
           {/* Hero image overlay */}
           <div className="absolute top-0 right-0 w-1/2 h-1/2 opacity-20 rounded-bl-3xl overflow-hidden">
@@ -909,7 +906,7 @@ export default function Login() {
               alt="Credit Score analytics dashboard"
               className="w-full h-full object-cover scale-110 hover:scale-105 transition-transform duration-700"
             />
-            <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-ocean-blue/20 dark:via-slate-600/30 to-sea-green/40 dark:to-slate-500/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-bl from-transparent via-[#77dd77]/20 dark:via-green-900/30 to-[#004225]/40 dark:to-[#041a10]/50"></div>
           </div>
 
           <div className="absolute bottom-0 left-0 w-1/2 h-1/3 opacity-15 rounded-tr-3xl overflow-hidden">
@@ -918,7 +915,7 @@ export default function Login() {
               alt="Professional funding consultation"
               className="w-full h-full object-cover scale-110 hover:scale-105 transition-transform duration-700"
             />
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-sea-green/20 dark:via-slate-600/30 to-cyan-blue/40 dark:to-slate-500/40"></div>
+            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-[#77dd77]/20 dark:via-green-900/30 to-[#1B8B00]/40 dark:to-[#0b3320]/50"></div>
           </div>
 
           <div
@@ -930,27 +927,21 @@ export default function Login() {
           <div className="relative z-10 flex flex-col justify-between w-full">
             {/* Header */}
             <div>
-              <Link to="/" className="flex items-center space-x-3 mb-12">
-                <img src="/image.png" alt="The Capsol" className="w-20 h-14" />
-                <div>
-                  <span className="text-3xl font-bold">The Capsol</span>
-                  <div className="text-white/80 text-sm">
-                    AI-Powered Credit Solutions
-                  </div>
-                </div>
+              <Link to="/" className="flex items-center mb-12">
+                <img src="/capsol-logo.png" alt="CapSol" className="h-14 w-auto object-contain" />
               </Link>
 
               <div className="space-y-10">
                 <div>
                   <h1 className="text-4xl xl:text-5xl font-bold mb-6 leading-tight">
-                    Analyze and manage your
-                    <span className="block bg-gradient-to-r from-white to-cyan-200 bg-clip-text text-transparent">
-                      credit data with AI-powered insights.
+                    Secure and manage your
+                    <span className="block bg-gradient-to-r from-white via-[#c9f7c9] to-[#77dd77] bg-clip-text text-transparent">
+                      funding workflow with CapSol.
                     </span>
                   </h1>
                   <p className="text-lg xl:text-xl text-white/90 leading-relaxed max-w-lg">
-                    Used by many credit professionals for analysis and workflow automation
-                    to streamline their operations.
+                    Built for investors and operators who need capital strategy, lender matching,
+                    and a cleaner path to execution.
                   </p>
 
                   {/* Success metrics highlight */}
@@ -958,13 +949,13 @@ export default function Login() {
                     <div className="flex items-center space-x-2">
                       <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse"></div>
                       <span className="text-sm font-medium">
-                        AI-Assisted Credit Insights
+                        AI-powered capital matching
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-cyan-400 rounded-full animate-pulse delay-300"></div>
+                      <div className="w-3 h-3 bg-[#77dd77] rounded-full animate-pulse delay-300"></div>
                       <span className="text-sm font-medium">
-                        Informational underwriting-style review tools
+                        Deal readiness walkthroughs
                       </span>
                     </div>
                   </div>
@@ -1014,37 +1005,27 @@ export default function Login() {
           <div className="w-full max-w-md lg:max-w-lg xl:max-w-md">
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-center justify-center mb-8">
-              <Link to="/" className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-ocean-blue to-sea-green rounded-2xl flex items-center justify-center shadow-lg">
-                  <CreditCard className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <span className="text-2xl font-bold bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent">
-                    The Capsol
-                  </span>
-                  <div className="text-muted-foreground text-sm">
-                    AI-Powered Platform
-                  </div>
-                </div>
+              <Link to="/" className="flex items-center">
+                <img src="/capsol-logo.png" alt="CapSol" className="h-14 w-auto object-contain" />
               </Link>
             </div>
 
-            <Card className="border-0 shadow-2xl bg-white/95 dark:bg-gradient-to-br dark:from-slate-800/95 dark:to-slate-700/95 dark:border-slate-600/30 backdrop-blur-lg">
+            <Card className="border border-green-100/70 shadow-[0_25px_80px_-30px_rgba(0,66,37,0.35)] bg-white/95 dark:bg-gradient-to-br dark:from-[#0a2416]/95 dark:to-[#133723]/95 dark:border-green-900/40 backdrop-blur-lg rounded-[28px] overflow-hidden">
               <CardHeader className="text-center pb-4 pt-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-ocean-blue to-sea-green rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-                  <Shield className="h-8 w-8 text-white" />
+                <div className="w-16 h-16 bg-gradient-to-r from-[#004225] to-[#77dd77] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-900/20">
+                  <Building className="h-8 w-8 text-white" />
                 </div>
                 <CardTitle className="text-2xl gradient-text-primary mb-2">
                   Welcome Back
                 </CardTitle>
                 <CardDescription className="text-sm text-muted-foreground">
-                  Access your professional A.I Power Funding Solution Dashboard
+                  Access your CapSol dashboard for capital strategy, intake, and appointment workflows
                 </CardDescription>
               </CardHeader>
 
               <CardContent className="pt-0 px-6 pb-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-gradient-light dark:bg-gradient-to-r dark:from-slate-700/80 dark:to-slate-600/80 dark:border-slate-600">
+                  <TabsList className="grid w-full grid-cols-2 mb-6 bg-green-50 dark:bg-gradient-to-r dark:from-[#123321] dark:to-[#0d2718] dark:border-green-900/30 rounded-2xl p-1 h-auto">
                     <TabsTrigger
                       value="login"
                       className="data-[state=active]:gradient-primary data-[state=active]:text-white"
@@ -1062,16 +1043,16 @@ export default function Login() {
                   <TabsContent value="login">
                     <form onSubmit={handleLogin} className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="email" className="text-sm font-medium">
+                        <Label htmlFor="email" className="text-sm font-medium text-[#004225] dark:text-[#c9f7c9]">
                           Email Address
                         </Label>
                         <div className="relative group">
-                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-ocean-blue transition-colors" />
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#1B8B00] transition-colors" />
                           <Input
                             id="email"
                             type="email"
                             placeholder="enter@email.com"
-                            className="pl-10 h-11 bg-gradient-light dark:bg-gradient-to-r dark:from-slate-700/80 dark:to-slate-600/80 dark:border-slate-600 border-border/40 focus:border-ocean-blue/60 dark:focus:border-ocean-blue/80 focus:ring-ocean-blue/20 transition-all"
+                            className="pl-10 h-11 bg-white dark:bg-gradient-to-r dark:from-[#123321]/90 dark:to-[#0d2718]/90 dark:border-green-900/40 border-green-100 focus:border-[#1B8B00]/60 dark:focus:border-[#77dd77]/80 focus:ring-[#77dd77]/20 transition-all rounded-xl"
                             value={loginData.email}
                             onChange={(e) =>
                               setLoginData({
@@ -1087,17 +1068,17 @@ export default function Login() {
                       <div className="space-y-2">
                         <Label
                           htmlFor="password"
-                          className="text-sm font-medium"
+                          className="text-sm font-medium text-[#004225] dark:text-[#c9f7c9]"
                         >
                           Password
                         </Label>
                         <div className="relative group">
-                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-ocean-blue transition-colors" />
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-[#1B8B00] transition-colors" />
                           <Input
                             id="password"
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
-                            className="pl-10 pr-12 h-11 bg-gradient-light dark:bg-gradient-to-r dark:from-slate-700/80 dark:to-slate-600/80 dark:border-slate-600 border-border/40 focus:border-ocean-blue/60 dark:focus:border-ocean-blue/80 focus:ring-ocean-blue/20 transition-all"
+                            className="pl-10 pr-12 h-11 bg-white dark:bg-gradient-to-r dark:from-[#123321]/90 dark:to-[#0d2718]/90 dark:border-green-900/40 border-green-100 focus:border-[#1B8B00]/60 dark:focus:border-[#77dd77]/80 focus:ring-[#77dd77]/20 transition-all rounded-xl"
                             value={loginData.password}
                             onChange={(e) =>
                               setLoginData({
@@ -1111,7 +1092,7 @@ export default function Login() {
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 hover:bg-ocean-blue/10"
+                            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-10 w-10 hover:bg-green-100 dark:hover:bg-green-900/20 rounded-xl"
                             onClick={() => setShowPassword(!showPassword)}
                           >
                             {showPassword ? (

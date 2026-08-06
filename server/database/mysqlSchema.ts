@@ -13,6 +13,45 @@ import { ENV_CONFIG } from '../config/environment.js';
 
 const securityLogger = new SecurityLogger();
 
+async function repairTableIdAutoIncrement(tableName: string): Promise<boolean> {
+  const columns = await executeQuery(
+    `SELECT COLUMN_NAME, COLUMN_KEY, EXTRA
+       FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?`,
+    [tableName]
+  );
+  const idColumn = (columns as any[]).find((column: any) => column.COLUMN_NAME === 'id');
+
+  if (!idColumn) {
+    console.warn(`⚠️  ${tableName}.id column is missing; unable to repair AUTO_INCREMENT automatically`);
+    return false;
+  }
+
+  if (String(idColumn.EXTRA || '').toLowerCase().includes('auto_increment')) {
+    return true;
+  }
+
+  const primaryIndexes = await executeQuery(`SHOW INDEX FROM \`${tableName}\` WHERE Key_name = 'PRIMARY'`);
+  const hasPrimaryKey = Array.isArray(primaryIndexes) && primaryIndexes.length > 0;
+  const idIsPrimary = String(idColumn.COLUMN_KEY || '').toUpperCase() === 'PRI';
+
+  if (!hasPrimaryKey) {
+    await executeQuery(`ALTER TABLE \`${tableName}\` ADD PRIMARY KEY (id)`);
+  } else if (!idIsPrimary) {
+    console.warn(`⚠️  ${tableName}.id is not AUTO_INCREMENT and another primary key exists`);
+    return false;
+  }
+
+  await executeQuery(`ALTER TABLE \`${tableName}\` MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT`);
+  console.log(`✅ Repaired ${tableName}.id AUTO_INCREMENT`);
+  return true;
+}
+
+async function repairClientsIdAutoIncrement(): Promise<boolean> {
+  return repairTableIdAutoIncrement('clients');
+}
+
 // Enhanced interfaces (same as SQLite version but optimized for MySQL)
 export interface User {
   id: number;
@@ -186,6 +225,8 @@ export interface Subscription {
   cancel_at_period_end: boolean;
   cancellation_reason_code?: 'affordability' | 'guidance' | 'other' | null;
   cancellation_reason_text?: string | null;
+  cancellation_guidance_choice?: 'join_class_now' | 'not_now' | 'still_cancel' | null;
+  cancellation_guidance_updated_at?: string | null;
   cancellation_requested_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -466,52 +507,34 @@ export async function initializeMySQLDatabase(): Promise<void> {
     
     await createMySQLTables();
 
-    // Legacy imports can predate core auth columns used by current signup flows.
     try {
-      const cols = await executeQuery(
-        `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'`
-      );
-      const existing = new Set((cols as any[]).map((r: any) => r.COLUMN_NAME));
-      const alters: string[] = [];
-      let backfillEmailVerified = false;
-      let backfillPasswordChangedAt = false;
+      await repairClientsIdAutoIncrement();
+    } catch (error: any) {
+      console.log('⚠️  Error repairing clients.id AUTO_INCREMENT:', error.message);
+    }
 
-      if (!existing.has('email_verified')) {
-        alters.push('ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT FALSE');
-        backfillEmailVerified = true;
-      }
-      if (!existing.has('failed_login_attempts')) alters.push('ADD COLUMN failed_login_attempts INT NOT NULL DEFAULT 0');
-      if (!existing.has('locked_until')) alters.push('ADD COLUMN locked_until DATETIME NULL');
-      if (!existing.has('last_login_ip')) alters.push('ADD COLUMN last_login_ip VARCHAR(45) NULL');
-      if (!existing.has('last_login_user_agent')) alters.push('ADD COLUMN last_login_user_agent TEXT NULL');
-      if (!existing.has('password_changed_at')) {
-        alters.push('ADD COLUMN password_changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP');
-        backfillPasswordChangedAt = true;
-      }
+    try {
+      await repairTableIdAutoIncrement('user_activities');
+    } catch (error: any) {
+      console.log('⚠️  Error repairing user_activities.id AUTO_INCREMENT:', error.message);
+    }
 
-      if (alters.length > 0) {
-        await executeQuery(`ALTER TABLE users ${alters.join(', ')}`);
-      }
+    try {
+      await repairTableIdAutoIncrement('activities');
+    } catch (error: any) {
+      console.log('⚠️  Error repairing activities.id AUTO_INCREMENT:', error.message);
+    }
 
-      if (backfillEmailVerified) {
-        await executeQuery(`
-          UPDATE users
-          SET email_verified = CASE
-            WHEN status = 'pending' THEN FALSE
-            ELSE TRUE
-          END
-        `);
-      }
+    try {
+      await repairTableIdAutoIncrement('dispute_letter_history');
+    } catch (error: any) {
+      console.log('Error repairing dispute_letter_history.id AUTO_INCREMENT:', error.message);
+    }
 
-      if (backfillPasswordChangedAt) {
-        await executeQuery(`
-          UPDATE users
-          SET password_changed_at = COALESCE(updated_at, created_at, NOW())
-          WHERE password_changed_at IS NULL
-        `);
-      }
-    } catch (e) {
-      console.error('Failed to update users auth schema:', e);
+    try {
+      await repairTableIdAutoIncrement('disputes');
+    } catch (error: any) {
+      console.log('Error repairing disputes.id AUTO_INCREMENT:', error.message);
     }
 
     try {
@@ -563,6 +586,37 @@ export async function initializeMySQLDatabase(): Promise<void> {
     }
 
     try {
+      const integrationColumns = await executeQuery(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_integrations'`
+      );
+      const existingIntegrationColumns = new Set((integrationColumns as any[]).map((row: any) => row.COLUMN_NAME));
+      const integrationAlters: string[] = [];
+      if (!existingIntegrationColumns.has('verified_at')) integrationAlters.push('ADD COLUMN verified_at DATETIME NULL');
+      if (!existingIntegrationColumns.has('last_validation_code')) integrationAlters.push('ADD COLUMN last_validation_code INT NULL');
+      if (!existingIntegrationColumns.has('last_validation_error')) integrationAlters.push('ADD COLUMN last_validation_error TEXT NULL');
+      if (integrationAlters.length) {
+        await executeQuery(`ALTER TABLE admin_integrations ${integrationAlters.join(', ')}`);
+      }
+
+      const logColumns = await executeQuery(
+        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'integration_activity_logs'`
+      );
+      const existingLogColumns = new Set((logColumns as any[]).map((row: any) => row.COLUMN_NAME));
+      const logAlters: string[] = [];
+      if (!existingLogColumns.has('response_code')) logAlters.push('ADD COLUMN response_code INT NULL');
+      if (!existingLogColumns.has('error_message')) logAlters.push('ADD COLUMN error_message TEXT NULL');
+      if (!existingLogColumns.has('data_fields')) logAlters.push('ADD COLUMN data_fields JSON NULL');
+      if (!existingLogColumns.has('retry_status')) logAlters.push('ADD COLUMN retry_status VARCHAR(100) NULL');
+      if (logAlters.length) {
+        await executeQuery(`ALTER TABLE integration_activity_logs ${logAlters.join(', ')}`);
+      }
+    } catch (e) {
+      console.error('Failed to update GoHighLevel integration schema:', e);
+    }
+
+    try {
       const cols = await executeQuery(
         `SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'disputes'`
       );
@@ -575,13 +629,30 @@ export async function initializeMySQLDatabase(): Promise<void> {
 
       if (!hadFiledDate) alters.push('ADD COLUMN filed_date DATE NULL');
       if (!hadResponseDate) alters.push('ADD COLUMN response_date DATE NULL');
+      if (!existing.has('account_number')) alters.push('ADD COLUMN account_number VARCHAR(50) NULL');
+      if (!existing.has('dispute_type')) alters.push("ADD COLUMN dispute_type ENUM('inaccurate', 'incomplete', 'unverifiable', 'fraudulent', 'other') NOT NULL DEFAULT 'inaccurate'");
+      if (!existing.has('priority')) alters.push("ADD COLUMN priority ENUM('low', 'medium', 'high') NOT NULL DEFAULT 'medium'");
+      if (!existing.has('expected_resolution_date')) alters.push('ADD COLUMN expected_resolution_date DATE NULL');
       if (!existing.has('result')) alters.push('ADD COLUMN result TEXT NULL');
+      if (!existing.has('notes')) alters.push('ADD COLUMN notes TEXT NULL');
+      if (!existing.has('documents')) alters.push('ADD COLUMN documents JSON NULL');
       if (!hadCreatedBy) alters.push('ADD COLUMN created_by INT NULL');
       if (!hadUpdatedBy) alters.push('ADD COLUMN updated_by INT NULL');
 
       if (alters.length) {
         await executeQuery(`ALTER TABLE disputes ${alters.join(', ')}`);
       }
+
+      // Older installations used a different status set and required filed_date.
+      // Keep legacy values readable while accepting the enhanced dispute workflow.
+      await executeQuery(`
+        ALTER TABLE disputes
+          MODIFY COLUMN status ENUM(
+            'draft', 'submitted', 'in_progress', 'resolved', 'rejected',
+            'pending', 'investigating', 'verified', 'deleted', 'updated'
+          ) NOT NULL DEFAULT 'draft',
+          MODIFY COLUMN filed_date DATE NULL
+      `);
 
       if (!hadFiledDate) {
         if (existing.has('date_submitted')) {
@@ -665,6 +736,14 @@ export async function initializeMySQLDatabase(): Promise<void> {
       if (!existing.has('cancellation_reason_text')) {
         await executeQuery(`ALTER TABLE subscriptions ADD COLUMN cancellation_reason_text TEXT NULL`);
         console.log('✅ Added cancellation_reason_text to subscriptions');
+      }
+      if (!existing.has('cancellation_guidance_choice')) {
+        await executeQuery(`ALTER TABLE subscriptions ADD COLUMN cancellation_guidance_choice VARCHAR(32) NULL`);
+        console.log('✅ Added cancellation_guidance_choice to subscriptions');
+      }
+      if (!existing.has('cancellation_guidance_updated_at')) {
+        await executeQuery(`ALTER TABLE subscriptions ADD COLUMN cancellation_guidance_updated_at DATETIME NULL`);
+        console.log('✅ Added cancellation_guidance_updated_at to subscriptions');
       }
       if (!existing.has('cancellation_requested_at')) {
         await executeQuery(`ALTER TABLE subscriptions ADD COLUMN cancellation_requested_at DATETIME NULL`);
@@ -780,9 +859,13 @@ async function createMySQLTables(): Promise<void> {
     nmi_password VARCHAR(255) NULL,
     nmi_test_mode BOOLEAN NOT NULL DEFAULT FALSE,
     nmi_gateway_logo VARCHAR(500) NULL,
-    funding_override_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    funding_override_signature_text TEXT NULL,
-    funding_override_signed_at DATETIME NULL,
+      funding_override_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      funding_override_signature_text TEXT NULL,
+      funding_override_signed_at DATETIME NULL,
+      send_dispute_letter_email BOOLEAN NOT NULL DEFAULT TRUE,
+      send_inactivity_email BOOLEAN NOT NULL DEFAULT TRUE,
+      send_report_pull_reminder_email BOOLEAN NOT NULL DEFAULT TRUE,
+      notify_client_after_report_pull BOOLEAN NOT NULL DEFAULT TRUE,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       created_by INT NULL,
@@ -831,6 +914,9 @@ async function createMySQLTables(): Promise<void> {
       custom_field_report_date VARCHAR(255) NULL,
       field_mappings JSON NULL,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      verified_at DATETIME NULL,
+      last_validation_code INT NULL,
+      last_validation_error TEXT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       created_by INT NULL,
@@ -853,6 +939,10 @@ async function createMySQLTables(): Promise<void> {
       status ENUM('success','failed') NOT NULL,
       message TEXT NULL,
       client_id INT NULL,
+      response_code INT NULL,
+      error_message TEXT NULL,
+      data_fields JSON NULL,
+      retry_status VARCHAR(100) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_integration_id (integration_id),
       INDEX idx_admin_id (admin_id),
@@ -1052,11 +1142,17 @@ async function createMySQLTables(): Promise<void> {
       client_id INT NOT NULL,
       bureau ENUM('experian', 'equifax', 'transunion') NOT NULL,
       account_name VARCHAR(255) NOT NULL,
+      account_number VARCHAR(50),
       dispute_reason TEXT NOT NULL,
-      status ENUM('draft', 'pending', 'investigating', 'verified', 'deleted', 'updated') NOT NULL DEFAULT 'pending',
-      filed_date DATE NOT NULL,
+      dispute_type ENUM('inaccurate', 'incomplete', 'unverifiable', 'fraudulent', 'other') NOT NULL DEFAULT 'inaccurate',
+      status ENUM('draft', 'submitted', 'in_progress', 'resolved', 'rejected', 'pending', 'investigating', 'verified', 'deleted', 'updated') NOT NULL DEFAULT 'draft',
+      priority ENUM('low', 'medium', 'high') NOT NULL DEFAULT 'medium',
+      filed_date DATE,
       response_date DATE,
+      expected_resolution_date DATE,
       result TEXT,
+      notes TEXT,
+      documents JSON,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       created_by INT NOT NULL,
@@ -1600,12 +1696,15 @@ async function createMySQLTables(): Promise<void> {
       cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
       cancellation_reason_code VARCHAR(32) NULL,
       cancellation_reason_text TEXT NULL,
+      cancellation_guidance_choice VARCHAR(32) NULL,
+      cancellation_guidance_updated_at DATETIME NULL,
       cancellation_requested_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_user_id (user_id),
       INDEX idx_stripe_subscription (stripe_subscription_id),
       INDEX idx_status (status),
+      INDEX idx_cancellation_guidance_choice (cancellation_guidance_choice),
       INDEX idx_cancellation_requested_at (cancellation_requested_at),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -2610,6 +2709,41 @@ async function createMySQLTables(): Promise<void> {
       console.log('ℹ️  phone column already exists');
     } else {
       console.log('⚠️  Error adding phone column:', error.message);
+    }
+  }
+
+  try {
+    await executeQuery(`
+      ALTER TABLE users
+      ADD COLUMN send_dispute_letter_email BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    console.log('✅ Added send_dispute_letter_email column to users table');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME') {
+      console.log('⚠️  Error adding send_dispute_letter_email column:', error.message);
+    }
+  }
+
+  try {
+    await executeQuery(`
+      ALTER TABLE users
+      ADD COLUMN send_inactivity_email BOOLEAN NOT NULL DEFAULT TRUE
+    `);
+    console.log('Added send_inactivity_email column to users table');
+  } catch (error: any) {
+    if (error.code !== 'ER_DUP_FIELDNAME') {
+      console.log('Error adding send_inactivity_email column:', error.message);
+    }
+  }
+
+  for (const column of ['send_report_pull_reminder_email', 'notify_client_after_report_pull']) {
+    try {
+      await executeQuery(`ALTER TABLE users ADD COLUMN ${column} BOOLEAN NOT NULL DEFAULT TRUE`);
+      console.log(`Added ${column} column to users table`);
+    } catch (error: any) {
+      if (error.code !== 'ER_DUP_FIELDNAME') {
+        console.log(`Error adding ${column} column:`, error.message);
+      }
     }
   }
 

@@ -98,6 +98,7 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import PaymentPrompt from "@/components/PaymentPrompt";
 import RestrictedFeature from "@/components/RestrictedFeature";
 import AdminCalendar from "@/components/AdminCalendar";
+import BasicAdminCalendar from "@/components/BasicAdminCalendar";
 import { EmailVerificationModal } from "@/components/EmailVerificationModal";
 import AdminContractPrompt from "@/components/AdminContractPrompt";
 import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
@@ -185,13 +186,13 @@ const eliteDashboardOverviewAnimatedUsers = new Set<string>();
 const getStatusColor = (status: string) => {
   switch (status) {
     case "Active":
-      return "bg-[#dfffe0] text-[#004225] border-[#004225]/20";
+      return "bg-blue-100 text-blue-800 border-blue-200";
     case "New":
-      return "bg-[#f3fff3] text-[#004225] border-[#dfffe0]";
+      return "bg-green-100 text-green-800 border-green-200";
     case "In Progress":
-      return "bg-[#5fcf74]/15 text-[#004225] border-[#77dd77]/25";
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
     case "Completed":
-      return "bg-[#004225]/10 text-[#77dd77] border-[#004225]/20";
+      return "bg-purple-100 text-purple-800 border-purple-200";
     default:
       return "bg-gray-100 text-gray-800 border-gray-200";
   }
@@ -202,7 +203,7 @@ const getProgressIcon = (progress: string) => {
     case "improving":
       return <TrendingUp className="h-4 w-4 text-green-600" />;
     case "stable":
-      return <CheckCircle className="h-4 w-4 text-indigo-600" />;
+      return <CheckCircle className="h-4 w-4 text-blue-600" />;
     case "new":
       return <Clock className="h-4 w-4 text-yellow-600" />;
     case "improved":
@@ -355,7 +356,7 @@ export default function Dashboard() {
     ? "Scan the code below, open the referral page, or download the QR image to share it."
     : "Scan the code below, open the registration page, or download the QR image to share it.";
   const qrModalAlt = qrModalType === "referral" ? "Referral link QR code" : "Credit report registration QR code";
-  const qrLogoPath = "/image.png";
+  const qrLogoPath = "/capsol-fav.png";
   const basicDashboardClient = useMemo(() => {
     if (!isBasicAdminPortalUser) {
       return null;
@@ -374,6 +375,7 @@ export default function Dashboard() {
   const basicWorkAreaHref = basicDashboardClient
     ? `/credit-report/${basicDashboardClient.id}?tab=overview`
     : "/credit-report";
+  const basicVisibleRecentActivity = Array.isArray(recentActivity) ? recentActivity.slice(0, 5) : [];
 
   useEffect(() => {
     if (authLoading || isDashboardOverviewCached) {
@@ -1527,7 +1529,7 @@ export default function Dashboard() {
   return (
     <DashboardLayout
       title={isBasicAdminPortalUser ? "Basic Dashboard" : "Dashboard Overview"}
-      description={isBasicAdminPortalUser ? "Profile, report, and Work Area" : "Monitor your funding business performance and client progress"}
+      description={isBasicAdminPortalUser ? "My profile, my report, and Work Area" : "Monitor your funding business performance and client progress"}
       onAddClient={handleAddClient}
     >
       <Dialog open={showPhoneDialog} onOpenChange={(open) => {
@@ -1562,7 +1564,7 @@ export default function Dashboard() {
             <Button
               onClick={handleSavePhone}
               disabled={isSavingPhone}
-              className="bg-gradient-to-r from-violet-600 to-indigo-900 hover:from-violet-600/90 hover:to-indigo-900/90 text-white"
+              className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-500/90 hover:to-teal-500/90 text-white"
             >
               {isSavingPhone ? (
                 <div className="flex items-center gap-2">
@@ -1584,36 +1586,38 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Elite Dashboard (The Capsol Elite + Agreement Signed) ── */}
+      {/* ── Elite Dashboard (Score Machine Elite + Agreement Signed) ── */}
       {isBasicAdminPortalUser ? (
         <div className="space-y-6">
-          <section className="overflow-hidden rounded-lg border border-sky-100 bg-white shadow-sm shadow-sky-100/70 dark:border-slate-800 dark:bg-slate-950 dark:shadow-none">
+          <section className="relative overflow-hidden rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-emerald-50 shadow-lg shadow-sky-100/70 dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 dark:shadow-none">
+            <div className="absolute right-0 top-0 h-40 w-40 translate-x-16 -translate-y-16 rounded-full bg-sky-300/30 blur-3xl dark:bg-sky-500/10" />
+            <div className="absolute bottom-0 left-1/3 h-32 w-32 translate-y-16 rounded-full bg-emerald-300/30 blur-3xl dark:bg-emerald-500/10" />
             <div className="flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl space-y-3">
-                <Badge className="border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-50 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
-                  The Capsol Basic
+                <Badge className="border-sky-200 bg-white/80 text-sky-700 shadow-sm hover:bg-white dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300">
+                  Score Machine Basic
                 </Badge>
                 <div>
                   <h2 className="text-2xl font-semibold tracking-normal text-slate-950 dark:text-white sm:text-3xl">
                     Welcome back{userProfile?.first_name ? `, ${userProfile.first_name}` : ""}
                   </h2>
                   <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-400">
-                    Profile, report review, and Work Area are ready in one place.
+                    Your profile, report review, and Work Area are ready in one place.
                   </p>
                 </div>
               </div>
               <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-[360px]">
                 <Button
                   onClick={() => navigate(basicProfileHref)}
-                  className="h-12 justify-start bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400"
+                  className="h-12 justify-start bg-gradient-to-r from-sky-600 to-blue-600 text-white shadow-md shadow-sky-200 hover:from-sky-700 hover:to-blue-700 dark:shadow-none"
                 >
                   <Users className="mr-2 h-4 w-4" />
-                  Open Profile
+                  Open My Profile
                 </Button>
                 <Button
                   onClick={() => navigate(basicWorkAreaHref)}
                   variant="outline"
-                  className="h-12 justify-start border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 dark:border-sky-900 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800"
+                  className="h-12 justify-start border-emerald-200 bg-white/80 text-emerald-700 shadow-sm hover:bg-emerald-50 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300 dark:hover:bg-slate-800"
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   Open Work Area
@@ -1623,55 +1627,101 @@ export default function Dashboard() {
           </section>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <Card className="overflow-hidden border-0 bg-gradient-to-br from-white to-sky-50 shadow-md shadow-sky-100/70 dark:from-slate-900 dark:to-slate-950 dark:shadow-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Profile</CardTitle>
-                <Users className="h-4 w-4 text-sky-500" />
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">My Profile</CardTitle>
+                <div className="rounded-lg bg-sky-500 p-2 text-white shadow-sm"><Users className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                <div className="text-2xl font-semibold text-sky-700 dark:text-sky-300">
                   {loading ? "--" : (basicDashboardClient ? "Ready" : "Add")}
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {basicDashboardClient ? basicDashboardClient.name : "Create your first profile"}
+                  {basicDashboardClient ? basicDashboardClient.name : "Set up your first profile"}
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <Card className="overflow-hidden border-0 bg-gradient-to-br from-white to-emerald-50 shadow-md shadow-emerald-100/70 dark:from-slate-900 dark:to-slate-950 dark:shadow-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Report Pulls</CardTitle>
-                <FileText className="h-4 w-4 text-emerald-500" />
+                <div className="rounded-lg bg-emerald-500 p-2 text-white shadow-sm"><FileText className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                <div className="text-2xl font-semibold text-emerald-700 dark:text-emerald-300">
                   {loading ? "--" : (stats.reportPulls || 0).toLocaleString()}
                 </div>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">This month</p>
               </CardContent>
             </Card>
 
-            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <Card className="overflow-hidden border-0 bg-gradient-to-br from-white to-amber-50 shadow-md shadow-amber-100/70 dark:from-slate-900 dark:to-slate-950 dark:shadow-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Funding Status</CardTitle>
-                <Target className="h-4 w-4 text-amber-500" />
+                <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">File Status</CardTitle>
+                <div className="rounded-lg bg-amber-500 p-2 text-white shadow-sm"><Target className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold text-slate-950 dark:text-white">
+                <div className="text-2xl font-semibold text-amber-700 dark:text-amber-300">
                   {loading ? "--" : `${stats.fundable || 0}/${stats.notFundable || 0}`}
                 </div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Fundable / not fundable</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ready To Go / Not Ready</p>
               </CardContent>
             </Card>
 
-            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <Card className="overflow-hidden border-0 bg-gradient-to-br from-white to-violet-50 shadow-md shadow-violet-100/70 dark:from-slate-900 dark:to-slate-950 dark:shadow-none">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-300">Access</CardTitle>
-                <CheckCircle className="h-4 w-4 text-sky-500" />
+                <div className="rounded-lg bg-violet-500 p-2 text-white shadow-sm"><CheckCircle className="h-4 w-4" /></div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-semibold text-slate-950 dark:text-white">Basic</div>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Profile and Work Area</p>
+                <div className="text-2xl font-semibold text-violet-700 dark:text-violet-300">Basic</div>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">My profile and Work Area</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-5">
+            <Card className="overflow-hidden border-0 bg-gradient-to-br from-white to-blue-50 shadow-lg shadow-blue-100/70 dark:from-slate-900 dark:to-slate-950 dark:shadow-none">
+              <CardContent className="p-5 sm:p-6">
+                <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-950 dark:text-white">Get Your Credit Report</h3>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Register, copy the link, or share the QR preview with clients.</p>
+                      </div>
+                      <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 p-3 text-white shadow-md shadow-blue-200 dark:shadow-none">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="basic-credit-report-link" className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Credit Report Link</Label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Input id="basic-credit-report-link" value={creditReportLink} readOnly className="h-10 font-mono text-xs bg-white/80 dark:bg-slate-900" />
+                        <Button size="sm" variant="outline" className="h-10 px-3 bg-white/80" onClick={handleCopyCreditReportLink}>
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Button onClick={handleOpenCreditReportLink} className="bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600">
+                      Register Now
+                    </Button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openQrModal("credit-report")}
+                    className="relative mx-auto h-40 w-40 rounded-2xl border-4 border-white bg-white p-2 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-500/60 dark:border-slate-800 dark:bg-slate-900"
+                    aria-label="Open large QR code"
+                  >
+                    <img src={creditReportQrCodeUrl} alt="Credit report registration QR code" className="h-full w-full object-contain" loading="lazy" />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white/95 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                        <img src={qrLogoPath} alt="Score Machine logo" className="h-6 w-6 object-contain" />
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -1680,7 +1730,7 @@ export default function Dashboard() {
             <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <CardHeader>
                 <CardTitle className="text-slate-950 dark:text-white">Your Current Profile</CardTitle>
-                <CardDescription>Continue from the most recent client/report you added.</CardDescription>
+                <CardDescription>Continue from the most recent report you added.</CardDescription>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -1708,9 +1758,9 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                      <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="border-slate-200 bg-white text-slate-700 hover:bg-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
                         <Eye className="mr-2 h-4 w-4" />
-                        Profile
+                        My Profile
                       </Button>
                       <Button onClick={() => navigate(basicWorkAreaHref)} className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
                         <BarChart3 className="mr-2 h-4 w-4" />
@@ -1723,7 +1773,7 @@ export default function Dashboard() {
                     <UserPlus className="mx-auto h-8 w-8 text-sky-500" />
                     <h3 className="mt-3 text-base font-semibold text-slate-950 dark:text-white">Add your first report</h3>
                     <p className="mx-auto mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                      Profile and Work Area appear after the first report is added.
+                      Your profile and Work Area appear after the first report is added.
                     </p>
                     <Button onClick={handleAddClient} className="mt-4 bg-slate-900 text-white hover:bg-slate-800 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
                       <UserPlus className="mr-2 h-4 w-4" />
@@ -1737,21 +1787,97 @@ export default function Dashboard() {
             <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <CardHeader>
                 <CardTitle className="text-slate-950 dark:text-white">Next Steps</CardTitle>
-                <CardDescription>Profile, report, and settings shortcuts.</CardDescription>
+                <CardDescription>My profile, report, and settings shortcuts.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                <Button onClick={() => navigate(basicProfileHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
                   <Users className="mr-2 h-4 w-4" />
-                  Review profile details
+                  Review my profile details
                 </Button>
-                <Button onClick={() => navigate(basicWorkAreaHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
+                <Button onClick={() => navigate(basicWorkAreaHref)} variant="outline" className="h-11 w-full justify-start border-slate-200 bg-white text-slate-700 hover:bg-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800">
                   <FileText className="mr-2 h-4 w-4" />
-                  Review credit report
+                  Review my credit report
                 </Button>
                 <Button onClick={handleAddClient} className="h-11 w-full justify-start bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add or re-pull report
                 </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.75fr)] xl:items-start">
+            <section className="space-y-3">
+              <div className="px-1">
+                <div className="flex items-center gap-2 text-slate-950 dark:text-white">
+                  <Calendar className="h-4 w-4 text-sky-500" />
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.18em]">Calendar</h3>
+                </div>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  My reminders, meetings, and upcoming dates in the basic portal view.
+                </p>
+              </div>
+              <BasicAdminCalendar />
+            </section>
+
+            <Card className="border-sky-100 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <CardHeader>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-slate-950 dark:text-white">Recent Activity</CardTitle>
+                    <CardDescription>Latest updates from your profile and report workflow.</CardDescription>
+                  </div>
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-900">
+                    <Clock className="h-4 w-4 text-slate-500 dark:text-slate-300" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1.5 h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-700" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                          <div className="h-3 w-full animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                          <div className="h-3 w-20 animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : basicVisibleRecentActivity.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+                    No recent activity
+                  </div>
+                ) : (
+                  basicVisibleRecentActivity.map((activity) => (
+                    <div key={activity.id} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`mt-1.5 h-2.5 w-2.5 rounded-full ${
+                            activity.status === "success"
+                              ? "bg-emerald-500"
+                              : activity.status === "info"
+                                ? "bg-sky-500"
+                                : "bg-amber-500"
+                          }`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-slate-900 dark:text-white">
+                            {activity.client || "Activity"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                            {activity.description}
+                          </p>
+                          <p className="mt-2 text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+                            {activity.time}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1800,7 +1926,7 @@ export default function Dashboard() {
       {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 mb-8">
         <Card
-          className="border-0 shadow-lg bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
+          className="border-0 shadow-lg bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
           onClick={() => navigate("/clients")}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
@@ -1826,7 +1952,7 @@ export default function Dashboard() {
               width="80"
               height="40"
               viewBox="0 0 80 40"
-              className="text-indigo-500"
+              className="text-blue-500"
             >
               <path
                 d="M0,35 Q10,25 20,30 T40,20 T60,15 T80,10"
@@ -1871,12 +1997,12 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Fundable
             </CardTitle>
-            <div className="bg-gradient-to-br from-[#004225] to-[#77dd77] p-2 rounded-lg">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-2 rounded-lg">
               <Award className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-[#004225] dark:text-[#dfffe0]">
+            <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
               {loading ? "--" : (stats.fundable || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -1884,7 +2010,7 @@ export default function Dashboard() {
             </p>
           </CardContent>
           <div className="absolute bottom-0 right-0 opacity-20">
-            <svg width="60" height="60" viewBox="0 0 60 60" className="text-[#77dd77]">
+            <svg width="60" height="60" viewBox="0 0 60 60" className="text-purple-500">
               <circle cx="30" cy="30" r="20" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
               <circle cx="30" cy="30" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" style={{ animationDelay: "0.5s" }} />
               <path d="M30,10 L30,15 M30,45 L30,50 M10,30 L15,30 M45,30 L50,30" stroke="currentColor" strokeWidth="2" />
@@ -2039,19 +2165,19 @@ export default function Dashboard() {
         </Card>
 
         <Card
-          className="border-0 shadow-lg bg-gradient-to-br from-white to-indigo-50/60 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
+          className="border-0 shadow-lg bg-gradient-to-br from-white to-teal-50/50 dark:from-slate-800 dark:to-slate-700 hover:shadow-xl transition-all duration-300 cursor-pointer relative overflow-hidden"
           
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
             <CardTitle className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Total Products
             </CardTitle>
-            <div className="bg-gradient-to-br from-violet-600 to-indigo-900 p-2 rounded-lg">
+            <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-2 rounded-lg">
               <CreditCard className="h-4 w-4 text-white" />
             </div>
           </CardHeader>
           <CardContent className="relative z-10">
-            <div className="text-3xl font-bold text-indigo-700 dark:text-indigo-300">
+            <div className="text-3xl font-bold text-teal-600 dark:text-teal-400">
               {loading ? "--" : (stats.totalCards || 0).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -2059,7 +2185,7 @@ export default function Dashboard() {
             </p>
           </CardContent>
           <div className="absolute bottom-0 right-0 opacity-20">
-            <svg width="60" height="60" viewBox="0 0 60 60" className="text-indigo-500">
+            <svg width="60" height="60" viewBox="0 0 60 60" className="text-teal-500">
               <circle cx="30" cy="30" r="20" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
               <circle cx="30" cy="30" r="10" fill="none" stroke="currentColor" strokeWidth="2" className="animate-pulse" />
             </svg>
@@ -2067,7 +2193,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-blue-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2092,7 +2218,7 @@ export default function Dashboard() {
                   Register Now
                 </Button>
               </div>
-              <div className="flex flex-col items-center gap-3 p-4 bg-white/80 dark:bg-slate-800/70 rounded-xl border border-violet-100/80 dark:border-slate-700/80 shadow-sm min-w-[160px]">
+              <div className="flex flex-col items-center gap-3 p-4 bg-white/80 dark:bg-slate-800/70 rounded-xl border border-blue-100/80 dark:border-slate-700/80 shadow-sm min-w-[160px]">
                 <button
                   type="button"
                   onClick={() => openQrModal("credit-report")}
@@ -2109,7 +2235,7 @@ export default function Dashboard() {
                     <div className="h-8 w-8 rounded-full bg-white/90 backdrop-blur border border-slate-200 shadow-sm flex items-center justify-center">
                       <img
                         src={qrLogoPath}
-                        alt="The Capsol logo"
+                        alt="Score Machine logo"
                         className="h-5 w-5 object-contain"
                       />
                     </div>
@@ -2123,7 +2249,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-indigo-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2147,7 +2273,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-violet-50/60 dark:from-slate-800 dark:to-slate-700 mb-8">
+        <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-emerald-50/50 dark:from-slate-800 dark:to-slate-700 mb-8">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               <div className="space-y-1">
@@ -2187,7 +2313,7 @@ export default function Dashboard() {
                   <Button
                     onClick={handleGenerateClientIntakeLink}
                     disabled={isGeneratingIntakeLink}
-                    className="bg-gradient-to-r from-violet-600 to-indigo-900 hover:from-violet-600/90 hover:to-indigo-900/90"
+                    className="bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-500/90 hover:to-teal-500/90"
                   >
                     {isGeneratingIntakeLink ? "Generating..." : "Generate Onboarding Link"}
                   </Button>
@@ -2462,7 +2588,7 @@ export default function Dashboard() {
                   <Button
                     onClick={handleAffiliateProAccess}
                     variant="outline"
-                    className="w-full justify-start border-[#004225]/20 text-[#004225] dark:border-[#dfffe0]/20 dark:text-[#dfffe0]"
+                    className="w-full justify-start border-purple-500/30 text-purple-600"
                   >
                     <Crown className="h-4 w-4 mr-2" />
                     {affiliateVerificationStatus === 'active' 
@@ -2508,7 +2634,7 @@ export default function Dashboard() {
                           <Copy className="h-4 w-4" />
                         </Button>
                       </div>
-                      <div className="flex items-center justify-between gap-3 rounded-xl border border-violet-100 bg-violet-50/70 p-3 dark:border-violet-900/40 dark:bg-violet-950/20">
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
                         <div>
                           <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Referral QR</div>
                           <div className="text-xs text-muted-foreground">Open the referral QR preview and download it.</div>
@@ -2517,7 +2643,7 @@ export default function Dashboard() {
                           type="button"
                           onClick={() => openQrModal("referral")}
                           disabled={!referralQrCodeUrl}
-                          className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-violet-200 bg-white p-0.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900/50"
+                          className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-emerald-200 bg-white p-0.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-900/50"
                           aria-label="Open referral QR code"
                         >
                           <img
@@ -2530,7 +2656,7 @@ export default function Dashboard() {
                             <div className="h-5 w-5 rounded-full bg-white/90 backdrop-blur border border-slate-200 shadow-sm flex items-center justify-center">
                               <img
                                 src={qrLogoPath}
-                                alt="The Capsol logo"
+                                alt="Score Machine logo"
                                 className="h-3 w-3 object-contain"
                               />
                             </div>
@@ -2594,7 +2720,7 @@ export default function Dashboard() {
                           activity.status === "success"
                             ? "bg-green-500"
                             : activity.status === "info"
-                              ? "bg-indigo-600"
+                              ? "bg-blue-500"
                               : "bg-yellow-500"
                         }`}
                       />
@@ -2654,23 +2780,23 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <Award className="h-4 w-4 text-[#77dd77]" />
+                  <Award className="h-4 w-4 text-purple-600" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Reports Pulls
                   </span>
                 </div>
-                <span className="text-sm font-bold text-[#77dd77]">
+                <span className="text-sm font-bold text-purple-600">
                   {loading ? "--" : (stats.reportPulls || 0)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
-                  <DollarSign className="h-4 w-4 text-indigo-700 dark:text-indigo-300" />
+                  <DollarSign className="h-4 w-4 text-emerald-600" />
                   <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
                     Funding Invoice Paid
                   </span>
                 </div>
-                <span className="text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                <span className="text-sm font-bold text-emerald-600">
                   {loading ? "--" : (stats.fundingInvoicesPaid || 0)}
                 </span>
               </div>
@@ -2699,7 +2825,7 @@ export default function Dashboard() {
                 <div className="h-16 w-16 rounded-full bg-white/95 backdrop-blur border border-slate-200 shadow flex items-center justify-center">
                   <img
                     src={qrLogoPath}
-                    alt="The Capsol logo"
+                    alt="Score Machine logo"
                     className="h-12 w-12 object-contain"
                   />
                 </div>
@@ -2937,16 +3063,16 @@ export default function Dashboard() {
             {/* Popup Card */}
             <motion.div
               className="relative w-[90vw] max-w-lg rounded-3xl overflow-hidden shadow-2xl"
-              style={{ boxShadow: '0 0 80px rgba(119,221,119,0.28), 0 0 160px rgba(0,66,37,0.16)' }}
+              style={{ boxShadow: '0 0 80px rgba(0,212,255,0.3), 0 0 160px rgba(112,0,255,0.15)' }}
               initial={{ opacity: 0, scale: 0.7, y: 40 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             >
               {/* Neon top border */}
-              <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #dfffe0, #77dd77, #5fcf74, #004225, #dfffe0)' }} />
+              <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #00d4ff, #7000ff, #ff00ff, #00ffcc, #00d4ff)' }} />
               {/* Content */}
-              <div className="relative px-8 py-10 text-center" style={{ background: 'linear-gradient(180deg, #001c10 0%, #002f1b 100%)' }}>
+              <div className="relative px-8 py-10 text-center" style={{ background: 'linear-gradient(180deg, #0a0a1a 0%, #0d0d2b 100%)' }}>
                 {/* Background particles */}
                 {Array.from({ length: 20 }).map((_, i) => (
                   <motion.div
@@ -2957,7 +3083,7 @@ export default function Dashboard() {
                       height: 2 + Math.random() * 3,
                       left: `${Math.random() * 100}%`,
                       top: `${Math.random() * 100}%`,
-                      background: ['#77dd77', '#004225', '#5fcf74', '#dfffe0'][i % 4],
+                      background: ['#00d4ff', '#7000ff', '#ff00ff', '#00ffcc'][i % 4],
                       opacity: 0.3,
                     }}
                     animate={{ opacity: [0.1, 0.5, 0.1], y: [0, -10, 0] }}
@@ -2968,18 +3094,18 @@ export default function Dashboard() {
                 {/* Crown icon */}
                 <motion.div
                   className="mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-6"
-                  style={{ background: 'linear-gradient(135deg, rgba(119,221,119,0.2), rgba(0,66,37,0.2))', border: '2px solid rgba(119,221,119,0.3)', boxShadow: '0 0 30px rgba(119,221,119,0.2)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(112,0,255,0.2))', border: '2px solid rgba(0,212,255,0.3)', boxShadow: '0 0 30px rgba(0,212,255,0.2)' }}
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.2, type: 'spring', damping: 12 }}
                 >
-                  <Crown className="h-10 w-10 text-[#77dd77]" />
+                  <Crown className="h-10 w-10 text-cyan-400" />
                 </motion.div>
 
                 {/* Title */}
                 <motion.h2
                   className="text-3xl sm:text-4xl font-black mb-3"
-                  style={{ background: 'linear-gradient(135deg, #dfffe0 0%, #77dd77 55%, #004225 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+                  style={{ background: 'linear-gradient(135deg, #00d4ff 0%, #7000ff 50%, #ff00ff 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3, duration: 0.6 }}
@@ -2989,12 +3115,12 @@ export default function Dashboard() {
 
                 {/* Description */}
                 <motion.p
-                  className="text-[#dfffe0]/80 text-sm sm:text-base mb-8 max-w-sm mx-auto leading-relaxed"
+                  className="text-cyan-200/80 text-sm sm:text-base mb-8 max-w-sm mx-auto leading-relaxed"
                   initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.45, duration: 0.5 }}
                 >
-                  Your dashboard has been upgraded with premium The Capsol Elite features. Enjoy the enhanced experience!
+                  Your dashboard has been upgraded with premium Score Machine Elite features. Enjoy the enhanced experience!
                 </motion.p>
 
                 {/* Feature highlights */}
@@ -3009,9 +3135,9 @@ export default function Dashboard() {
                     { icon: '📊', label: 'Pro Analytics' },
                     { icon: '🛡️', label: 'Premium Tools' },
                   ].map((feat, idx) => (
-                    <div key={idx} className="rounded-xl p-3 border border-[#004225]/30" style={{ background: 'rgba(0,66,37,0.12)' }}>
+                    <div key={idx} className="rounded-xl p-3 border border-cyan-800/30" style={{ background: 'rgba(0,212,255,0.05)' }}>
                       <div className="text-2xl mb-1">{feat.icon}</div>
-                      <div className="text-xs text-[#dfffe0]/80 font-medium">{feat.label}</div>
+                      <div className="text-xs text-cyan-300/70 font-medium">{feat.label}</div>
                     </div>
                   ))}
                 </motion.div>
@@ -3025,7 +3151,7 @@ export default function Dashboard() {
                   <Button
                     onClick={() => setShowEliteWelcome(false)}
                     className="px-10 py-3 text-base font-bold rounded-xl text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-                    style={{ background: 'linear-gradient(135deg, #002f1b, #004225, #77dd77)', boxShadow: '0 0 30px rgba(119,221,119,0.3)' }}
+                    style={{ background: 'linear-gradient(135deg, #00d4ff, #7000ff)', boxShadow: '0 0 30px rgba(0,212,255,0.3)' }}
                   >
                     🚀 Let's Go!
                   </Button>
@@ -3034,7 +3160,7 @@ export default function Dashboard() {
                 {/* Bottom neon line */}
                 <motion.div
                   className="mt-8 h-0.5 mx-auto rounded-full"
-                  style={{ background: 'linear-gradient(90deg, transparent, #dfffe0, #77dd77, #004225, transparent)' }}
+                  style={{ background: 'linear-gradient(90deg, transparent, #00d4ff, #7000ff, #ff00ff, transparent)' }}
                   initial={{ width: 0, opacity: 0 }}
                   animate={{ width: 200, opacity: 0.5 }}
                   transition={{ delay: 0.9, duration: 0.6 }}

@@ -51,8 +51,11 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
   const [repullLoading, setRepullLoading] = useState(false);
   const [clientsExpanded, setClientsExpanded] = useState(true);
   const [workAreaExpanded, setWorkAreaExpanded] = useState(false);
+  const [creditReportExpanded, setCreditReportExpanded] = useState(false);
 
   const currentSearchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const activeCreditReportTab = currentSearchParams.get("tab");
+  const isLawEngineAutoActive = currentSearchParams.get("lawEngineAuto") === "true";
   const routeClientId = useMemo(() => {
     const queryClientId = String(currentSearchParams.get("clientId") || "").trim();
     if (queryClientId) {
@@ -93,7 +96,7 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
       name: [client.first_name, client.last_name]
         .filter(Boolean)
         .join(" ")
-        .trim() || String(client.name || "Client"),
+        .trim() || String(client.name || "My Profile"),
       latestJsonData: client.latestJsonData,
       platform: client.platform,
       platform_email: client.platform_email,
@@ -200,25 +203,59 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
   }, [primaryClientRefreshNonce, routeClientId, userProfile]);
 
   const clientProfileTabs = [
-    { name: "Profile & Documents", tab: "info", icon: User },
-    { name: "Credit Reports", tab: "history", icon: FileText },
-    { name: "Score History", tab: "scores", icon: Activity },
+    { name: "My Profile & Documents", tab: "info", icon: User },
+    { name: "My Reports", tab: "history", icon: FileText },
+    { name: "My Score History", tab: "scores", icon: Activity },
     { name: "Generated Letters", tab: "letters", icon: Mail },
     { name: "Equifax Settlement", tab: "equifax", icon: ShieldAlert },
-    { name: "Raw Data", tab: "json", icon: Database },
+    { name: "My Raw Data", tab: "json", icon: Database },
   ];
 
-  const workAreaTabs = [
-    { name: "Overview", tab: "overview", icon: PieChart },
-    { name: "Analysis & Insights", tab: "analysis", icon: BarChart },
-    { name: "Progress Report", tab: "progress", icon: TrendingUp },
-    { name: "Underwriting", tab: "underwriting", icon: FileCheck },
-    { name: "Credit War Map", tab: "creditWarMap", icon: Map },
-    { name: "Debt Consolidation", tab: "debtConsolidation", icon: DollarSign },
-    { name: "Personal Identity", tab: "personal", icon: User },
-    { name: "Inquiries", tab: "inquiries", icon: Search },
-    { name: "Public Records", tab: "public", icon: Gavel },
-    { name: "Accounts", tab: "accounts", icon: List },
+  const buildCreditReportHref = (tab: string, options?: { lawEngineAuto?: boolean }) => {
+    if (!clientId) {
+      return "#";
+    }
+
+    const params = new URLSearchParams();
+    params.set("clientId", clientId);
+    params.set("tab", tab);
+
+    if (options?.lawEngineAuto) {
+      params.set("lawEngineAuto", "true");
+    }
+
+    return `/credit-report?${params.toString()}`;
+  };
+
+  const workAreaSections = [
+    {
+      name: "Work Area",
+      items: [
+        { name: "Basic Analysis Insights", tab: "analysis", icon: BarChart },
+        { name: "Progress Report", tab: "progress", icon: TrendingUp },
+        { name: "Underwriting Assessment", tab: "underwriting", icon: FileCheck },
+      ],
+    },
+    {
+      name: "Credit Repair",
+      items: [
+        { name: "Credit War Map Strategy", tab: "creditWarMap", icon: Map },
+        { name: "Credit Repair", tab: "creditRepair", icon: ShieldAlert },
+      ],
+    },
+  ];
+
+  const creditReportSections = [
+    {
+      name: "My Report",
+      items: [
+        { name: "Overview Dashboard", tab: "overview", icon: PieChart },
+        { name: "Personal Identity", tab: "personal", icon: User },
+        { name: "Inquiries Credit Pulls", tab: "inquiries", icon: Search },
+        { name: "Public Records Legal", tab: "public", icon: Gavel },
+        { name: "Accounts Credit Lines", tab: "accounts", icon: List },
+      ],
+    },
   ];
 
   const repullTargetClient = lastPulledClient;
@@ -288,7 +325,6 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
     { name: "Subscription", href: "/subscription", icon: CreditCard },
     { name: "Support", href: "/support", icon: HelpCircle },
     { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Invoices", href: "/invoices", icon: FileText },
   ];
 
   const handleLogout = async () => {
@@ -309,40 +345,44 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex font-sans text-gray-900">
+    <div className="basic-admin-theme min-h-screen flex font-sans">
       
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-300 flex flex-col shrink-0">
-        <div className="h-16 border-b border-gray-300 flex items-center px-4">
-          <Link to="/dashboard" className="flex w-full items-center">
-            <img src="/capsol-logo.png" alt="CapSol" className="h-10 w-full max-w-[180px] object-contain" />
-          </Link>
+      <aside className="basic-admin-sidebar sticky top-0 h-screen w-64 flex flex-col shrink-0">
+        <div className="h-20 border-b border-green-100/80 px-5 dark:border-slate-800">
+          <div className="flex h-full items-center justify-between">
+            <div className="flex items-center">
+              <img src="/capsol-logo.png" alt="CapSol" className="h-10 w-auto object-contain" />
+            </div>
+          </div>
         </div>
         
-        <div className="p-4 border-b border-gray-300 bg-gray-50">
-          <div className="text-xs font-bold text-gray-500 uppercase mb-1">Current User</div>
-          <div className="font-semibold">{userProfile?.first_name} {userProfile?.last_name}</div>
-          <div className="text-xs text-gray-600 uppercase">Basic Access</div>
+        <div className="border-b border-sky-100/80 p-4 dark:border-slate-800">
+          <div className="basic-admin-user-card p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700 dark:text-sky-300">Current User</div>
+            <div className="mt-2 font-semibold text-slate-900 dark:text-white">{userProfile?.first_name} {userProfile?.last_name}</div>
+            <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Basic Access</div>
           {shouldShowRepullAction && repullTargetClient && (
-            <div className="mt-3 space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                Last Pulled Client
+            <div className="mt-4 space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                Last Pulled Report
               </div>
-              <div className="text-sm font-medium text-gray-800">{repullTargetClient.name}</div>
+              <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{repullTargetClient.name}</div>
               <button
                 type="button"
                 onClick={handleRepullReport}
                 disabled={repullLoading}
-                className="flex w-full items-center justify-center gap-2 border border-black bg-black px-3 py-2 text-xs font-bold uppercase text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="basic-admin-primary-action flex w-full items-center justify-center gap-2"
               >
                 {repullLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                 {repullLoading ? "Repulling..." : "Repull Report"}
               </button>
             </div>
           )}
+          </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-2">
             {/* Top Links */}
             {topNavigation.map((item) => {
@@ -352,10 +392,10 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
                 <li key={item.name}>
                   <Link
                     to={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-semibold uppercase transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-semibold uppercase ${
                       isActive 
-                        ? 'bg-black text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? 'basic-admin-nav-item-active' 
+                        : 'basic-admin-nav-item'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -368,12 +408,12 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
             {/* Clients Section (Non-clickable Header) */}
             <li className="pt-2">
               <div 
-                className="flex items-center justify-between px-3 py-2 text-sm font-bold uppercase text-gray-500 cursor-pointer hover:bg-gray-100"
+                className="basic-admin-section-toggle flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-bold uppercase"
                 onClick={() => setClientsExpanded(!clientsExpanded)}
               >
                 <div className="flex items-center gap-3">
                   <Users className="h-4 w-4" />
-                  Client Profile
+                  My Profile
                 </div>
                 {clientsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </div>
@@ -388,10 +428,10 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
                       <li key={tab.name}>
                         <Link
                           to={href}
-                          className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase transition-colors ${
+                          className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase ${
                             isTabActive 
-                              ? 'bg-gray-200 text-black border-l-2 border-black' 
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-black border-l-2 border-transparent'
+                              ? 'basic-admin-subnav-item-active' 
+                              : 'basic-admin-subnav-item'
                           }`}
                         >
                           <Icon className="h-3 w-3" />
@@ -407,7 +447,7 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
             {/* Work Area Section (Clickable Dropdown) */}
             <li className="pt-2 pb-2">
               <div 
-                className="flex items-center justify-between px-3 py-2 text-sm font-bold uppercase text-gray-500 cursor-pointer hover:bg-gray-100"
+                className="basic-admin-section-toggle flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-bold uppercase"
                 onClick={() => setWorkAreaExpanded(!workAreaExpanded)}
               >
                 <div className="flex items-center gap-3">
@@ -418,28 +458,97 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
               </div>
 
               {workAreaExpanded && (
-                <ul className="pl-6 space-y-1 mt-1">
-                  {workAreaTabs.map((tab) => {
-                    const href = clientId ? `/credit-report?clientId=${clientId}&tab=${tab.tab}` : "#";
-                    const isTabActive = location.pathname.includes('/credit-report') && location.search.includes(`tab=${tab.tab}`);
-                    const Icon = tab.icon;
-                    return (
-                      <li key={tab.name}>
-                        <Link
-                          to={href}
-                          className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase transition-colors ${
-                            isTabActive 
-                              ? 'bg-gray-200 text-black border-l-2 border-black' 
-                              : 'text-gray-600 hover:bg-gray-100 hover:text-black border-l-2 border-transparent'
-                          }`}
-                        >
-                          <Icon className="h-3 w-3" />
-                          {tab.name}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <div className="pl-6 mt-1 space-y-3">
+                  {workAreaSections.map((section) => (
+                    <div key={section.name} className="space-y-1">
+                      <div className="px-3 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                        {section.name}
+                      </div>
+                      <ul className="space-y-1">
+                        {section.items.map((tab) => {
+                          const href = buildCreditReportHref(tab.tab, { lawEngineAuto: tab.lawEngineAuto });
+                          const isOverviewLawEngineActive = activeCreditReportTab === "overview" && isLawEngineAutoActive;
+                          const isTabActive = location.pathname.includes('/credit-report') && (
+                            tab.lawEngineAuto
+                              ? isOverviewLawEngineActive
+                              : activeCreditReportTab === tab.tab && !(tab.tab === "overview" && isOverviewLawEngineActive)
+                          );
+                          const Icon = tab.icon;
+
+                          return (
+                            <li key={tab.name}>
+                              <Link
+                                to={href}
+                                className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase ${
+                                  isTabActive
+                                    ? 'basic-admin-subnav-item-active'
+                                    : 'basic-admin-subnav-item'
+                                }`}
+                              >
+                                <Icon className="h-3 w-3" />
+                                {tab.name}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </li>
+
+            {/* Credit Report Section (Clickable Dropdown) */}
+            <li className="pt-2 pb-2">
+              <div
+                className="basic-admin-section-toggle flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-bold uppercase"
+                onClick={() => setCreditReportExpanded(!creditReportExpanded)}
+              >
+                <div className="flex items-center gap-3">
+                  <PieChart className="h-4 w-4" />
+                  Credit Report
+                </div>
+                {creditReportExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+
+              {creditReportExpanded && (
+                <div className="pl-6 mt-1 space-y-3">
+                  {creditReportSections.map((section) => (
+                    <div key={section.name} className="space-y-1">
+                      <div className="px-3 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                        {section.name}
+                      </div>
+                      <ul className="space-y-1">
+                        {section.items.map((tab) => {
+                          const href = buildCreditReportHref(tab.tab, { lawEngineAuto: (tab as any).lawEngineAuto });
+                          const isOverviewLawEngineActive = activeCreditReportTab === "overview" && isLawEngineAutoActive;
+                          const isTabActive = location.pathname.includes('/credit-report') && (
+                            (tab as any).lawEngineAuto
+                              ? isOverviewLawEngineActive
+                              : activeCreditReportTab === tab.tab && !(tab.tab === "overview" && isOverviewLawEngineActive)
+                          );
+                          const Icon = tab.icon;
+
+                          return (
+                            <li key={tab.name}>
+                              <Link
+                                to={href}
+                                className={`flex items-center gap-3 px-3 py-2 text-xs font-semibold uppercase ${
+                                  isTabActive
+                                    ? 'basic-admin-subnav-item-active'
+                                    : 'basic-admin-subnav-item'
+                                }`}
+                              >
+                                <Icon className="h-3 w-3" />
+                                {tab.name}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               )}
             </li>
 
@@ -451,10 +560,10 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
                 <li key={item.name}>
                   <Link
                     to={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-semibold uppercase transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-semibold uppercase ${
                       isActive 
-                        ? 'bg-black text-white' 
-                        : 'text-gray-700 hover:bg-gray-200'
+                        ? 'basic-admin-nav-item-active' 
+                        : 'basic-admin-nav-item'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -466,13 +575,14 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
           </ul>
         </nav>
 
-        <div className="p-4 border-t border-gray-300">
-          <button 
+        <div className="border-t border-sky-100/80 p-4 dark:border-slate-800">
+          <button
+            type="button"
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2 text-sm font-semibold uppercase text-red-600 hover:bg-red-50 transition-colors"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold uppercase text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/30"
           >
             <LogOut className="h-4 w-4" />
-            Sign Out
+            Logout
           </button>
         </div>
       </aside>
@@ -481,17 +591,20 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
       <div className="flex-1 flex flex-col min-w-0">
         
         {/* Navbar */}
-        <header className="h-14 bg-white border-b border-gray-300 flex items-center justify-between px-6 shrink-0">
-          <div className="font-bold text-sm uppercase text-gray-700">
-            {title || "Admin Portal"}
+        <header className="basic-admin-topbar flex h-16 shrink-0 items-center justify-between px-4 sm:px-6">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-600 dark:text-sky-300">Basic Workspace</div>
+            <div className="mt-1 font-bold text-sm uppercase text-slate-700 dark:text-slate-200">
+              {title || "Admin Portal"}
+            </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Standard View</span>
+            <span className="basic-admin-topbar-badge">Essential View</span>
             {(onAddClient || shouldShowRepullAction) && (
               <button 
                 onClick={handlePrimaryAction}
                 disabled={repullLoading || (!shouldShowRepullAction && !onAddClient)}
-                className="border border-black bg-black text-white px-4 py-1.5 text-xs font-bold uppercase hover:bg-gray-800 transition-colors"
+                className="basic-admin-primary-action"
               >
                 {repullLoading ? "Repulling..." : shouldShowRepullAction ? "Repull Report" : "+ Add Record"}
               </button>
@@ -500,8 +613,10 @@ export default function BasicAdminLayout({ children, onAddClient, title }: Basic
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
+        <main className="basic-admin-page flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="basic-admin-content-frame">
+            {children}
+          </div>
         </main>
 
       </div>

@@ -1,15 +1,16 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
-import { getDatabaseAdapter, runQuery, getQuery, allQuery } from '../database/databaseAdapter.js';
+import { runQuery, getQuery, allQuery } from '../database/databaseAdapter.js';
 import { authenticateToken, AuthRequest } from '../middleware/authMiddleware.js';
 import { requireSignedAdminContract } from '../middleware/contractGuard.js';
+import { getGhlApiErrorDetails, validateGhlCredentials } from '../services/ghlService.js';
 
 const router = Router();
 
 const integrationUpdateSchema = z.object({
   access_token: z.string().min(1),
-  location_id: z.string().trim().optional().nullable()
+  location_id: z.string().trim().min(1, 'Location ID is required')
 });
 
 async function resolveAdminId(req: AuthRequest): Promise<number | null> {
@@ -30,6 +31,31 @@ function generateIntegrationHash() {
   return crypto.randomBytes(18).toString('base64url');
 }
 
+async function logConnectionAttempt(params: {
+  integrationId: number;
+  adminId: number;
+  status: 'success' | 'failed';
+  message: string;
+  responseCode?: number | null;
+  errorMessage?: string | null;
+}) {
+  await runQuery(
+    `INSERT INTO integration_activity_logs
+     (integration_id, admin_id, direction, event_type, status, message, response_code,
+      error_message, data_fields, retry_status, created_at)
+     VALUES (?, ?, 'outbound', 'connection_validation', ?, ?, ?, ?, ?, 'not_applicable', CURRENT_TIMESTAMP)`,
+    [
+      params.integrationId,
+      params.adminId,
+      params.status,
+      params.message,
+      params.responseCode ?? null,
+      params.errorMessage ?? null,
+      JSON.stringify(['access_token', 'location_id'])
+    ]
+  );
+}
+
 router.use(authenticateToken, requireSignedAdminContract);
 
 router.get('/ghl', async (req: AuthRequest, res) => {
@@ -45,7 +71,10 @@ router.get('/ghl', async (req: AuthRequest, res) => {
     );
 
     const lastSuccess = await getQuery(
-      `SELECT created_at FROM integration_activity_logs WHERE admin_id = ? AND direction = 'outbound' AND status = 'success' ORDER BY created_at DESC LIMIT 1`,
+      `SELECT created_at FROM integration_activity_logs
+       WHERE admin_id = ? AND direction = 'outbound' AND status = 'success'
+         AND event_type <> 'connection_validation'
+       ORDER BY created_at DESC LIMIT 1`,
       [adminId]
     );
 
@@ -72,8 +101,9 @@ router.get('/ghl', async (req: AuthRequest, res) => {
         isActive: integration?.is_active ? true : false,
         hasToken: Boolean(integration?.access_token),
         status: integration?.is_active
-          ? (integration?.access_token ? 'connected' : 'not_configured')
-          : 'disabled',
+          ? (integration?.access_token && integration?.location_id && integration?.verified_at ? 'connected' : 'invalid')
+          : (integration?.last_validation_error ? 'invalid' : 'disabled'),
+        verifiedAt: integration?.verified_at || null,
         lastSuccessfulSync: lastSuccess?.created_at || null,
         lastError: lastError?.message
           ? { message: lastError.message, timestamp: lastError.created_at }
@@ -98,9 +128,14 @@ router.get('/ghl/activity', async (req: AuthRequest, res) => {
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 && rawLimit <= 100 ? rawLimit : 25;
 
     const logs = await allQuery(
-      `SELECT l.id, l.direction, l.event_type, l.status, l.message, l.client_id, l.created_at, c.email as client_email
+      `SELECT l.id, l.direction, l.event_type, l.status, l.message, l.client_id, l.created_at,
+              l.response_code, l.error_message, l.data_fields, l.retry_status,
+              c.email as client_email, c.first_name as client_first_name, c.last_name as client_last_name,
+              u.email as admin_email,
+              u.first_name as admin_first_name, u.last_name as admin_last_name
        FROM integration_activity_logs l
        LEFT JOIN clients c ON l.client_id = c.id
+       LEFT JOIN users u ON l.admin_id = u.id
        WHERE l.admin_id = ?
        ORDER BY l.created_at DESC
        LIMIT ${limit}`,
@@ -122,32 +157,91 @@ router.post('/ghl', async (req: AuthRequest, res) => {
     }
 
     const payload = integrationUpdateSchema.parse(req.body || {});
-    const locationId = payload.location_id ? payload.location_id.trim() : null;
+    const locationId = payload.location_id.trim();
 
     const existing = await getQuery(
-      `SELECT id FROM admin_integrations WHERE admin_id = ? AND provider = 'ghl' ORDER BY id DESC LIMIT 1`,
+      `SELECT id, integration_hash FROM admin_integrations WHERE admin_id = ? AND provider = 'ghl' ORDER BY id DESC LIMIT 1`,
       [adminId]
     );
 
+    let integrationId: number;
+    let integrationHash: string;
     if (existing?.id) {
       await runQuery(
         `UPDATE admin_integrations
-         SET access_token = ?, location_id = ?, is_active = 1, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+         SET access_token = ?, location_id = ?, is_active = 0, verified_at = NULL,
+             last_validation_code = NULL, last_validation_error = NULL,
+             updated_at = CURRENT_TIMESTAMP, updated_by = ?
          WHERE id = ?`,
         [payload.access_token.trim(), locationId, adminId, existing.id]
       );
-      const updated = await getQuery('SELECT * FROM admin_integrations WHERE id = ?', [existing.id]);
-      return res.json({ success: true, data: { integrationHash: updated?.integration_hash || null } });
+      integrationId = Number(existing.id);
+      integrationHash = String(existing.integration_hash);
+    } else {
+      integrationHash = generateIntegrationHash();
+      const result = await runQuery(
+        `INSERT INTO admin_integrations
+         (admin_id, provider, name, access_token, location_id, integration_hash, is_active,
+          verified_at, created_at, updated_at, created_by, updated_by)
+         VALUES (?, 'ghl', ?, ?, ?, ?, 0, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)`,
+        [adminId, 'GoHighLevel', payload.access_token.trim(), locationId, integrationHash, adminId, adminId]
+      );
+      integrationId = Number(result?.insertId || result?.lastID);
+      if (!integrationId) {
+        const inserted = await getQuery(
+          `SELECT id FROM admin_integrations WHERE admin_id = ? AND provider = 'ghl' ORDER BY id DESC LIMIT 1`,
+          [adminId]
+        );
+        integrationId = Number(inserted?.id);
+      }
     }
 
-    const integrationHash = generateIntegrationHash();
-    await runQuery(
-      `INSERT INTO admin_integrations
-       (admin_id, provider, name, access_token, location_id, integration_hash, is_active, created_at, updated_at, created_by, updated_by)
-       VALUES (?, 'ghl', ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?)`,
-      [adminId, 'GoHighLevel', payload.access_token.trim(), locationId, integrationHash, adminId, adminId]
-    );
-    res.json({ success: true, data: { integrationHash } });
+    try {
+      const validation = await validateGhlCredentials(payload.access_token, locationId);
+      await runQuery(
+        `UPDATE admin_integrations
+         SET is_active = 1, verified_at = CURRENT_TIMESTAMP, last_validation_code = ?,
+             last_validation_error = NULL, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+         WHERE id = ? AND admin_id = ?`,
+        [validation.responseCode, adminId, integrationId, adminId]
+      );
+      await logConnectionAttempt({
+        integrationId,
+        adminId,
+        status: 'success',
+        responseCode: validation.responseCode,
+        message: validation.locationName
+          ? `Connected to GoHighLevel location ${validation.locationName} (${locationId})`
+          : `Connected to GoHighLevel location ${locationId}`
+      });
+      return res.json({
+        success: true,
+        data: { integrationHash, status: 'connected', verified: true }
+      });
+    } catch (validationError: any) {
+      const details = getGhlApiErrorDetails(validationError);
+      await runQuery(
+        `UPDATE admin_integrations
+         SET is_active = 0, verified_at = NULL, last_validation_code = ?,
+             last_validation_error = ?, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+         WHERE id = ? AND admin_id = ?`,
+        [details.responseCode, details.message, adminId, integrationId, adminId]
+      );
+      await logConnectionAttempt({
+        integrationId,
+        adminId,
+        status: 'failed',
+        responseCode: details.responseCode,
+        message: details.message,
+        errorMessage: details.message
+      });
+      return res.status(details.responseCode && details.responseCode < 500 ? 400 : 502).json({
+        success: false,
+        error: details.message,
+        ghlResponseCode: details.responseCode,
+        status: 'invalid'
+      });
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
@@ -173,9 +267,17 @@ router.post('/ghl/disable', async (req: AuthRequest, res) => {
     }
 
     await runQuery(
-      `UPDATE admin_integrations SET is_active = 0, updated_at = CURRENT_TIMESTAMP, updated_by = ? WHERE id = ?`,
-      [adminId, existing.id]
+      `UPDATE admin_integrations
+       SET is_active = 0, verified_at = NULL, updated_at = CURRENT_TIMESTAMP, updated_by = ?
+       WHERE id = ? AND admin_id = ?`,
+      [adminId, existing.id, adminId]
     );
+    await logConnectionAttempt({
+      integrationId: Number(existing.id),
+      adminId,
+      status: 'success',
+      message: 'GoHighLevel integration disabled; outbound transmission stopped'
+    });
     res.json({ success: true });
   } catch (error) {
     console.error('Error disabling GHL integration:', error);

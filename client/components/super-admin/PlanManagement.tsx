@@ -31,8 +31,8 @@ const ADMIN_PAGES = [
   { id: 'ai-coach', name: 'AI Coach', path: '/ai-coach', description: 'AI coaching features' },
   { id: 'school', name: 'School', path: '/school', description: 'Educational content' },
   { id: 'analytics', name: 'Analytics', path: '/analytics', description: 'Analytics and insights' },
-  { id: 'score-machine-elite', name: 'The Capsol Elite', path: '/score-machine-elite', description: 'The Capsol Elite access' },
-  { id: 'score-machine-basic', name: 'The Capsol Basic', path: '/score-machine-basic', description: 'The Capsol Basic access' },
+  { id: 'score-machine-elite', name: 'Score Machine Elite', path: '/score-machine-elite', description: 'Score Machine Elite access' },
+  { id: 'score-machine-basic', name: 'Score Machine Basic', path: '/score-machine-basic', description: 'Score Machine Basic access' },
   { id: 'affiliate', name: 'Affiliate', path: '/affiliate', description: 'Affiliate program management' },
   { id: 'support', name: 'Support', path: '/support', description: 'Customer support and help desk' },
   { id: 'settings', name: 'Settings', path: '/settings', description: 'Account and system settings' }
@@ -48,6 +48,38 @@ const normalizePortalPagePermissions = (pagePermissions: string[]) => {
   }
 
   return uniquePermissions;
+};
+
+const getPlanPagePermissions = (plan: Pick<SubscriptionPlan, 'page_permissions'>) => {
+  const rawPermissions = plan.page_permissions as any;
+
+  if (!rawPermissions) {
+    return [];
+  }
+
+  if (Array.isArray(rawPermissions)) {
+    return rawPermissions.map((pageId) => String(pageId));
+  }
+
+  if (typeof rawPermissions === 'string') {
+    try {
+      const parsed = JSON.parse(rawPermissions);
+      if (Array.isArray(parsed)) {
+        return parsed.map((pageId) => String(pageId));
+      }
+      if (Array.isArray(parsed?.pages)) {
+        return parsed.pages.map((pageId: any) => String(pageId));
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  if (Array.isArray(rawPermissions?.pages)) {
+    return rawPermissions.pages.map((pageId: any) => String(pageId));
+  }
+
+  return [];
 };
 
 interface SubscriptionPlan {
@@ -150,6 +182,7 @@ export default function PlanManagement() {
   const [newFeature, setNewFeature] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterActive, setFilterActive] = useState<boolean | null>(null);
+  const [filterPlanTier, setFilterPlanTier] = useState<'all' | 'pro' | 'basic' | 'elite'>('all');
   const [allowedEmailsText, setAllowedEmailsText] = useState('');
   const [affiliateSearchTerm, setAffiliateSearchTerm] = useState('');
   // WebSocket functionality removed to eliminate connection errors
@@ -385,7 +418,16 @@ export default function PlanManagement() {
       normalizedPlanName.includes(normalizedSearchTerm) ||
       normalizedPlanDescription.includes(normalizedSearchTerm);
     const matchesFilter = filterActive === null || plan.is_active === filterActive;
-    return matchesSearch && matchesFilter;
+    const pagePermissions = getPlanPagePermissions(plan);
+    const hasBasic = pagePermissions.includes(SCORE_MACHINE_BASIC_PAGE);
+    const hasElite = pagePermissions.includes(SCORE_MACHINE_ELITE_PAGE);
+    const matchesPlanTier =
+      filterPlanTier === 'all' ||
+      (filterPlanTier === 'basic' && hasBasic) ||
+      (filterPlanTier === 'elite' && hasElite) ||
+      (filterPlanTier === 'pro' && !hasBasic && !hasElite);
+
+    return matchesSearch && matchesFilter && matchesPlanTier;
   });
   const activeAffiliates = affiliates.filter((affiliate) => affiliate.status === 'active');
   const filteredActiveAffiliates = activeAffiliates.filter((affiliate) => {
@@ -455,6 +497,17 @@ export default function PlanManagement() {
                 <SelectItem value="all">All Plans</SelectItem>
                 <SelectItem value="true">Active Only</SelectItem>
                 <SelectItem value="false">Inactive Only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={filterPlanTier} onValueChange={(value: 'all' | 'pro' | 'basic' | 'elite') => setFilterPlanTier(value)}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by plan type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="basic">Basic Only</SelectItem>
+                <SelectItem value="elite">Elite</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -765,7 +818,7 @@ export default function PlanManagement() {
                     </p>
                     <div className="mb-4 space-y-3 rounded-lg border p-3">
                       <p className="text-sm font-medium">
-                        The Capsol Elite | The Capsol Basic
+                        Score Machine Elite | Score Machine Basic
                       </p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         {ADMIN_PAGES.filter((page) => SCORE_MACHINE_PORTAL_PAGE_IDS.includes(page.id as (typeof SCORE_MACHINE_PORTAL_PAGE_IDS)[number])).map((page) => (

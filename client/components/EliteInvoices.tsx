@@ -26,10 +26,10 @@ export default function EliteInvoices({ children }: EliteInvoicesProps) {
           
           {/* HEADER */}
           <motion.div variants={itemVariants} className="bg-white p-8 rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#00d4ff]/20 to-[#7000ff]/20 rounded-full blur-3xl"></div>
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#77dd77]/20 to-[#004225]/20 rounded-full blur-3xl"></div>
             <div className="relative z-10">
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] tracking-tight flex items-center gap-2 mb-2">
-                <FileText className="h-8 w-8 text-[#7000ff]" /> Billing & Funding Receipts
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#004225] to-[#77dd77] tracking-tight flex items-center gap-2 mb-2">
+                <FileText className="h-8 w-8 text-[#004225]" /> Billing & Funding Receipts
               </h1>
               <p className="text-sm font-semibold text-slate-500 max-w-xl">
                 Manage and review your VIP funding charge invoices seamlessly.
@@ -56,7 +56,7 @@ export default function EliteInvoices({ children }: EliteInvoicesProps) {
               -webkit-text-fill-color: transparent;
             }
             .dark .elite-nested-wrapper .gradient-text-primary {
-              background: linear-gradient(to right, #f8fafc, #c084fc);
+              background: linear-gradient(to right, #f8fafc, #77dd77);
               -webkit-background-clip: text;
               -webkit-text-fill-color: transparent;
             }
@@ -65,7 +65,7 @@ export default function EliteInvoices({ children }: EliteInvoicesProps) {
               color: white !important;
             }
             .dark .elite-nested-wrapper .gradient-primary {
-              background: linear-gradient(to right, #06b6d4, #7c3aed) !important;
+              background: linear-gradient(to right, #004225, #77dd77) !important;
               color: #f8fafc !important;
             }
             .elite-nested-wrapper .gradient-primary:hover {

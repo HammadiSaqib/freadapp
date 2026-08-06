@@ -1,16 +1,21 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
+import fs from 'fs';
+import path from 'path';
 import { runQuery, getQuery, allQuery, getDatabaseAdapter } from '../database/databaseAdapter.js';
 import { format } from 'date-fns';
 import { executeTransaction } from '../database/mysqlConfig.js';
 import { Client } from '../database/schema.js';
 import { AuthRequest } from '../middleware/authMiddleware.js';
 import { validateClientQuota } from '../utils/planValidation.js';
+import { checkClientCreationKyc, isKycDatabaseRejection, KYC_REQUIRED_RESPONSE } from '../utils/kyc.js';
 import { ENV_CONFIG } from '../config/environment.js';
 import { fetchCreditReport } from '../services/scrapers/index.js';
 import { saveCreditReport } from '../database/dbConnection.js';
 import crypto from 'crypto';
+import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
+import { normalizeYearOnlyDob } from '../../shared/partialDob.js';
 import {
   captureEquifaxSettlementScreenshot,
   clickEquifaxSettlementLivePreview,
@@ -117,6 +122,61 @@ function normalizeComparableValue(value?: string | null) {
   return String(value || '').trim().toLowerCase();
 }
 
+function isMissingClientIdDefault(error: any) {
+  return error?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+    && String(error?.sqlMessage || error?.message || '').toLowerCase().includes("field 'id'");
+}
+
+async function executeClientInsert(connection: any, sql: string, params: any[]) {
+  try {
+    const [insertResult] = await connection.execute(sql, params);
+    return insertResult;
+  } catch (error: any) {
+    if (!isMissingClientIdDefault(error)) {
+      throw error;
+    }
+
+    console.warn('clients.id is missing AUTO_INCREMENT; using explicit transaction-scoped client id fallback');
+    const [rows] = await connection.execute('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM clients FOR UPDATE');
+    const nextId = Number(Array.isArray(rows) ? rows[0]?.next_id : rows?.next_id) || 1;
+    const fallbackSql = sql.replace(/INSERT\s+INTO\s+clients\s*\(/i, 'INSERT INTO clients (id, ');
+
+    if (fallbackSql === sql) {
+      throw error;
+    }
+
+    const [insertResult] = await connection.execute(fallbackSql, [nextId, ...params]);
+    return { ...(insertResult as any), insertId: nextId };
+  }
+}
+
+async function logClientActivitySafely(options: {
+  userId: number;
+  clientId: number | string | null | undefined;
+  activityType: 'create' | 'update' | 'delete';
+  description: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  sessionId?: string | null;
+}) {
+  try {
+    await runQuery(`
+      INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
+      VALUES (?, ?, 'client', ?, ?, ?, ?, ?)
+    `, [
+      options.userId,
+      options.activityType,
+      options.clientId || null,
+      options.description,
+      options.ipAddress || null,
+      options.userAgent || null,
+      options.sessionId || null
+    ]);
+  } catch (error: any) {
+    console.warn('Failed to log client user activity:', error?.message || error);
+  }
+}
+
 function shouldReuseExistingScrapedClient(clientData: z.infer<typeof clientSchema>) {
   const normalizedEmail = normalizeComparableValue(clientData.platform_email || clientData.email);
   const normalizedPlatform = normalizeComparableValue(clientData.platform);
@@ -205,11 +265,30 @@ function hasMatchingIdentityForMerge(existingClient: any, clientData: z.infer<ty
   const incomingFirstName = normalizeComparableValue(clientData.first_name);
   const incomingLastName = normalizeComparableValue(clientData.last_name);
 
+  const existingHasPlaceholderName =
+    !existingFirstName ||
+    !existingLastName ||
+    (existingFirstName === 'unknown' && existingLastName === 'client') ||
+    (existingFirstName === 'first' && existingLastName === 'last');
+
+  if (existingHasPlaceholderName && incomingFirstName && incomingLastName) {
+    return true;
+  }
+
   if (!existingFirstName || !existingLastName || !incomingFirstName || !incomingLastName) {
     return false;
   }
 
   if (existingFirstName !== incomingFirstName || existingLastName !== incomingLastName) {
+    const existingSsn = normalizeComparableValue(existingClient?.ssn_last_four);
+    const incomingSsn = normalizeComparableValue(clientData.ssn_last_four);
+    const existingDob = normalizeComparableValue(normalizeDateInput(existingClient?.date_of_birth));
+    const incomingDob = normalizeComparableValue(normalizeDateInput(clientData.date_of_birth));
+
+    if ((existingSsn && incomingSsn && existingSsn === incomingSsn) || (existingDob && incomingDob && existingDob === incomingDob)) {
+      return true;
+    }
+
     return false;
   }
 
@@ -239,6 +318,22 @@ function hasConflictingPlatform(existingClient: any, clientData: z.infer<typeof 
   }
 
   return existingPlatform !== incomingPlatform;
+}
+
+function canReuseVerifiedIntakeClient(existingClient: any, clientData: z.infer<typeof clientSchema>) {
+  const existingEmail = normalizeComparableValue(existingClient?.email || existingClient?.platform_email);
+  const incomingEmail = normalizeComparableValue(clientData.email || clientData.platform_email);
+  if (!existingEmail || !incomingEmail || existingEmail !== incomingEmail) {
+    return false;
+  }
+
+  const existingSsn = normalizeComparableValue(existingClient?.ssn_last_four);
+  const incomingSsn = normalizeComparableValue(clientData.ssn_last_four);
+  if (existingSsn && incomingSsn && existingSsn !== incomingSsn) {
+    return false;
+  }
+
+  return true;
 }
 
 async function findExistingClientForAdminByEmail(adminId: number, email?: string | null) {
@@ -337,6 +432,207 @@ function fallbackNameFromEmail(email: string) {
   return { firstName: "Unknown", lastName: "Client" };
 }
 
+function parsePositiveInteger(value: any): number {
+  const parsed = parseInt(String(value ?? '').replace(/[^\d]/g, ''), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function asArray<T = any>(value: T | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined) return [];
+  return [value];
+}
+
+function cleanNamePart(value: any): string {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function titleCaseName(value: string): string {
+  return cleanNamePart(value)
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
+}
+
+function getIdentityIqBundleComponents(rawData: any): any[] {
+  const bundle = rawData?.BundleComponents?.BundleComponent
+    || rawData?.BundleComponent
+    || rawData?.TrueLinkCreditReportType?.BundleComponents?.BundleComponent
+    || rawData?.rawCreditData?.BundleComponents?.BundleComponent;
+  return asArray(bundle);
+}
+
+function extractIdentityIqBorrowerName(rawData: any): { firstName: string; lastName: string } {
+  const components = getIdentityIqBundleComponents(rawData);
+  const candidates: Array<{ firstName: string; lastName: string; isPrimary: boolean }> = [];
+
+  const collectFromBorrowerName = (borrowerName: any) => {
+    asArray(borrowerName).forEach((entry: any) => {
+      const name = entry?.Name || entry;
+      const firstName = cleanNamePart(name?.['@first'] || name?.FirstName || name?.first);
+      const lastName = cleanNamePart(name?.['@last'] || name?.LastName || name?.last);
+      if (!firstName && !lastName) return;
+
+      const typeText = String(
+        entry?.NameType?.['@description'] ||
+        entry?.NameType?.['@abbreviation'] ||
+        entry?.NameType ||
+        ''
+      ).toLowerCase();
+      candidates.push({
+        firstName,
+        lastName,
+        isPrimary: typeText.includes('primary')
+      });
+    });
+  };
+
+  components.forEach((component) => {
+    collectFromBorrowerName(component?.Borrower?.BorrowerName);
+    collectFromBorrowerName(component?.TrueLinkCreditReportType?.Borrower?.BorrowerName);
+  });
+  collectFromBorrowerName(rawData?.Borrower?.BorrowerName || rawData?.BorrowerName);
+
+  const selected = candidates.find((candidate) => candidate.isPrimary) || candidates[0];
+  return {
+    firstName: titleCaseName(selected?.firstName || ''),
+    lastName: titleCaseName(selected?.lastName || '')
+  };
+}
+
+function extractIdentityIqBorrowerDob(rawData: any): string {
+  const components = getIdentityIqBundleComponents(rawData);
+  for (const component of components) {
+    const borrower = component?.Borrower || component?.TrueLinkCreditReportType?.Borrower;
+    const births = asArray(borrower?.Birth);
+    for (const birth of births) {
+      const value = birth?.['@date'] || birth?.['@birthDate'] || birth?.Date || birth?.DOB || birth;
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+  return '';
+}
+
+function extractIdentityIqBorrowerAddress(rawData: any): { address: string; city: string; state: string; zipCode: string } {
+  const components = getIdentityIqBundleComponents(rawData);
+  for (const component of components) {
+    const borrower = component?.Borrower || component?.TrueLinkCreditReportType?.Borrower;
+    const addresses = asArray(borrower?.BorrowerAddress);
+    for (const entry of addresses) {
+      const creditAddress = entry?.CreditAddress || entry;
+      const address = cleanNamePart(
+        creditAddress?.['@unparsedStreet'] ||
+        [
+          creditAddress?.['@houseNumber'],
+          creditAddress?.['@direction'],
+          creditAddress?.['@streetName'],
+          creditAddress?.['@streetType'],
+          creditAddress?.['@unit']
+        ].filter(Boolean).join(' ')
+      );
+      const city = cleanNamePart(creditAddress?.['@city'] || creditAddress?.City);
+      const state = cleanNamePart(creditAddress?.['@stateCode'] || creditAddress?.State);
+      const zipCode = cleanNamePart(creditAddress?.['@postalCode'] || creditAddress?.Zip);
+      if (address || city || state || zipCode) {
+        return { address, city, state, zipCode };
+      }
+    }
+  }
+
+  return { address: '', city: '', state: '', zipCode: '' };
+}
+
+function getMyScoreIqRawReports(rawData: any): any[] {
+  if (Array.isArray(rawData?.data)) return rawData.data;
+  if (Array.isArray(rawData?.rawCreditData?.data)) return rawData.rawCreditData.data;
+  return [];
+}
+
+function extractMyScoreIqBorrowerName(rawData: any): { firstName: string; lastName: string } {
+  for (const report of getMyScoreIqRawReports(rawData)) {
+    for (const name of asArray(report?.names)) {
+      const firstName = cleanNamePart(name?.first_name || name?.FirstName || name?.first);
+      const lastName = cleanNamePart(name?.last_name || name?.LastName || name?.last);
+      if (firstName || lastName) {
+        return {
+          firstName: titleCaseName(firstName),
+          lastName: titleCaseName(lastName)
+        };
+      }
+    }
+  }
+
+  return { firstName: '', lastName: '' };
+}
+
+function extractMyScoreIqBorrowerDob(rawData: any): string {
+  for (const report of getMyScoreIqRawReports(rawData)) {
+    if (report?.date_of_birth) return String(report.date_of_birth);
+    if (report?.dob) return String(report.dob);
+    if (report?.year_of_birth) return normalizeYearOnlyDob(report.year_of_birth);
+  }
+  return '';
+}
+
+function extractMyScoreIqBorrowerAddress(rawData: any): { address: string; city: string; state: string; zipCode: string } {
+  for (const report of getMyScoreIqRawReports(rawData)) {
+    for (const rawAddress of asArray(report?.addresses)) {
+      const address = cleanNamePart([
+        rawAddress?.house_number,
+        rawAddress?.pre_directional,
+        rawAddress?.street_name,
+        rawAddress?.suffix,
+        rawAddress?.post_directional,
+        rawAddress?.unit
+      ].filter(Boolean).join(' '));
+      const city = cleanNamePart(rawAddress?.city);
+      const state = cleanNamePart(rawAddress?.state);
+      const zipCode = cleanNamePart(rawAddress?.zipcode || rawAddress?.zip_code || rawAddress?.zip);
+      if (address || city || state || zipCode) {
+        return { address, city, state, zipCode };
+      }
+    }
+  }
+
+  return { address: '', city: '', state: '', zipCode: '' };
+}
+
+function parseMyScoreIqRawScore(report: any): number {
+  const directScore = parsePositiveInteger(report?.score || report?.credit_score || report?.fico_score);
+  if (directScore) return directScore;
+
+  const scoreDetail = Array.isArray(report?.score_details) ? report.score_details[0] : report?.score_details;
+  const scoreDetailValue = parsePositiveInteger(scoreDetail?.score);
+  if (scoreDetailValue) return scoreDetailValue;
+
+  const rawContent = report?.credit_score_content?.content
+    || report?.credit_score_content
+    || scoreDetail?.credit_score_content?.content
+    || scoreDetail?.credit_score_content;
+  if (rawContent) {
+    try {
+      const content = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent;
+      return parsePositiveInteger(content?.score);
+    } catch {}
+  }
+
+  return 0;
+}
+
+function extractMyScoreIqScores(rawData: any): { experianScore: number; equifaxScore: number; transunionScore: number } {
+  const scores = { experianScore: 0, equifaxScore: 0, transunionScore: 0 };
+  for (const report of getMyScoreIqRawReports(rawData)) {
+    const bureau = String(report?.bureau || '').toLowerCase();
+    const score = parseMyScoreIqRawScore(report);
+    if (!score) continue;
+    if (bureau.includes('experian')) scores.experianScore = score;
+    if (bureau.includes('equifax')) scores.equifaxScore = score;
+    if (bureau.includes('transunion')) scores.transunionScore = score;
+  }
+  return scores;
+}
+
 async function pruneGhlWebhookEvents() {
   const adapter = getDatabaseAdapter();
   const isSqlite = adapter.getType() === 'sqlite';
@@ -392,8 +688,10 @@ async function logIntegrationActivity(params: {
   } catch {}
 }
 
-function extractClientFromReport(rawReport: any, email: string) {
+function extractClientFromReport(rawReport: any, email: string, allowEmailFallback = true) {
   const reportData = rawReport?.reportData || rawReport;
+  const rawCreditData = rawReport?.rawCreditData || rawReport?.raw_credit_data || null;
+  const scoreFallback = rawReport?.scores || null;
   let firstName = "";
   let lastName = "";
   let dateOfBirth = "";
@@ -412,8 +710,28 @@ function extractClientFromReport(rawReport: any, email: string) {
     lastName = primaryName?.LastName || "";
   }
 
+  if (!firstName && !lastName) {
+    const rawName = extractIdentityIqBorrowerName(rawCreditData || reportData);
+    firstName = rawName.firstName;
+    lastName = rawName.lastName;
+  }
+
+  if (!firstName && !lastName) {
+    const rawName = extractMyScoreIqBorrowerName(rawCreditData || reportData);
+    firstName = rawName.firstName;
+    lastName = rawName.lastName;
+  }
+
   if (reportData?.DOB && Array.isArray(reportData.DOB) && reportData.DOB.length > 0) {
     dateOfBirth = reportData.DOB[0]?.DOB || "";
+  }
+
+  if (!dateOfBirth) {
+    dateOfBirth = extractIdentityIqBorrowerDob(rawCreditData || reportData);
+  }
+
+  if (!dateOfBirth) {
+    dateOfBirth = extractMyScoreIqBorrowerDob(rawCreditData || reportData);
   }
 
   if (reportData?.Address && Array.isArray(reportData.Address) && reportData.Address.length > 0) {
@@ -422,6 +740,22 @@ function extractClientFromReport(rawReport: any, email: string) {
     city = currentAddress?.City || "";
     state = currentAddress?.State || "";
     zipCode = currentAddress?.Zip || "";
+  }
+
+  if (!address && !city && !state && !zipCode) {
+    const rawAddress = extractIdentityIqBorrowerAddress(rawCreditData || reportData);
+    address = rawAddress.address;
+    city = rawAddress.city;
+    state = rawAddress.state;
+    zipCode = rawAddress.zipCode;
+  }
+
+  if (!address && !city && !state && !zipCode) {
+    const rawAddress = extractMyScoreIqBorrowerAddress(rawCreditData || reportData);
+    address = rawAddress.address;
+    city = rawAddress.city;
+    state = rawAddress.state;
+    zipCode = rawAddress.zipCode;
   }
 
   if (reportData?.Score && Array.isArray(reportData.Score) && reportData.Score.length > 0) {
@@ -444,7 +778,24 @@ function extractClientFromReport(rawReport: any, email: string) {
     creditScore = Math.max(experianScore, equifaxScore, transunionScore);
   }
 
-  if (!firstName && !lastName) {
+  if (!creditScore && scoreFallback && typeof scoreFallback === 'object') {
+    experianScore = parsePositiveInteger(scoreFallback.experian) || experianScore;
+    equifaxScore = parsePositiveInteger(scoreFallback.equifax) || equifaxScore;
+    transunionScore = parsePositiveInteger(scoreFallback.transunion) || transunionScore;
+    creditScore = Math.max(experianScore, equifaxScore, transunionScore);
+  }
+
+  if (!creditScore) {
+    const rawScores = extractMyScoreIqScores(rawCreditData || reportData);
+    experianScore = rawScores.experianScore || experianScore;
+    equifaxScore = rawScores.equifaxScore || equifaxScore;
+    transunionScore = rawScores.transunionScore || transunionScore;
+    creditScore = Math.max(experianScore, equifaxScore, transunionScore);
+  }
+
+  const verifiedReportName = Boolean(firstName || lastName);
+
+  if (!verifiedReportName && allowEmailFallback) {
     const fallback = fallbackNameFromEmail(email);
     firstName = fallback.firstName;
     lastName = fallback.lastName;
@@ -461,7 +812,8 @@ function extractClientFromReport(rawReport: any, email: string) {
     creditScore,
     experianScore,
     equifaxScore,
-    transunionScore
+    transunionScore,
+    verifiedReportName
   };
 }
 
@@ -473,6 +825,24 @@ function resolveReportData(scraperResult: any) {
     || scraperResult?.report?.reportData
     || scraperResult?.report
     || null;
+}
+
+function cleanupIntakeScrapedArtifact(filePathValue: any) {
+  const rawPath = String(filePathValue || '').trim();
+  if (!rawPath) return;
+
+  try {
+    const outputDir = path.resolve(process.cwd(), 'scraper-output');
+    const resolvedPath = path.resolve(process.cwd(), rawPath);
+    if (!resolvedPath.startsWith(outputDir + path.sep)) {
+      return;
+    }
+    if (fs.existsSync(resolvedPath)) {
+      fs.unlinkSync(resolvedPath);
+    }
+  } catch (cleanupError: any) {
+    console.warn('Failed to remove invalid intake scrape artifact:', cleanupError?.message || cleanupError);
+  }
 }
 
 // Get all clients for the authenticated user (or all clients for funding managers)
@@ -684,18 +1054,16 @@ export async function createClient(req: AuthRequest, res: Response) {
           `Existing client reused for fresh credit report: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`
         ]);
 
-        await runQuery(`
-          INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
-          VALUES (?, 'update', 'client', ?, ?, ?, ?, ?)
-        `, [
-          baseUserId,
-          existingClient.id,
-          `Existing client reused for fresh credit report: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`,
-          req.ip,
-          req.get('User-Agent') || null,
-          null
-        ]);
+        await logClientActivitySafely({
+          userId: baseUserId,
+          activityType: 'update',
+          clientId: existingClient.id,
+          description: `Existing client reused for fresh credit report: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent') || null
+        });
 
+        syncAdminClientToGhlInBackground(baseUserId, Number(existingClient.id), 'client_imported');
         return res.status(200).json({
           ...refreshedClient,
           reusedExisting: true,
@@ -740,18 +1108,16 @@ export async function createClient(req: AuthRequest, res: Response) {
         `Existing client merged by matching email and identity: ${clientData.first_name} ${clientData.last_name}`
       ]);
 
-      await runQuery(`
-        INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
-        VALUES (?, 'update', 'client', ?, ?, ?, ?, ?)
-      `, [
-        baseUserId,
-        emailMatchedClient.id,
-        `Existing client merged by matching email and identity: ${clientData.first_name} ${clientData.last_name}`,
-        req.ip,
-        req.get('User-Agent') || null,
-        null
-      ]);
+      await logClientActivitySafely({
+        userId: baseUserId,
+        activityType: 'update',
+        clientId: emailMatchedClient.id,
+        description: `Existing client merged by matching email and identity: ${clientData.first_name} ${clientData.last_name}`,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || null
+      });
 
+      syncAdminClientToGhlInBackground(baseUserId, Number(emailMatchedClient.id), 'client_imported');
       return res.status(200).json({
         ...refreshedClient,
         reusedExisting: true,
@@ -760,6 +1126,20 @@ export async function createClient(req: AuthRequest, res: Response) {
       });
     }
     
+    const kycGate = await checkClientCreationKyc({
+      userId: baseUserId,
+      source: 'api_client_create',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || null,
+    });
+    if (!kycGate.allowed) {
+      return res.status(403).json({
+        ...KYC_REQUIRED_RESPONSE,
+        kyc_status: kycGate.status,
+        existing_client_count: kycGate.clientCount,
+      });
+    }
+
     // Use transaction to prevent race conditions in quota validation
     const result = await executeTransaction(async (connection) => {
       // Check client quota within transaction to prevent race conditions
@@ -778,7 +1158,7 @@ export async function createClient(req: AuthRequest, res: Response) {
       const platformEmail = clientData.platform_email || clientData.email;
       const platformPassword = clientData.platform_password;
       
-      const [insertResult] = await connection.execute(`
+      const insertResult = await executeClientInsert(connection, `
         INSERT INTO clients (
           user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
           date_of_birth, employment_status, annual_income, status, credit_score,
@@ -846,17 +1226,16 @@ export async function createClient(req: AuthRequest, res: Response) {
       `New client added: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`
     ]);
 
-    await runQuery(`
-      INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
-      VALUES (?, 'create', 'client', ?, ?, ?, ?, ?)
-    `, [
-      baseUserId,
-      insertedId,
-      `New client added: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`,
-      req.ip,
-      req.get('User-Agent') || null,
-      null
-    ]);
+    await logClientActivitySafely({
+      userId: baseUserId,
+      activityType: 'create',
+      clientId: insertedId,
+      description: `New client added: ${clientData.first_name} ${clientData.last_name}${clientData.platform ? ` (via ${clientData.platform})` : ''}`,
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || null
+    });
+
+    syncAdminClientToGhlInBackground(baseUserId, Number(insertedId), 'client_created');
     
     res.status(201).json({
       ...newClient,
@@ -864,6 +1243,9 @@ export async function createClient(req: AuthRequest, res: Response) {
       created: true,
     });
   } catch (error) {
+    if (isKycDatabaseRejection(error)) {
+      return res.status(403).json(KYC_REQUIRED_RESPONSE);
+    }
     // Handle quota exceeded errors from transaction
     if (error instanceof Error && error.message.startsWith('{')) {
       try {
@@ -985,6 +1367,12 @@ export async function getClientIntakeConfig(req: Request, res: Response) {
 
 export async function submitClientIntake(req: Request, res: Response) {
   try {
+    try {
+      req.setTimeout?.(300000);
+      res.setTimeout?.(300000);
+      req.socket?.setTimeout?.(300000);
+    } catch {}
+
     let adminId: number | null = null;
     try {
       adminId = await resolveAdminIdFromIntake((req.query as any)?.token || (req.body as any)?.token, (req.query as any)?.slug || (req.body as any)?.slug);
@@ -1007,10 +1395,42 @@ export async function submitClientIntake(req: Request, res: Response) {
     }
 
     const intakeData = clientIntakeSchema.parse(req.body);
+
+    const existingIntakeClient = await findExistingClientForAdminByPlatformEmail(adminId, {
+      email: intakeData.email,
+      platform: intakeData.platform,
+    }) || await findExistingClientForAdminByEmail(adminId, intakeData.email);
+    if (!existingIntakeClient?.id) {
+      const kycGate = await checkClientCreationKyc({
+        userId: adminId,
+        source: 'public_client_intake',
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || null,
+      });
+      if (!kycGate.allowed) {
+        return res.status(403).json({
+          ...KYC_REQUIRED_RESPONSE,
+          kyc_status: kycGate.status,
+          existing_client_count: kycGate.clientCount,
+        });
+      }
+    }
+
+    const quotaValidation = await validateClientQuota(adminId);
+    if (!quotaValidation.canAdd) {
+      return res.status(403).json({
+        success: false,
+        error: 'Client quota exceeded',
+        message: quotaValidation.error,
+        planLimits: quotaValidation.planLimits
+      });
+    }
+
     const scraperOptions: any = {
       saveHtml: false,
       takeScreenshots: false,
-      outputDir: './scraper-output'
+      outputDir: './scraper-output',
+      clientId: 'unknown'
     };
     if (intakeData.ssnLast4) {
       scraperOptions.ssnLast4 = intakeData.ssnLast4;
@@ -1024,69 +1444,150 @@ export async function submitClientIntake(req: Request, res: Response) {
     );
 
     const reportData = resolveReportData(scraperResult);
-    const extracted = extractClientFromReport(reportData, intakeData.email);
-    const hadReportInfo = Boolean(extracted.firstName || extracted.lastName || extracted.dateOfBirth || extracted.address || extracted.creditScore);
-    const notesMessage = hadReportInfo
-      ? `Client created via intake with credit report scraping from ${intakeData.platform}. Bureau Scores - Experian: ${extracted.experianScore || 'N/A'}, Equifax: ${extracted.equifaxScore || 'N/A'}, TransUnion: ${extracted.transunionScore || 'N/A'}`
-      : `Client created via intake without attached report due to temporary scraper error on ${intakeData.platform}.`;
+    const extractionReportData = {
+      reportData,
+      rawCreditData: scraperResult?.rawCreditData,
+      scores: scraperResult?.scores
+    };
+    const extracted = extractClientFromReport(extractionReportData, intakeData.email, false);
 
-    const result = await executeTransaction(async (connection) => {
-      const quotaValidation = await validateClientQuota(adminId);
-      if (!quotaValidation.canAdd) {
-        throw new Error(JSON.stringify({
-          status: 403,
-          error: 'Client quota exceeded',
-          message: quotaValidation.error,
-          planLimits: quotaValidation.planLimits
-        }));
-      }
-      const [insertResult] = await connection.execute(`
-        INSERT INTO clients (
-          user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
-          date_of_birth, employment_status, annual_income, status, credit_score,
-          experian_score, equifax_score, transunion_score, previous_credit_score, notes, 
-          platform, platform_email, platform_password, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        adminId,
-        extracted.firstName || null,
-        extracted.lastName || null,
-        intakeData.email,
-        null,
-        extracted.address || null,
-        extracted.city || null,
-        extracted.state || null,
-        extracted.zipCode || null,
-        intakeData.ssnLast4 || null,
-        normalizeDateInput(extracted.dateOfBirth) || null,
-        null,
-        null,
-        'active',
-        extracted.creditScore || null,
-        extracted.experianScore || null,
-        extracted.equifaxScore || null,
-        extracted.transunionScore || null,
-        null,
-        notesMessage,
-        intakeData.platform || null,
-        intakeData.email || null,
-        intakeData.password || null,
-        adminId,
-        adminId
-      ]);
-      return insertResult;
+    if (!extracted.verifiedReportName) {
+      cleanupIntakeScrapedArtifact(scraperResult?.filePath || scraperResult?.converted_report_path || reportData?.filePath || reportData?.converted_report_path);
+      return res.status(422).json({
+        success: false,
+        error: 'Unable to verify client name from credit report',
+        message: `We couldn't verify your name in the ${intakeData.platform} report. Please double-check the monitoring email and password. If those are correct, your password may have changed or the monitoring subscription may need renewal.`
+      });
+    }
+
+    const notesMessage = `Client created via intake with credit report scraping from ${intakeData.platform}. Bureau Scores - Experian: ${extracted.experianScore || 'N/A'}, Equifax: ${extracted.equifaxScore || 'N/A'}, TransUnion: ${extracted.transunionScore || 'N/A'}`;
+    const clientData = {
+      first_name: extracted.firstName,
+      last_name: extracted.lastName,
+      email: intakeData.email,
+      date_of_birth: extracted.dateOfBirth || undefined,
+      address: extracted.address || undefined,
+      city: extracted.city || undefined,
+      state: extracted.state || undefined,
+      zip_code: extracted.zipCode || undefined,
+      credit_score: extracted.creditScore > 0 ? extracted.creditScore : undefined,
+      experian_score: extracted.experianScore > 0 ? extracted.experianScore : undefined,
+      equifax_score: extracted.equifaxScore > 0 ? extracted.equifaxScore : undefined,
+      transunion_score: extracted.transunionScore > 0 ? extracted.transunionScore : undefined,
+      status: 'active' as const,
+      platform: intakeData.platform as z.infer<typeof clientSchema>['platform'],
+      platform_email: intakeData.email,
+      platform_password: intakeData.password,
+      ssn_last_four: intakeData.ssnLast4 || undefined,
+      notes: notesMessage
+    };
+
+    let insertedId: number | string | undefined;
+    let created = true;
+
+    const platformMatchedClient = await findExistingClientForAdminByPlatformEmail(adminId, {
+      email: intakeData.email,
+      platform: intakeData.platform
     });
+    const emailMatchedClient = platformMatchedClient?.id
+      ? null
+      : await findExistingClientForAdminByEmail(adminId, intakeData.email);
+    const existingClient = platformMatchedClient || emailMatchedClient;
 
-    const insertedId = (result as any)?.insertId;
+    if (existingClient?.id) {
+      const identityMatches = hasMatchingIdentityForMerge(existingClient, clientData);
+      const canReuseVerifiedIntake = canReuseVerifiedIntakeClient(existingClient, clientData);
+
+      if (emailMatchedClient?.id && hasConflictingPlatform(emailMatchedClient, clientData) && !identityMatches && !canReuseVerifiedIntake) {
+        return res.status(409).json({
+          success: false,
+          error: 'Client with this email already exists under a different platform'
+        });
+      }
+
+      if (!identityMatches && !canReuseVerifiedIntake) {
+        return res.status(409).json({
+          success: false,
+          error: 'Client with this email already exists under a different identity'
+        });
+      }
+
+      const updates = buildReusedClientUpdates(existingClient, clientData, adminId);
+      const fields = Object.keys(updates);
+      if (fields.length > 0) {
+        const setClause = fields.map((field) => `${field} = ?`).join(', ');
+        const values = fields.map((field) => updates[field]);
+        await runQuery(
+          `UPDATE clients SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
+          [...values, existingClient.id, adminId]
+        );
+      }
+
+      insertedId = existingClient.id;
+      created = false;
+    } else {
+      const result = await executeTransaction(async (connection) => {
+        const transactionQuotaValidation = await validateClientQuota(adminId);
+        if (!transactionQuotaValidation.canAdd) {
+          throw new Error(JSON.stringify({
+            status: 403,
+            error: 'Client quota exceeded',
+            message: transactionQuotaValidation.error,
+            planLimits: transactionQuotaValidation.planLimits
+          }));
+        }
+
+        const insertResult = await executeClientInsert(connection, `
+          INSERT INTO clients (
+            user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
+            date_of_birth, employment_status, annual_income, status, credit_score,
+            experian_score, equifax_score, transunion_score, previous_credit_score, notes, 
+            platform, platform_email, platform_password, created_by, updated_by
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          adminId,
+          extracted.firstName || null,
+          extracted.lastName || null,
+          intakeData.email,
+          null,
+          extracted.address || null,
+          extracted.city || null,
+          extracted.state || null,
+          extracted.zipCode || null,
+          intakeData.ssnLast4 || null,
+          normalizeDateInput(extracted.dateOfBirth) || null,
+          null,
+          null,
+          'active',
+          extracted.creditScore || null,
+          extracted.experianScore || null,
+          extracted.equifaxScore || null,
+          extracted.transunionScore || null,
+          null,
+          notesMessage,
+          intakeData.platform || null,
+          intakeData.email || null,
+          intakeData.password || null,
+          adminId,
+          adminId
+        ]);
+        return insertResult;
+      });
+
+      insertedId = (result as any)?.insertId;
+    }
+
     const newClient = await getQuery(
       'SELECT * FROM clients WHERE id = ?',
       [insertedId]
     );
 
-    try {
-      const { updateCreditReportClientId } = await import('../database/dbConnection.js');
-      await updateCreditReportClientId(insertedId.toString());
-    } catch {}
+    if (created) {
+      try {
+        const { updateCreditReportClientId } = await import('../database/dbConnection.js');
+        await updateCreditReportClientId(String(insertedId));
+      } catch {}
+    }
 
     if (insertedId) {
       try {
@@ -1105,37 +1606,55 @@ export async function submitClientIntake(req: Request, res: Response) {
       } catch {}
     }
 
-    await runQuery(`
-      INSERT INTO activities (user_id, client_id, type, description)
-      VALUES (?, ?, ?, ?)
-    `, [
-      adminId,
-      insertedId,
-      'client_added',
-      `New client added: ${extracted.firstName} ${extracted.lastName}${intakeData.platform ? ` (via ${intakeData.platform})` : ''}`
-    ]);
+    const activityDescription = created
+      ? `New client added: ${extracted.firstName} ${extracted.lastName}${intakeData.platform ? ` (via ${intakeData.platform})` : ''}`
+      : `Existing client reused for fresh intake credit report: ${extracted.firstName} ${extracted.lastName}${intakeData.platform ? ` (via ${intakeData.platform})` : ''}`;
 
-    await runQuery(`
-      INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
-      VALUES (?, 'create', 'client', ?, ?, ?, ?, ?)
-    `, [
-      adminId,
-      insertedId,
-      `New client added: ${extracted.firstName} ${extracted.lastName}${intakeData.platform ? ` (via ${intakeData.platform})` : ''}`,
-      (req as any).ip || null,
-      req.get('User-Agent') || null,
-      null
-    ]);
+    try {
+      await runQuery(`
+        INSERT INTO activities (user_id, client_id, type, description)
+        VALUES (?, ?, ?, ?)
+      `, [
+        adminId,
+        insertedId,
+        created ? 'client_added' : 'score_updated',
+        activityDescription
+      ]);
+    } catch (activityError: any) {
+      console.warn('Failed to log client intake activity:', activityError?.message || activityError);
+    }
+
+    try {
+      await runQuery(`
+        INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
+        VALUES (?, ?, 'client', ?, ?, ?, ?, ?)
+      `, [
+        adminId,
+        created ? 'create' : 'update',
+        insertedId,
+        activityDescription,
+        (req as any).ip || null,
+        req.get('User-Agent') || null,
+        null
+      ]);
+    } catch (userActivityError: any) {
+      console.warn('Failed to log client intake user activity:', userActivityError?.message || userActivityError);
+    }
 
     res.status(201).json({
       success: true,
       data: {
         client: newClient,
         clientId: insertedId,
-        clientName: `${extracted.firstName} ${extracted.lastName}`.trim()
+        clientName: `${extracted.firstName} ${extracted.lastName}`.trim(),
+        reusedExisting: !created,
+        created
       }
     });
   } catch (error: any) {
+    if (isKycDatabaseRejection(error)) {
+      return res.status(403).json(KYC_REQUIRED_RESPONSE);
+    }
     if (error instanceof Error && error.message.startsWith('{')) {
       try {
         const errorData = JSON.parse(error.message);
@@ -1326,8 +1845,30 @@ export async function submitGhlWebhook(req: Request, res: Response) {
       return res.json({ success: true, data: refreshedClient, created: false });
     }
 
+    const kycGate = await checkClientCreationKyc({
+      userId: adminId,
+      source: 'ghl_webhook',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || null,
+    });
+    if (!kycGate.allowed) {
+      await logIntegrationActivity({
+        integrationId: Number(integration.id),
+        adminId,
+        direction: 'inbound',
+        eventType: 'client_created',
+        status: 'failed',
+        message: 'Identity verification required',
+      });
+      return res.status(403).json({
+        ...KYC_REQUIRED_RESPONSE,
+        kyc_status: kycGate.status,
+        existing_client_count: kycGate.clientCount,
+      });
+    }
+
     const result = await executeTransaction(async (connection) => {
-      const [insertResult] = await connection.execute(`
+      const insertResult = await executeClientInsert(connection, `
         INSERT INTO clients (
           user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
           date_of_birth, employment_status, annual_income, status, credit_score,
@@ -1404,6 +1945,9 @@ export async function submitGhlWebhook(req: Request, res: Response) {
 
     return res.status(201).json({ success: true, data: newClient, created: true });
   } catch (error) {
+    if (isKycDatabaseRejection(error)) {
+      return res.status(403).json(KYC_REQUIRED_RESPONSE);
+    }
     if (error instanceof z.ZodError) {
       try {
         const integrationHash = String(req.params.integration_hash || '').trim();
@@ -1541,6 +2085,8 @@ export async function updateClient(req: AuthRequest, res: Response) {
       'SELECT * FROM clients WHERE id = ?',
       [id]
     );
+
+    syncAdminClientToGhlInBackground(baseUserId, Number(id), 'client_updated');
     
     res.json(updatedClient);
   } catch (error) {

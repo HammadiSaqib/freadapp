@@ -54,7 +54,7 @@ export default function BookAppointment() {
   const [selectedDate, setSelectedDate] = useState(getNextBusinessDate);
   const [slots, setSlots] = useState<AppointmentSlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<AppointmentSlot | null>(null);
-  const [timezoneLabel, setTimezoneLabel] = useState("Charlotte, North Carolina (ET)");
+  const [timezoneLabel, setTimezoneLabel] = useState("Eastern Time (ET)");
   const [bookingNotice, setBookingNotice] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -83,7 +83,7 @@ export default function BookAppointment() {
         const nextServices = payload.data?.services || [];
         setServices(nextServices);
         setSelectedServiceId(nextServices[0]?.id ?? null);
-        setTimezoneLabel(payload.data?.timezone_label || "Charlotte, North Carolina (ET)");
+        setTimezoneLabel(payload.data?.timezone_label || "Eastern Time (ET)");
         setBookingNotice(payload.data?.booking_notice || "");
       } catch (err: any) {
         setError(err?.message || "Failed to load booking page");

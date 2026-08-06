@@ -5,6 +5,7 @@ import { Client } from '../database/enhancedSchema.js';
 import { AuthRequest } from '../middleware/securityMiddleware.js';
 import { sanitizeInput, validatePasswordStrength } from '../config/security.js';
 import { validateClientQuota } from '../utils/planValidation.js';
+import { checkClientCreationKyc, isKycDatabaseRejection, KYC_REQUIRED_RESPONSE } from '../utils/kyc.js';
 import { emailService } from '../services/emailService.js';
 
 // Enhanced validation schemas with comprehensive rules
@@ -358,6 +359,20 @@ export async function createClient(req: AuthRequest, res: Response) {
         error: 'Client with this email already exists'
       });
     }
+
+    const kycGate = await checkClientCreationKyc({
+      userId: baseUserId,
+      source: 'enhanced_api_client_create',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || null,
+    });
+    if (!kycGate.allowed) {
+      return res.status(403).json({
+        ...KYC_REQUIRED_RESPONSE,
+        kyc_status: kycGate.status,
+        existing_client_count: kycGate.clientCount,
+      });
+    }
     
     // Prepare transaction queries
     const queries = [
@@ -471,6 +486,9 @@ export async function createClient(req: AuthRequest, res: Response) {
     });
     
   } catch (error) {
+    if (isKycDatabaseRejection(error)) {
+      return res.status(403).json(KYC_REQUIRED_RESPONSE);
+    }
     console.error('Error creating client:', error);
     
     if (error instanceof z.ZodError) {

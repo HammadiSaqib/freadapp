@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { creditReportScraperApi } from "@/lib/api";
+import { getBankruptcyBureaus } from "@/utils/fundingBankruptcyEligibility";
 import { ChevronDown, Bot, Wrench, Plus, Check, Settings2, ShieldAlert, Gift, Building2, ChevronRight, CheckCircle, Loader2, Sparkles, ChevronUp, Maximize2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -749,15 +750,18 @@ export default function FundingDIY() {
     };
 
     try {
-      if (normalize((clientDetails as any)?.fundable_in_ex)) output.push("Experian");
-      if (normalize((clientDetails as any)?.fundable_in_eq)) output.push("Equifax");
-      if (normalize((clientDetails as any)?.fundable_in_tu)) output.push("TransUnion");
+      const bankruptcyBureaus = getBankruptcyBureaus(latestReportData);
+      if (normalize((clientDetails as any)?.fundable_in_ex) && !bankruptcyBureaus.has("Experian")) output.push("Experian");
+      if (normalize((clientDetails as any)?.fundable_in_eq) && !bankruptcyBureaus.has("Equifax")) output.push("Equifax");
+      if (normalize((clientDetails as any)?.fundable_in_tu) && !bankruptcyBureaus.has("TransUnion")) output.push("TransUnion");
     } catch {
       return [];
     }
 
     return output;
-  }, [clientDetails]);
+  }, [clientDetails, latestReportData]);
+
+  const bankruptcyBureaus = useMemo(() => getBankruptcyBureaus(latestReportData), [latestReportData]);
 
   const goalCards = useMemo(() => (goalValue === "both" ? allCards : cards), [allCards, cards, goalValue]);
   const recommendedGoalCards = useMemo(() => (
@@ -831,11 +835,12 @@ export default function FundingDIY() {
   }), [allowedBureauSet, bureauPullCounts.Equifax, bureauPullCounts.Experian, bureauPullCounts.TransUnion]);
 
   const cardHasBureau = useCallback((card: FundingCard, bureau: "Experian" | "Equifax" | "TransUnion") => {
+    if (bankruptcyBureaus.has(bureau)) return false;
     const cardBureaus = parseStringArray(card.credit_bureaus);
     const bankBureaus = allBanks.find((bank) => bank.id === card.bank_id)?.credit_bureaus || [];
     const merged = Array.from(new Set([...cardBureaus, ...bankBureaus]));
     return merged.map(canonBureau).filter(Boolean).includes(bureau);
-  }, [allBanks, canonBureau]);
+  }, [allBanks, bankruptcyBureaus, canonBureau]);
 
   const bankEligibility = useCallback((bankId?: number) => {
     const stateCode = String(selectedState || resolveClientState() || "").toUpperCase();

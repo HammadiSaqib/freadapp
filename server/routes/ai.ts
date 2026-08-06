@@ -88,6 +88,75 @@ async function ensureOpenAiPromptUsageTable(): Promise<void> {
   return openAiPromptUsageTableReady;
 }
 
+let openAiPromptCreditBalanceTableReady: Promise<void> | null = null;
+async function ensureOpenAiPromptCreditBalanceTable(): Promise<void> {
+  if (!openAiPromptCreditBalanceTableReady) {
+    openAiPromptCreditBalanceTableReady = (async () => {
+      const db = getDatabaseAdapter();
+
+      if (db.getType() === 'sqlite') {
+        await db.executeQuery(
+          `CREATE TABLE IF NOT EXISTS ai_prompt_credit_balances (
+            owner_user_id INTEGER NOT NULL PRIMARY KEY,
+            purchased_prompt_balance INTEGER NOT NULL DEFAULT 0,
+            total_purchased_prompts INTEGER NOT NULL DEFAULT 0,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )`,
+          [],
+        );
+        return;
+      }
+
+      await db.executeQuery(
+        `CREATE TABLE IF NOT EXISTS ai_prompt_credit_balances (
+          owner_user_id INT NOT NULL PRIMARY KEY,
+          purchased_prompt_balance INT NOT NULL DEFAULT 0,
+          total_purchased_prompts INT NOT NULL DEFAULT 0,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_ai_prompt_credit_balance_updated_at (updated_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        [],
+      );
+    })().catch((err) => {
+      openAiPromptCreditBalanceTableReady = null;
+      throw err;
+    });
+  }
+  return openAiPromptCreditBalanceTableReady;
+}
+
+async function readOpenAiPurchasedPromptBalance(ownerUserId: number): Promise<number> {
+  await ensureOpenAiPromptCreditBalanceTable();
+  const db = getDatabaseAdapter();
+  const row = await db.getQuery(
+    'SELECT purchased_prompt_balance FROM ai_prompt_credit_balances WHERE owner_user_id = ? LIMIT 1',
+    [ownerUserId],
+  );
+  return Math.max(0, Number(row?.purchased_prompt_balance || 0));
+}
+
+async function decrementOpenAiPurchasedPromptBalance(ownerUserId: number): Promise<number> {
+  await ensureOpenAiPromptCreditBalanceTable();
+  const db = getDatabaseAdapter();
+
+  if (db.getType() === 'sqlite') {
+    await db.executeQuery(
+      `UPDATE ai_prompt_credit_balances
+       SET purchased_prompt_balance = MAX(0, purchased_prompt_balance - 1), updated_at = CURRENT_TIMESTAMP
+       WHERE owner_user_id = ? AND purchased_prompt_balance > 0`,
+      [ownerUserId],
+    );
+  } else {
+    await db.executeQuery(
+      `UPDATE ai_prompt_credit_balances
+       SET purchased_prompt_balance = GREATEST(0, purchased_prompt_balance - 1), updated_at = NOW()
+       WHERE owner_user_id = ? AND purchased_prompt_balance > 0`,
+      [ownerUserId],
+    );
+  }
+
+  return readOpenAiPurchasedPromptBalance(ownerUserId);
+}
 let gptChatHistoryTableReady: Promise<void> | null = null;
 async function ensureGptChatHistoryTable(): Promise<void> {
   if (!gptChatHistoryTableReady) {
@@ -525,13 +594,19 @@ function buildOpenAiPromptQuotaPayload(
   used: number,
   unlimited: boolean,
   resetAt: string | null,
+  purchasedPromptBalance = 0,
 ) {
   const resetInDays = getDaysUntilReset(resetAt);
+  const purchasedRemaining = Math.max(0, Number(purchasedPromptBalance || 0));
+  const freeRemaining = Math.max(0, OPEN_AI_PROMPT_LIMIT - used);
 
   if (unlimited) {
     return {
       used,
       limit: null as number | null,
+      baseLimit: OPEN_AI_PROMPT_LIMIT,
+      freeRemaining: null as number | null,
+      purchasedRemaining,
       remaining: null as number | null,
       unlimited: true,
       resetAt,
@@ -539,11 +614,13 @@ function buildOpenAiPromptQuotaPayload(
     };
   }
 
-  const remaining = Math.max(0, OPEN_AI_PROMPT_LIMIT - used);
   return {
     used,
-    limit: OPEN_AI_PROMPT_LIMIT,
-    remaining,
+    limit: OPEN_AI_PROMPT_LIMIT + purchasedRemaining,
+    baseLimit: OPEN_AI_PROMPT_LIMIT,
+    freeRemaining,
+    purchasedRemaining,
+    remaining: freeRemaining + purchasedRemaining,
     unlimited: false,
     resetAt,
     resetInDays,
@@ -591,7 +668,7 @@ Tone & Ethics:
 
 Platform Policy:
 - Do not recommend other credit repair or funding platforms.
-- When recommending services, refer to FinMint/The Capsol offerings and resources.
+- When recommending services, refer to FinMint/Score Machine offerings and resources.
 
 Response Style:
 - Use plain English with short paragraphs and helpful bullet points.
@@ -1287,12 +1364,14 @@ router.get(
 
       const promptBillingWindow = await resolveOpenAiPromptBillingWindow(promptQuotaOwner.ownerUserId);
       const currentPromptUsage = await readOpenAiPromptUsage(promptQuotaOwner.ownerUserId, promptBillingWindow);
+      const purchasedPromptBalance = await readOpenAiPurchasedPromptBalance(promptQuotaOwner.ownerUserId);
 
       return res.json({
         quota: buildOpenAiPromptQuotaPayload(
           currentPromptUsage,
           promptQuotaOwner.unlimited,
           promptBillingWindow.resetAt,
+          purchasedPromptBalance,
         ),
       });
     } catch (error: any) {
@@ -1330,13 +1409,17 @@ router.post(
 
       const promptBillingWindow = await resolveOpenAiPromptBillingWindow(promptQuotaOwner.ownerUserId);
       const currentPromptUsage = await readOpenAiPromptUsage(promptQuotaOwner.ownerUserId, promptBillingWindow);
-      if (!promptQuotaOwner.unlimited && currentPromptUsage >= OPEN_AI_PROMPT_LIMIT) {
+      const purchasedPromptBalance = await readOpenAiPurchasedPromptBalance(promptQuotaOwner.ownerUserId);
+      const freePromptsRemaining = Math.max(0, OPEN_AI_PROMPT_LIMIT - currentPromptUsage);
+      const totalPromptsRemaining = freePromptsRemaining + purchasedPromptBalance;
+      if (!promptQuotaOwner.unlimited && totalPromptsRemaining <= 0) {
         return res.status(402).json({
-          error: `You have used all ${OPEN_AI_PROMPT_LIMIT} Open AI prompts for the current billing period.`,
+          error: `You have reached your prompt limit. Please purchase more prompts or wait until your free ${OPEN_AI_PROMPT_LIMIT} prompts reset.`,
           quota: buildOpenAiPromptQuotaPayload(
             currentPromptUsage,
             promptQuotaOwner.unlimited,
             promptBillingWindow.resetAt,
+            purchasedPromptBalance,
           ),
         });
       }
@@ -1389,9 +1472,15 @@ router.post(
 
       await saveGptChatHistoryEntry(req.user.id, req.user.email, result.reply, 'assistant');
 
-      const updatedPromptUsage = promptQuotaOwner.unlimited
-        ? currentPromptUsage
-        : await incrementOpenAiPromptUsage(promptQuotaOwner.ownerUserId, promptBillingWindow);
+      let updatedPromptUsage = currentPromptUsage;
+      let updatedPurchasedPromptBalance = purchasedPromptBalance;
+      if (!promptQuotaOwner.unlimited) {
+        if (currentPromptUsage < OPEN_AI_PROMPT_LIMIT) {
+          updatedPromptUsage = await incrementOpenAiPromptUsage(promptQuotaOwner.ownerUserId, promptBillingWindow);
+        } else {
+          updatedPurchasedPromptBalance = await decrementOpenAiPurchasedPromptBalance(promptQuotaOwner.ownerUserId);
+        }
+      }
 
       res.json({
         reply: result.reply,
@@ -1401,6 +1490,7 @@ router.post(
           updatedPromptUsage,
           promptQuotaOwner.unlimited,
           promptBillingWindow.resetAt,
+          updatedPurchasedPromptBalance,
         ),
       });
     } catch (error: any) {

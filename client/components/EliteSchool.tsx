@@ -114,28 +114,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
   const enrolledCourseList = courses.filter(c => enrolledCourses.includes(c.id));
   const completedCourseList = enrolledCourseList.filter(c => c.progress >= 100);
 
-  const getCourseVideoUrl = (course: EliteCourse) => {
-    const rawVideoUrl = String(course.videoUrl || course.video_url || "").trim();
-
-    if (!rawVideoUrl) {
-      return "";
-    }
-
-    if (/^(?:[a-z]+:)?\/\//i.test(rawVideoUrl) || rawVideoUrl.startsWith("/")) {
-      return rawVideoUrl;
-    }
-
-    return `https://${rawVideoUrl}`;
-  };
-
   const handleCourseStart = (course: EliteCourse) => {
-    const videoUrl = getCourseVideoUrl(course);
-
-    if (videoUrl) {
-      window.open(videoUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-
     navigate(`/course/${course.id}`);
   };
 
@@ -150,43 +129,43 @@ export default function EliteSchool(props: EliteSchoolProps) {
           {/* HEADER & STATS */}
           <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden flex flex-col justify-center">
-              <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#00d4ff]/20 to-[#7000ff]/20 rounded-full blur-3xl"></div>
-              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#7000ff] to-[#00d4ff] tracking-tight flex items-center gap-2 mb-2">
-                <Crown className="h-8 w-8 text-[#7000ff]" /> Elite Academy
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-[#77dd77]/20 to-[#004225]/20 rounded-full blur-3xl"></div>
+              <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#004225] to-[#77dd77] tracking-tight flex items-center gap-2 mb-2">
+                <Crown className="h-8 w-8 text-[#004225]" /> CapSol Academy
               </h1>
               <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 max-w-md">Master the strategies and tools to scale your funding business to the next level.</p>
               
               <div className="flex items-center gap-4 mt-6">
-                <Button className="bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 dark:text-slate-800 shadow-[0_0_15px_rgba(0,212,255,0.4)] border-0 text-xs font-black uppercase tracking-wider rounded-xl h-10 px-6">
+                <Button className="bg-gradient-to-r from-[#004225] to-[#77dd77] text-white shadow-[0_0_15px_rgba(27,139,0,0.28)] border-0 text-xs font-black uppercase tracking-wider rounded-xl h-10 px-6">
                   Continue Learning <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
-                <Button variant="outline" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl h-10 px-6 hover:text-[#7000ff] hover:bg-purple-50 dark:bg-purple-900/50 transition-colors">
+                <Button variant="outline" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 shadow-sm text-xs font-bold uppercase tracking-wider rounded-xl h-10 px-6 hover:text-[#004225] hover:bg-green-50 dark:hover:bg-emerald-950/50 transition-colors">
                   View Certifications
                 </Button>
               </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#ff9900] to-[#ff00ff]"></div>
+              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#004225] to-[#77dd77]"></div>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Your Progress</span>
-                <div className="p-2 rounded-xl bg-orange-50 shadow-inner"><Flame className="h-4 w-4 text-[#ff9900]" /></div>
+                <div className="p-2 rounded-xl bg-green-50 shadow-inner"><Flame className="h-4 w-4 text-[#1B8B00]" /></div>
               </div>
               <div className="flex items-baseline gap-2 mb-2">
                 <span className="text-4xl font-black text-slate-800 dark:text-slate-100">{enrolledCourseList.length}</span>
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">Enrolled</span>
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mt-2 shadow-inner overflow-hidden">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${enrolledCourseList.length ? (completedCourseList.length / enrolledCourseList.length) * 100 : 0}%` }} transition={{ duration: 1 }} className="bg-gradient-to-r from-[#ff9900] to-[#ff00ff] h-full rounded-full" />
+                <motion.div initial={{ width: 0 }} animate={{ width: `${enrolledCourseList.length ? (completedCourseList.length / enrolledCourseList.length) * 100 : 0}%` }} transition={{ duration: 1 }} className="bg-gradient-to-r from-[#004225] to-[#77dd77] h-full rounded-full" />
               </div>
               <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 mt-2">{completedCourseList.length} courses completed</p>
             </div>
 
             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00ffcc] to-[#00d4ff]"></div>
+              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#1B8B00] to-[#77dd77]"></div>
               <div className="flex items-center justify-between mb-4">
                 <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Elite Points</span>
-                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 shadow-inner"><Sparkles className="h-4 w-4 text-[#00ffcc]" /></div>
+                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 shadow-inner"><Sparkles className="h-4 w-4 text-[#1B8B00]" /></div>
               </div>
               <div className="flex items-baseline gap-2 mb-1">
                 <span className="text-4xl font-black text-slate-800 dark:text-slate-100">{userStats?.totalPoints || 0}</span>
@@ -218,7 +197,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
                 placeholder="Search academy..." 
                 value={searchQuery} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
-                className="pl-10 h-12 border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400 dark:text-slate-500 text-sm font-semibold"
+                className="pl-10 h-12 border-slate-100 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-[0_4px_20px_rgb(0,0,0,0.03)] focus:ring-2 focus:ring-[#77dd77]/30 focus:border-[#1B8B00]/40 transition-all placeholder:text-slate-400 dark:text-slate-500 text-sm font-semibold"
               />
             </div>
           </motion.div>
@@ -271,7 +250,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
                 <div className="space-y-6">
                   {coursesLoading ? (
                     <div className="flex justify-center py-20">
-                      <div className="h-12 w-12 rounded-full border-4 border-[#00d4ff] border-t-transparent animate-spin"></div>
+                      <div className="h-12 w-12 rounded-full border-4 border-[#1B8B00] border-t-transparent animate-spin"></div>
                     </div>
                   ) : filteredCourses.length === 0 ? (
                     <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -283,9 +262,16 @@ export default function EliteSchool(props: EliteSchoolProps) {
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                       {filteredCourses.map((course) => (
                         <div key={course.id} className="group bg-white dark:bg-slate-900 rounded-3xl border border-white dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,212,255,0.15)] transition-all duration-300 overflow-hidden flex flex-col relative">
-                          {course.featured && <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-[#ff00ff] to-[#7000ff] text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">Featured</div>}
+                          {course.featured && <div className="absolute top-4 right-4 z-10 bg-gradient-to-r from-[#004225] to-[#77dd77] text-white text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg">Featured</div>}
                           <div className="h-48 relative overflow-hidden bg-slate-100 dark:bg-slate-800">
-                            <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                            <img
+                              src={course.thumbnail || '/placeholder.png'}
+                              alt={course.title}
+                              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                              onError={(event) => {
+                                event.currentTarget.src = '/placeholder.png';
+                              }}
+                            />
                             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
                             <div className="absolute bottom-4 left-4 flex items-center gap-2">
                               <Badge className="bg-white dark:bg-slate-900/20 backdrop-blur-md border-white dark:border-slate-800/30 text-white text-[9px] font-bold uppercase tracking-wider">{course.category || 'General'}</Badge>
@@ -299,7 +285,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
                               </span>
                               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 flex items-center"><Users className="w-3 h-3 mr-1" /> {course.enrolled}</span>
                             </div>
-                            <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight mb-2 group-hover:text-[#00d4ff] transition-colors">{course.title}</h3>
+                            <h3 className="text-lg font-black text-slate-800 dark:text-slate-100 leading-tight mb-2 group-hover:text-[#1B8B00] transition-colors">{course.title}</h3>
                             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 dark:text-slate-500 line-clamp-2 mb-4 flex-grow">{course.description}</p>
                             
                             <div className="flex items-center gap-3 pt-4 border-t border-slate-50">
@@ -311,7 +297,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
                                 <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{course.instructor}</p>
                               </div>
                               <Button
-                                className="h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-[#00d4ff] hover:text-white hover:shadow-[0_0_15px_rgba(0,212,255,0.4)] transition-all border-0 text-[10px] font-black uppercase tracking-wider"
+                                className="h-8 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-[#1B8B00] hover:text-white hover:shadow-[0_0_15px_rgba(27,139,0,0.28)] transition-all border-0 text-[10px] font-black uppercase tracking-wider"
                                 onClick={() => handleCourseStart(course)}
                               >
                                 {course.isEnrolled ? 'Resume' : 'Start'}
@@ -372,15 +358,15 @@ export default function EliteSchool(props: EliteSchoolProps) {
                                 <div className="flex items-center gap-3">
                                   <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
                                     <AvatarImage src={user.avatar} />
-                                    <AvatarFallback className="bg-gradient-to-br from-[#00d4ff] to-[#7000ff] text-white font-bold">{user.name.charAt(0)}</AvatarFallback>
+                                    <AvatarFallback className="bg-gradient-to-br from-[#004225] to-[#77dd77] text-white font-bold">{user.name.charAt(0)}</AvatarFallback>
                                   </Avatar>
                                   <div className="font-bold text-slate-800 dark:text-slate-100 text-sm">{user.name}</div>
                                 </div>
                               </td>
                               <td className="py-4 px-6">
                                 <Badge variant="outline" className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 ${
-                                  user.tier === 'diamond' ? 'border-[#00d4ff]/50 text-[#00d4ff] bg-blue-50 dark:bg-blue-900/50' :
-                                  user.tier === 'platinum' ? 'border-[#7000ff]/50 text-[#7000ff] bg-purple-50 dark:bg-purple-900/50' :
+                                  user.tier === 'diamond' ? 'border-[#1B8B00]/40 text-[#1B8B00] bg-green-50 dark:bg-emerald-950/50' :
+                                  user.tier === 'platinum' ? 'border-[#004225]/40 text-[#004225] bg-emerald-50 dark:bg-emerald-950/50' :
                                   user.tier === 'gold' ? 'border-[#ffcc00]/50 text-amber-600 bg-amber-50 dark:bg-amber-900/50' :
                                   'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-800/50'
                                 }`}>
@@ -416,7 +402,14 @@ export default function EliteSchool(props: EliteSchoolProps) {
                       {enrolledCourseList.map((course) => (
                         <div key={course.id} className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-lg transition-all p-6 flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                           <div className="w-full sm:w-40 h-32 rounded-2xl overflow-hidden shrink-0 relative shadow-inner">
-                            <img src={course.thumbnail} alt={course.title} className="w-full h-full object-cover" />
+                            <img
+                              src={course.thumbnail || '/placeholder.png'}
+                              alt={course.title}
+                              className="w-full h-full object-cover"
+                              onError={(event) => {
+                                event.currentTarget.src = '/placeholder.png';
+                              }}
+                            />
                             {course.progress >= 100 && (
                               <div className="absolute inset-0 bg-emerald-50 dark:bg-emerald-900/500/20 backdrop-blur-[2px] flex items-center justify-center">
                                 <div className="bg-white dark:bg-slate-900 rounded-full p-1.5 shadow-lg"><CheckCircle className="w-6 h-6 text-emerald-500" /></div>
@@ -429,7 +422,7 @@ export default function EliteSchool(props: EliteSchoolProps) {
                             
                             <div className="space-y-2 mt-auto">
                               <div className="flex items-center justify-between text-xs font-bold">
-                                <span className={course.progress >= 100 ? "text-emerald-500" : "text-[#00d4ff]"}>
+                                <span className={course.progress >= 100 ? "text-emerald-500" : "text-[#1B8B00]"}>
                                   {course.progress >= 100 ? 'Completed' : 'In Progress'}
                                 </span>
                                 <span className="text-slate-600 dark:text-slate-400">{course.progress}%</span>
@@ -439,12 +432,12 @@ export default function EliteSchool(props: EliteSchoolProps) {
                                   initial={{ width: 0 }} 
                                   animate={{ width: `${course.progress}%` }} 
                                   transition={{ duration: 1 }} 
-                                  className={`h-full rounded-full ${course.progress >= 100 ? 'bg-gradient-to-r from-[#00ffcc] to-emerald-500' : 'bg-gradient-to-r from-[#00d4ff] to-[#7000ff]'}`} 
+                                  className={`h-full rounded-full ${course.progress >= 100 ? 'bg-gradient-to-r from-[#1B8B00] to-emerald-500' : 'bg-gradient-to-r from-[#004225] to-[#77dd77]'}`} 
                                 />
                               </div>
                             </div>
                             
-                            <Button className="w-full mt-5 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-[#00d4ff] hover:text-white hover:shadow-[0_0_15px_rgba(0,212,255,0.4)] transition-all border border-slate-100 dark:border-slate-800 hover:border-transparent text-xs font-black uppercase tracking-wider rounded-xl h-10">
+                            <Button className="w-full mt-5 bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 hover:bg-[#1B8B00] hover:text-white hover:shadow-[0_0_15px_rgba(27,139,0,0.28)] transition-all border border-slate-100 dark:border-slate-800 hover:border-transparent text-xs font-black uppercase tracking-wider rounded-xl h-10">
                               {course.progress >= 100 ? 'Review Course' : 'Continue Learning'}
                             </Button>
                           </div>

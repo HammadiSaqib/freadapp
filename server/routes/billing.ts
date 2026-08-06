@@ -9,11 +9,313 @@ import AffiliateUpgradeService from '../services/affiliateUpgradeService.js';
 import { emailService } from '../services/emailService.js';
 import crypto from 'crypto';
 import { createAffiliate } from '../controllers/authController.js';
+import type { Request } from 'express';
+import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 
 const router = express.Router();
 
 // Initialize Stripe (will be updated dynamically from database)
 let stripe: Stripe;
+let basicPlansStripe: Stripe | null = null;
+let basicPlansStripeSecretInUse: string | null = null;
+
+type SubscriptionStripeContext = 'default' | 'basic_plans';
+
+const SCORE_MACHINE_BASIC_PAGE = 'score-machine-basic';
+
+function getBasicPlansStripeSecretKey() {
+  return String(process.env.BASIC_PLANS_STRIPE_SECRET_KEY || '').trim();
+}
+
+function getBasicPlansStripePublishableKey() {
+  return String(process.env.BASIC_PLANS_STRIPE_PUBLISHABLE_KEY || '').trim();
+}
+
+function getBasicPlansStripeWebhookSecret() {
+  return String(process.env.BASIC_PLANS_STRIPE_WEBHOOK_SECRET || '').trim();
+}
+
+function getWebhookRequestHost(req: Request) {
+  const forwardedHost = String(req.headers['x-forwarded-host'] || '').trim();
+  const hostHeader = String(req.headers.host || '').trim();
+  return (forwardedHost || hostHeader).toLowerCase();
+}
+
+function getStripeWebhookContextFromRequest(req: Request): SubscriptionStripeContext {
+  const host = getWebhookRequestHost(req);
+
+  if (
+    host.includes('admin.tsmbasic.com') ||
+    host === 'localhost:3000' ||
+    host === '127.0.0.1:3000' ||
+    host === 'admin.localhost:3000'
+  ) {
+    return 'basic_plans';
+  }
+
+  return 'default';
+}
+
+function getRequestProtocol(req: Request) {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').trim().toLowerCase();
+  if (forwardedProto === 'http' || forwardedProto === 'https') {
+    return forwardedProto;
+  }
+
+  return req.protocol || 'http';
+}
+
+function getPortalBaseUrlForStripeContext(req: Request, context: SubscriptionStripeContext) {
+  const protocol = getRequestProtocol(req);
+  const host = getWebhookRequestHost(req);
+  const hostname = host.split(':')[0];
+
+  const isLocal =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.endsWith('.localhost');
+
+  if (isLocal) {
+    const localHost = hostname === 'localhost' || hostname === '127.0.0.1'
+      ? hostname
+      : 'admin.localhost';
+    const port = context === 'basic_plans' ? '3000' : '3001';
+    return `${protocol}://${localHost}:${port}`;
+  }
+
+  return context === 'basic_plans'
+    ? 'https://admin.tsmbasic.com'
+    : 'https://admin.thescoremachine.com';
+}
+
+function getPlanPermissionPages(pagePermissions: any): string[] {
+  if (!pagePermissions) {
+    return [];
+  }
+
+  let parsed = pagePermissions;
+  if (typeof pagePermissions === 'string') {
+    try {
+      parsed = JSON.parse(pagePermissions);
+    } catch {
+      return [];
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    return parsed.map((pageId) => String(pageId));
+  }
+
+  if (parsed && Array.isArray(parsed.pages)) {
+    return parsed.pages.map((pageId: any) => String(pageId));
+  }
+
+  if (parsed && Array.isArray(parsed.permissions)) {
+    return parsed.permissions.map((pageId: any) => String(pageId));
+  }
+
+  return [];
+}
+
+function getStripeSubscriptionPeriodDates(stripeSub: any) {
+  const firstItem = stripeSub?.items?.data?.[0];
+  const periodStartSeconds = stripeSub?.current_period_start ?? firstItem?.current_period_start;
+  const periodEndSeconds = stripeSub?.current_period_end ?? firstItem?.current_period_end;
+
+  return {
+    periodStart: typeof periodStartSeconds === 'number' ? new Date(periodStartSeconds * 1000) : null,
+    periodEnd: typeof periodEndSeconds === 'number' ? new Date(periodEndSeconds * 1000) : null,
+  };
+}
+
+function getStripeContextForPlan(plan: any): SubscriptionStripeContext {
+  return getPlanPermissionPages(plan?.page_permissions).includes(SCORE_MACHINE_BASIC_PAGE)
+    ? 'basic_plans'
+    : 'default';
+}
+
+async function getBasicPlansStripe() {
+  const secretKey = getBasicPlansStripeSecretKey();
+  if (!secretKey) {
+    throw new Error('Basic Plans Stripe secret key is not configured. Set BASIC_PLANS_STRIPE_SECRET_KEY.');
+  }
+
+  if (!secretKey.startsWith('sk_')) {
+    throw new Error('Basic Plans Stripe secret key must start with sk_. Publishable keys start with pk_.');
+  }
+
+  if (!basicPlansStripe || basicPlansStripeSecretInUse !== secretKey) {
+    basicPlansStripe = new Stripe(secretKey);
+    basicPlansStripeSecretInUse = secretKey;
+  }
+
+  return basicPlansStripe;
+}
+
+async function getStripeForSubscriptionContext(context: SubscriptionStripeContext) {
+  if (context === 'basic_plans') {
+    return getBasicPlansStripe();
+  }
+
+  if (!stripe) {
+    await initializeStripe();
+  }
+
+  if (!stripe) {
+    throw new Error('Stripe not configured');
+  }
+
+  return stripe;
+}
+
+async function findUserByStripeCustomerId(context: SubscriptionStripeContext, customerId: string) {
+  if (context === 'basic_plans') {
+    await ensureBasicPlansStripeCustomersTable();
+    const basicCustomerRows = await executeQuery<any[]>(
+      `SELECT user_kind, user_id
+       FROM basic_plans_stripe_customers
+       WHERE stripe_customer_id = ?
+       LIMIT 1`,
+      [customerId]
+    );
+
+    if (Array.isArray(basicCustomerRows) && basicCustomerRows.length > 0) {
+      return {
+        userId: Number(basicCustomerRows[0].user_id || 0) || undefined,
+        userKind: String(basicCustomerRows[0].user_kind || 'user'),
+      };
+    }
+  }
+
+  const userRows = await executeQuery<any[]>(
+    'SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1',
+    [customerId]
+  );
+  if (Array.isArray(userRows) && userRows.length > 0) {
+    return {
+      userId: Number(userRows[0].id || 0) || undefined,
+      userKind: 'user',
+    };
+  }
+
+  const affiliateRows = await executeQuery<any[]>(
+    'SELECT id FROM affiliates WHERE stripe_customer_id = ? LIMIT 1',
+    [customerId]
+  );
+  if (Array.isArray(affiliateRows) && affiliateRows.length > 0) {
+    return {
+      userId: Number(affiliateRows[0].id || 0) || undefined,
+      userKind: 'affiliate',
+    };
+  }
+
+  return {
+    userId: undefined,
+    userKind: undefined,
+  };
+}
+
+async function retrieveCheckoutSessionForSubscription(sessionId: string) {
+  const contexts: SubscriptionStripeContext[] = ['default', 'basic_plans'];
+  let firstError: any = null;
+
+  for (const context of contexts) {
+    if (context === 'basic_plans' && !getBasicPlansStripeSecretKey()) {
+      continue;
+    }
+
+    try {
+      const stripeClient = await getStripeForSubscriptionContext(context);
+      const session = await stripeClient.checkout.sessions.retrieve(sessionId);
+      return { stripeClient, stripeContext: context, session };
+    } catch (error: any) {
+      firstError ||= error;
+    }
+  }
+
+  throw firstError || new Error('Checkout session not found');
+}
+
+async function getStripeContextFromPlanId(planId: number): Promise<SubscriptionStripeContext> {
+  if (!planId || Number.isNaN(planId)) {
+    return 'default';
+  }
+
+  const planRows = await executeQuery<any[]>(
+    'SELECT page_permissions FROM subscription_plans WHERE id = ? LIMIT 1',
+    [planId]
+  );
+  const plan = Array.isArray(planRows) && planRows.length > 0 ? planRows[0] : null;
+  return getStripeContextForPlan(plan);
+}
+
+async function ensureBasicPlansStripeCustomersTable() {
+  await executeQuery(`
+    CREATE TABLE IF NOT EXISTS basic_plans_stripe_customers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_kind VARCHAR(20) NOT NULL DEFAULT 'user',
+      user_id INT NOT NULL,
+      stripe_customer_id VARCHAR(255) NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_basic_plans_stripe_customer_user (user_kind, user_id)
+    )
+  `);
+}
+
+async function getOrCreateCheckoutStripeCustomer(
+  stripeClient: Stripe,
+  context: SubscriptionStripeContext,
+  userData: any,
+  isAffiliate: boolean,
+) {
+  const userId = Number(userData?.id);
+  const userKind = isAffiliate ? 'affiliate' : 'user';
+
+  if (context === 'default') {
+    let customerId = userData.stripe_customer_id;
+    if (!customerId) {
+      const customer = await stripeClient.customers.create({
+        email: userData.email,
+        name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+        metadata: { userId: String(userId), userKind }
+      });
+      customerId = customer.id;
+      if (isAffiliate) {
+        await executeQuery('UPDATE affiliates SET stripe_customer_id = ? WHERE id = ?', [customerId, userId]);
+      } else {
+        await executeQuery('UPDATE users SET stripe_customer_id = ? WHERE id = ?', [customerId, userId]);
+      }
+    }
+    return String(customerId);
+  }
+
+  await ensureBasicPlansStripeCustomersTable();
+  const existingRows = await executeQuery<any[]>(
+    'SELECT stripe_customer_id FROM basic_plans_stripe_customers WHERE user_kind = ? AND user_id = ? LIMIT 1',
+    [userKind, userId]
+  );
+  if (Array.isArray(existingRows) && existingRows[0]?.stripe_customer_id) {
+    return String(existingRows[0].stripe_customer_id);
+  }
+
+  const customer = await stripeClient.customers.create({
+    email: userData.email,
+    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+    metadata: {
+      userId: String(userId),
+      userKind,
+      product: 'score_machine_basic_plan'
+    }
+  });
+  await executeQuery(
+    `INSERT INTO basic_plans_stripe_customers (user_kind, user_id, stripe_customer_id)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE stripe_customer_id = VALUES(stripe_customer_id), updated_at = CURRENT_TIMESTAMP`,
+    [userKind, userId, customer.id]
+  );
+  return customer.id;
+}
 
 // Get active Stripe configuration
 async function getStripeConfig(): Promise<StripeConfig | null> {
@@ -35,17 +337,13 @@ export async function initializeStripe() {
     const config = await getStripeConfig();
     if (config && config.stripe_secret_key) {
       console.log('✅ Using Stripe config from database');
-      stripe = new Stripe(config.stripe_secret_key, {
-        apiVersion: '2024-06-20',
-      });
+      stripe = new Stripe(config.stripe_secret_key);
     } else {
       // Fallback to environment variables
       const secretKey = process.env.STRIPE_SECRET_KEY;
       if (secretKey) {
         console.log('✅ Using Stripe config from environment variables');
-        stripe = new Stripe(secretKey, {
-          apiVersion: '2024-06-20',
-        });
+        stripe = new Stripe(secretKey);
       } else {
         console.error('❌ No Stripe configuration found in database or environment variables');
       }
@@ -197,7 +495,7 @@ router.get('/stripe-history', authenticateToken, async (req, res) => {
           const chId = typeof piFull.latest_charge === 'string' ? piFull.latest_charge : null;
           if (chId) {
             const ch = await stripe.charges.retrieve(chId);
-            const inv = ch.invoice;
+            const inv = (ch as any).invoice;
             invoiceId = typeof inv === 'string' ? inv : null;
             const btId = typeof ch.balance_transaction === 'string' ? ch.balance_transaction : null;
             if (btId) {
@@ -246,7 +544,8 @@ router.get('/stripe-history', authenticateToken, async (req, res) => {
         ...(invStartingAfter ? { starting_after: invStartingAfter } : {})
       });
       for (const inv of invList.data) {
-        const piId = typeof inv.payment_intent === 'string' ? inv.payment_intent : null;
+        const invoiceAny = inv as any;
+        const piId = typeof invoiceAny.payment_intent === 'string' ? invoiceAny.payment_intent : null;
         const createdIso = new Date((inv.created || Math.floor(Date.now() / 1000)) * 1000).toISOString();
         if (piId && piIndex.has(piId)) {
           const idx = piIndex.get(piId)!;
@@ -415,26 +714,19 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
   try {
     console.log('🔄 Creating payment intent...');
     const userId = (req as any).user.id;
-    const { amount, currency = 'usd', planName, planType, course_id, affiliateId } = req.body;
+    const { amount, currency = 'usd', planName, planType, plan_id, course_id, affiliateId } = req.body;
     
     console.log('📋 Request data:', { userId, amount, currency, planName, planType, course_id, affiliateId });
     if (!Number.isFinite(amount) || amount < 0.5) {
       return res.status(400).json({ error: 'Invalid amount. Must be at least $0.50.' });
     }
     
-    // Try to initialize Stripe if not already initialized
-    if (!stripe) {
-      console.log('🔄 Stripe not initialized, attempting to initialize...');
-      await initializeStripe();
-    }
-    
-    if (!stripe) {
-      console.error('❌ Stripe not configured');
-      return res.status(500).json({ error: 'Stripe not configured' });
-    }
-    
-    console.log('✅ Stripe initialized successfully');
-
+    const parsedPlanId = Number(plan_id || 0);
+    const stripeContext = parsedPlanId > 0
+      ? await getStripeContextFromPlanId(parsedPlanId)
+      : 'default';
+    const paymentStripe = await getStripeForSubscriptionContext(stripeContext);
+    console.log('Stripe initialized successfully for payment intent context:', stripeContext);
     // Resolve affiliateId from body, query, or referer using robust resolver
     let resolvedAffiliateId: number | null = null;
     let referralSource: 'affiliate' | 'main' = 'main';
@@ -503,11 +795,13 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
       console.log('👤 User data found:', { email: userData.email, name: `${userData.first_name} ${userData.last_name}` });
     }
     let customerId = userData.stripe_customer_id;
-    console.log('💳 Existing customer ID:', customerId);
-    
-    if (!customerId) {
+    console.log('Existing customer ID:', customerId);
+
+    if (stripeContext === 'basic_plans') {
+      customerId = await getOrCreateCheckoutStripeCustomer(paymentStripe, stripeContext, userData, isAffiliate);
+    } else if (!customerId) {
       console.log('🆕 Creating new Stripe customer...');
-      const customer = await stripe.customers.create({
+      const customer = await paymentStripe.customers.create({
         email: userData.email,
         name: `${userData.first_name} ${userData.last_name}`,
         metadata: {
@@ -535,7 +829,7 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
     
     // Create payment intent
     console.log('💰 Creating payment intent with amount:', Math.round(amount * 100), 'cents');
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await paymentStripe.paymentIntents.create({
       amount: Math.round(amount * 100), // Convert to cents
       currency,
       customer: customerId,
@@ -545,7 +839,8 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
         planType: planType || '',
         course_id: course_id ? course_id.toString() : '',
         affiliateId: resolvedAffiliateId ? String(resolvedAffiliateId) : '',
-        referralSource
+        referralSource,
+        stripeContext
       }
     }, {
       idempotencyKey: `pi_${userId}_${course_id || 'none'}_${Math.round(amount * 100)}`
@@ -590,7 +885,8 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
       type: course_id ? 'course_purchase' : 'subscription',
       course_id: course_id || undefined,
       affiliateId: resolvedAffiliateId || undefined,
-      referralSource
+      referralSource,
+      stripeContext
     });
     await executeQuery(
       `INSERT INTO billing_transactions 
@@ -633,21 +929,10 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
   try {
     console.log('🧾 Creating subscription checkout session...');
     const userId = (req as any).user.id;
-    const requesterRole = String((req as any)?.user?.role || '').toLowerCase();
     const { planId, billingCycle = 'monthly', affiliateId } = req.body as { planId: number; billingCycle?: 'monthly' | 'yearly'; affiliateId?: string | number };
 
     if (!planId) {
       return res.status(400).json({ error: 'planId is required' });
-    }
-
-    // Initialize Stripe if needed
-    if (!stripe) {
-      console.log('🔄 Stripe not initialized, attempting to initialize...');
-      await initializeStripe();
-    }
-    if (!stripe) {
-      console.error('❌ Stripe not configured');
-      return res.status(500).json({ error: 'Stripe not configured' });
     }
 
     // Fetch plan to get Stripe Price IDs
@@ -659,6 +944,9 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       return res.status(404).json({ error: 'Plan not found or inactive' });
     }
     const plan = planRows[0];
+    const stripeContext = getStripeContextForPlan(plan);
+    const checkoutStripe = await getStripeForSubscriptionContext(stripeContext);
+    console.log('Subscription checkout Stripe context:', stripeContext, 'plan:', plan.name);
 
     try {
       const perm = plan.page_permissions ? JSON.parse(plan.page_permissions) : [];
@@ -675,18 +963,18 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       }
     } catch {}
 
-    const useTrialPrice = billingCycle === 'monthly' && !!plan.trial_price_id;
+    const useTrialPrice = stripeContext === 'default' && billingCycle === 'monthly' && !!plan.trial_price_id;
     let priceId = useTrialPrice
       ? plan.trial_price_id
       : billingCycle === 'yearly'
-        ? plan.stripe_yearly_price_id
-        : plan.stripe_monthly_price_id;
+        ? (stripeContext === 'default' ? plan.stripe_yearly_price_id : null)
+        : (stripeContext === 'default' ? plan.stripe_monthly_price_id : null);
     const interval = billingCycle === 'yearly' ? 'year' : 'month';
     let pendingAmount = 0;
     let stripePriceValid = false;
     try {
       if (priceId) {
-        const stripePrice = await stripe.prices.retrieve(String(priceId));
+        const stripePrice = await checkoutStripe.prices.retrieve(String(priceId));
         if (stripePrice && stripePrice.id) {
           stripePriceValid = true;
           if (typeof stripePrice.unit_amount === 'number') {
@@ -707,21 +995,23 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       let productExists = false;
       if (productId) {
         try {
-          const product = await stripe.products.retrieve(productId);
+          const product = await checkoutStripe.products.retrieve(productId);
           if (product && product.id) {
             productExists = true;
           }
         } catch {}
       }
       if (!productExists) {
-        const product = await stripe.products.create({ name: plan.name });
+        const product = await checkoutStripe.products.create({ name: plan.name });
         productId = product.id;
-        await executeQuery(
-          'UPDATE subscription_plans SET stripe_product_id = ? WHERE id = ?',
-          [productId, plan.id]
-        );
+        if (stripeContext === 'default') {
+          await executeQuery(
+            'UPDATE subscription_plans SET stripe_product_id = ? WHERE id = ?',
+            [productId, plan.id]
+          );
+        }
       }
-      const newPrice = await stripe.prices.create({
+      const newPrice = await checkoutStripe.prices.create({
         unit_amount: Math.round(planPriceNum * 100),
         currency: 'usd',
         recurring: { interval },
@@ -730,12 +1020,12 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
       priceId = newPrice.id;
       stripePriceValid = true;
       pendingAmount = planPriceNum;
-      if (billingCycle === 'yearly') {
+      if (stripeContext === 'default' && billingCycle === 'yearly') {
         await executeQuery(
           'UPDATE subscription_plans SET stripe_yearly_price_id = ? WHERE id = ?',
           [priceId, plan.id]
         );
-      } else {
+      } else if (stripeContext === 'default') {
         await executeQuery(
           'UPDATE subscription_plans SET stripe_monthly_price_id = ? WHERE id = ?',
           [priceId, plan.id]
@@ -940,25 +1230,13 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
     } else {
       userData = user[0];
     }
-    let customerId = userData.stripe_customer_id;
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: userData.email,
-        name: `${userData.first_name} ${userData.last_name}`,
-        metadata: { userId: String(userId) }
-      });
-      customerId = customer.id;
-      if (isAffiliate) {
-        await executeQuery('UPDATE affiliates SET stripe_customer_id = ? WHERE id = ?', [customerId, userId]);
-      } else {
-        await executeQuery('UPDATE users SET stripe_customer_id = ? WHERE id = ?', [customerId, userId]);
-      }
-    }
+    const customerId = await getOrCreateCheckoutStripeCustomer(checkoutStripe, stripeContext, userData, isAffiliate);
 
     // Create Checkout Session
-    const successUrl = `https://admin.thescoremachine.com/billing/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `https://admin.thescoremachine.com/billing/cancel`;
-    const session = await stripe.checkout.sessions.create({
+    const portalBaseUrl = getPortalBaseUrlForStripeContext(req, stripeContext);
+    const successUrl = `${portalBaseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${portalBaseUrl}/billing/cancel`;
+    const session = await checkoutStripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: String(priceId), quantity: 1 }],
       customer: customerId,
@@ -970,7 +1248,8 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
         planId: String(planId),
         billingCycle,
         affiliateId: resolvedAffiliateId ? String(resolvedAffiliateId) : '',
-        referralSource
+        referralSource,
+        stripeContext
       },
       subscription_data: {
         metadata: {
@@ -978,11 +1257,10 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
           planId: String(planId),
           billingCycle,
           affiliateId: resolvedAffiliateId ? String(resolvedAffiliateId) : '',
-          referralSource
+          referralSource,
+          stripeContext
         }
       }
-    }, {
-      idempotencyKey: `subchk_${userId}_${planId}_${billingCycle}`
     });
 
     // Store a pending transaction record keyed by Checkout Session for later update
@@ -1008,7 +1286,7 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
         plan.name,
         billingCycle,
         `Stripe Checkout session ${session.id} for ${plan.name} (${billingCycle})`,
-        JSON.stringify({ type: 'subscription_checkout', planId, billingCycle, sessionId: session.id, affiliateId: resolvedAffiliateId || undefined, referralSource })
+        JSON.stringify({ type: 'subscription_checkout', planId, billingCycle, sessionId: session.id, affiliateId: resolvedAffiliateId || undefined, referralSource, stripeContext })
       ]
     );
 
@@ -1154,6 +1432,7 @@ router.post('/confirm-payment', authenticateToken, async (req, res) => {
           plan_type = VALUES(plan_type),
           cancel_at_period_end = FALSE
         `, [userId, transaction.plan_name, now, endDate, transaction.plan_type]);
+        syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
         console.log('✅ Subscription created/updated for user:', userId);
 
         // Create admin onboarding contract if not already pending/signed
@@ -1611,10 +1890,11 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
     if (!sessionId) {
       return res.status(400).json({ error: 'sessionId is required' });
     }
-    if (!stripe) {
-      await initializeStripe();
-    }
-    const session = await stripe.checkout.sessions.retrieve(String(sessionId));
+    const {
+      stripeClient: checkoutStripe,
+      stripeContext,
+      session,
+    } = await retrieveCheckoutSessionForSubscription(String(sessionId));
     if (!session || session.mode !== 'subscription' || !session.subscription) {
       return res.status(400).json({ error: 'Invalid checkout session' });
     }
@@ -1639,11 +1919,18 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
         planName = planRows[0].name;
       }
     }
-    const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-    const periodStart = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null;
-    const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
+    const stripeSub = await checkoutStripe.subscriptions.retrieve(stripeSubscriptionId);
+    const { periodStart, periodEnd } = getStripeSubscriptionPeriodDates(stripeSub);
     const statusMap: any = { active: 'active', canceled: 'canceled', past_due: 'past_due', unpaid: 'unpaid', incomplete: 'incomplete', incomplete_expired: 'incomplete' };
     const normalizedStatus = statusMap[stripeSub.status] || 'active';
+    try {
+      await executeQuery(
+        `UPDATE billing_transactions 
+         SET status = 'succeeded', updated_at = NOW() 
+         WHERE stripe_payment_intent_id = ?`,
+        [String(session.id)]
+      );
+    } catch {}
     if (userId) {
       const existing = await executeQuery<any[]>('SELECT id FROM subscriptions WHERE user_id = ? LIMIT 1', [userId]);
       if (Array.isArray(existing) && existing.length > 0) {
@@ -1684,6 +1971,7 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
       }
     }
     if (userId) {
+      syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
       const userRows = await executeQuery('SELECT email, first_name, last_name, company_name, role FROM users WHERE id = ?', [userId]) as any[];
       if (userRows && userRows.length > 0 && userRows[0].role === 'admin') {
         const adminAffiliateRows = await executeQuery('SELECT id FROM affiliates WHERE admin_id = ?', [userId]) as any[];
@@ -1777,7 +2065,8 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
         status: normalizedStatus,
         current_period_start: periodStart,
         current_period_end: periodEnd,
-        cancel_at_period_end: !!stripeSub.cancel_at_period_end
+        cancel_at_period_end: !!stripeSub.cancel_at_period_end,
+        stripe_context: stripeContext
       }
     });
   } catch (error: any) {
@@ -1789,14 +2078,20 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
 router.post('/cancel-subscription', authenticateToken, async (req, res) => {
   try {
     const userId = (req as any).user.id;
-    const { reasonCode, reasonText } = req.body as {
+    const { reasonCode, reasonText, guidanceChoice } = req.body as {
       reasonCode?: string;
       reasonText?: string;
+      guidanceChoice?: string;
     };
+    const guidanceChoices = ['join_class_now', 'not_now', 'still_cancel'];
     const normalizedReasonCode = ['affordability', 'guidance', 'other'].includes(String(reasonCode))
       ? String(reasonCode)
       : 'other';
     const normalizedReasonText = String(reasonText || '').trim().slice(0, 1000) || null;
+    const normalizedGuidanceChoice = guidanceChoices.includes(String(guidanceChoice))
+      ? String(guidanceChoice)
+      : null;
+    const guidanceChoiceForSave = normalizedReasonCode === 'guidance' ? normalizedGuidanceChoice : null;
     console.log(`🔄 Attempting to cancel subscription for user ${userId}`);
     const rows = await executeQuery(
       'SELECT id, status, plan_name, stripe_subscription_id FROM subscriptions WHERE user_id = ? AND status = ? LIMIT 1',
@@ -1816,9 +2111,8 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
       if (stripe && sub.stripe_subscription_id) {
         await stripe.subscriptions.update(String(sub.stripe_subscription_id), { cancel_at_period_end: true });
         const updated = await stripe.subscriptions.retrieve(String(sub.stripe_subscription_id));
-        if (updated.current_period_end) {
-          periodEnd = new Date(updated.current_period_end * 1000);
-        }
+        const updatedPeriodDates = getStripeSubscriptionPeriodDates(updated);
+        periodEnd = updatedPeriodDates.periodEnd;
       }
     } catch (err) {}
     await executeQuery(
@@ -1827,10 +2121,20 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
            current_period_end = ?,
            cancellation_reason_code = ?,
            cancellation_reason_text = ?,
+           cancellation_guidance_choice = ?,
+           cancellation_guidance_updated_at = CASE WHEN ? IS NOT NULL THEN CURRENT_TIMESTAMP ELSE cancellation_guidance_updated_at END,
            cancellation_requested_at = COALESCE(cancellation_requested_at, CURRENT_TIMESTAMP),
            updated_at = CURRENT_TIMESTAMP
        WHERE user_id = ? AND status = ?`,
-      [periodEnd ? new Date(periodEnd) : null, normalizedReasonCode, normalizedReasonText, userId, 'active']
+      [
+        periodEnd ? new Date(periodEnd) : null,
+        normalizedReasonCode,
+        normalizedReasonText,
+        guidanceChoiceForSave,
+        guidanceChoiceForSave,
+        userId,
+        'active'
+      ]
     );
     try {
       const userRows = await executeQuery(
@@ -1851,6 +2155,7 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
       console.log('🔁 Affiliate plan_type set to free and commission_rate set to 10% for user', userId);
     } catch {}
     console.log(`✅ Subscription set to cancel at period end for user ${userId}`);
+    syncGhlAdminLifecycleTagsInBackground(Number(userId));
     return res.json({
       success: true,
       message: 'Subscription cancellation scheduled',
@@ -1861,12 +2166,55 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
         cancel_at_period_end: true,
         cancellation_reason_code: normalizedReasonCode,
         cancellation_reason_text: normalizedReasonText,
+        cancellation_guidance_choice: guidanceChoiceForSave,
         cancellation_requested_at: new Date()
       }
     });
   } catch (error: any) {
     console.error('❌ Error canceling subscription:', error);
     res.status(500).json({ success: false, error: 'Failed to cancel subscription', details: error?.message || 'Unknown error' });
+  }
+});
+
+// Track cancellation guidance choice for analytics (before final cancellation)
+router.post('/cancellation-guidance-choice', authenticateToken, async (req, res) => {
+  try {
+    const userId = (req as any).user.id;
+    const { guidanceChoice } = req.body as { guidanceChoice?: string };
+    const normalizedGuidanceChoice = ['join_class_now', 'not_now', 'still_cancel'].includes(String(guidanceChoice))
+      ? String(guidanceChoice)
+      : null;
+
+    if (!normalizedGuidanceChoice) {
+      return res.status(400).json({ success: false, error: 'Invalid guidance choice' });
+    }
+
+    const rows = await executeQuery(
+      'SELECT id FROM subscriptions WHERE user_id = ? AND status = ? LIMIT 1',
+      [userId, 'active']
+    ) as any[];
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'No active subscription found' });
+    }
+
+    await executeQuery(
+      `UPDATE subscriptions
+       SET cancellation_guidance_choice = ?,
+           cancellation_guidance_updated_at = CURRENT_TIMESTAMP,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE user_id = ? AND status = ?`,
+      [normalizedGuidanceChoice, userId, 'active']
+    );
+
+    return res.json({
+      success: true,
+      guidanceChoice: normalizedGuidanceChoice,
+      trackedAt: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('❌ Error tracking cancellation guidance choice:', error);
+    return res.status(500).json({ success: false, error: 'Failed to track guidance choice' });
   }
 });
 
@@ -1939,12 +2287,33 @@ router.post('/retry-payment', authenticateToken, async (req, res) => {
 // Get Stripe publishable key
 router.get('/stripe-config', async (req, res) => {
   try {
+    const planId = Number(req.query.planId || req.query.plan_id || 0);
+    const stripeContext = planId > 0
+      ? await getStripeContextFromPlanId(planId)
+      : 'default';
+
+    if (stripeContext === 'basic_plans') {
+      const basicPublishableKey = getBasicPlansStripePublishableKey();
+      if (!basicPublishableKey) {
+        return res.status(500).json({
+          error: 'Basic Plans Stripe publishable key is not configured. Set BASIC_PLANS_STRIPE_PUBLISHABLE_KEY.',
+        });
+      }
+
+      return res.json({
+        success: true,
+        publishableKey: basicPublishableKey,
+        stripeContext,
+      });
+    }
+
     const config = await getStripeConfig();
     const publishableKey = config?.stripe_publishable_key || process.env.STRIPE_PUBLISHABLE_KEY;
     
     res.json({
       success: true,
-      publishableKey
+      publishableKey,
+      stripeContext,
     });
   } catch (error) {
     console.error('Error fetching Stripe config:', error);
@@ -1956,40 +2325,30 @@ router.get('/stripe-config', async (req, res) => {
 router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   try {
     const sig = req.headers['stripe-signature'] as string;
+    const webhookContext = getStripeWebhookContextFromRequest(req);
     const config = await getStripeConfig();
-    const endpointSecret = config?.webhook_endpoint_secret || process.env.STRIPE_WEBHOOK_SECRET;
+    const webhookStripe = await getStripeForSubscriptionContext(webhookContext);
+    const endpointSecret = webhookContext === 'basic_plans'
+      ? getBasicPlansStripeWebhookSecret()
+      : (config?.webhook_endpoint_secret || process.env.STRIPE_WEBHOOK_SECRET);
     
-    if (!stripe || !endpointSecret) {
+    if (!webhookStripe || !endpointSecret) {
       return res.status(400).send('Webhook configuration missing');
     }
     
     let event: Stripe.Event;
     
     try {
-      event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+      event = webhookStripe.webhooks.constructEvent(req.body, sig, endpointSecret);
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
       return res.status(400).send('Webhook signature verification failed');
     }
 
-    const syncSubscriptionFromStripe = async (stripeSub: Stripe.Subscription) => {
+    const syncSubscriptionFromStripe = async (stripeSub: Stripe.Subscription, lifecycleOptions: { paymentFailed?: boolean } = {}) => {
       const customerId = String(stripeSub.customer);
-      const userRows = await executeQuery<any[]>(
-        'SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1',
-        [customerId]
-      );
-      let userId: number | undefined = undefined;
-      if (Array.isArray(userRows) && userRows.length > 0) {
-        userId = userRows[0].id;
-      } else {
-        const affRows = await executeQuery<any[]>(
-          'SELECT id FROM affiliates WHERE stripe_customer_id = ? LIMIT 1',
-          [customerId]
-        );
-        if (Array.isArray(affRows) && affRows.length > 0) {
-          userId = affRows[0].id;
-        }
-      }
+      const userLookup = await findUserByStripeCustomerId(webhookContext, customerId);
+      const userId = userLookup.userId;
 
       const statusMap: any = {
         active: 'active',
@@ -2001,22 +2360,44 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         incomplete_expired: 'incomplete'
       };
       const normalizedStatus = statusMap[stripeSub.status] || 'active';
-      const periodStart = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null;
-      const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
+      const { periodStart, periodEnd } = getStripeSubscriptionPeriodDates(stripeSub);
+      const stripePrice = (stripeSub as any)?.items?.data?.[0]?.price;
+      const stripePriceId = String(stripePrice?.id || '').trim();
+      const stripePlanType = stripePrice?.recurring?.interval === 'year' ? 'yearly' : 'monthly';
+      let updatedPlanName: string | null = null;
+      if (stripePriceId) {
+        const planRows = await executeQuery(
+          `SELECT name
+           FROM subscription_plans
+           WHERE stripe_monthly_price_id = ? OR stripe_yearly_price_id = ?
+           LIMIT 1`,
+          [stripePriceId, stripePriceId]
+        ) as any[];
+        updatedPlanName = String(planRows?.[0]?.name || '').trim() || null;
+      }
 
       if (userId) {
         await executeQuery(
           `UPDATE subscriptions 
-           SET status = ?, current_period_start = ?, current_period_end = ?, cancel_at_period_end = ?, updated_at = CURRENT_TIMESTAMP 
+           SET status = ?,
+               plan_name = COALESCE(?, plan_name),
+               plan_type = COALESCE(?, plan_type),
+               current_period_start = ?,
+               current_period_end = ?,
+               cancel_at_period_end = ?,
+               updated_at = CURRENT_TIMESTAMP
            WHERE user_id = ?`,
           [
             normalizedStatus,
+            updatedPlanName,
+            updatedPlanName ? stripePlanType : null,
             periodStart ? new Date(periodStart) : null,
             periodEnd ? new Date(periodEnd) : null,
             !!stripeSub.cancel_at_period_end,
             userId
           ]
         );
+        syncGhlAdminLifecycleTagsInBackground(Number(userId), lifecycleOptions);
       }
 
       return { userId, customerId, normalizedStatus };
@@ -2033,12 +2414,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         
         // Process affiliate commission for webhook payments
         try {
-          const [txnRows] = await executeQuery(
+          const txnRows = await executeQuery(
             'SELECT user_id, amount, plan_name, plan_type, metadata FROM billing_transactions WHERE stripe_payment_intent_id = ?',
             [paymentIntent.id]
           ) as any[];
           
           if (txnRows && txnRows.length > 0) {
+            syncGhlAdminLifecycleTagsInBackground(Number(txnRows[0].user_id), { paymentFailed: false });
             const commissionService = new CommissionService();
             // Parse affiliateId from transaction metadata if present
             let affiliateIdFromMetadata: number | undefined = undefined;
@@ -2311,6 +2693,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           'UPDATE billing_transactions SET status = ? WHERE stripe_payment_intent_id = ?',
           ['failed', failedPayment.id]
         );
+        try {
+          const failedTransactionRows = await executeQuery(
+            'SELECT user_id FROM billing_transactions WHERE stripe_payment_intent_id = ? LIMIT 1',
+            [failedPayment.id]
+          ) as any[];
+          let failedUserId = failedTransactionRows?.[0]?.user_id
+            ? Number(failedTransactionRows[0].user_id)
+            : null;
+          if (!failedUserId && failedPayment.customer) {
+            const userLookup = await findUserByStripeCustomerId(webhookContext, String(failedPayment.customer));
+            failedUserId = userLookup.userId ? Number(userLookup.userId) : null;
+          }
+          if (failedUserId) {
+            syncGhlAdminLifecycleTagsInBackground(failedUserId, { paymentFailed: true });
+          }
+        } catch {}
         break;
       
       // Subscription Checkout completed
@@ -2337,9 +2735,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             }
 
             // Retrieve subscription details for period times
-            const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-            const periodStart = stripeSub.current_period_start ? new Date(stripeSub.current_period_start * 1000) : null;
-            const periodEnd = stripeSub.current_period_end ? new Date(stripeSub.current_period_end * 1000) : null;
+            const stripeSub = await webhookStripe.subscriptions.retrieve(stripeSubscriptionId);
+            const { periodStart, periodEnd } = getStripeSubscriptionPeriodDates(stripeSub);
+            const amount = typeof session.amount_total === 'number'
+              ? session.amount_total / 100
+              : Number((stripeSub as any)?.items?.data?.[0]?.price?.unit_amount || 0) / 100;
             const statusMap: any = {
               active: 'active',
               trialing: 'active',
@@ -2541,6 +2941,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       }
       }
           console.log('✅ Subscription created/updated via checkout session:', { userId, stripeSubscriptionId, planName, billingCycle });
+          if (userId) {
+            syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
+          }
 
           if (userId) {
             const userRows = await executeQuery(
@@ -2653,17 +3056,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice;
+        const invoiceAny = invoice as any;
         try {
-          const paymentIntentId = invoice.payment_intent ? String(invoice.payment_intent) : '';
+          const paymentIntentId = invoiceAny.payment_intent ? String(invoiceAny.payment_intent) : '';
           if (paymentIntentId) {
             await executeQuery(
               'UPDATE billing_transactions SET status = ?, updated_at = NOW() WHERE stripe_payment_intent_id = ?',
               ['succeeded', paymentIntentId]
             );
           }
-          if (invoice.subscription) {
-            const stripeSub = await stripe.subscriptions.retrieve(String(invoice.subscription));
-            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub);
+          if (invoiceAny.subscription) {
+            const stripeSub = await webhookStripe.subscriptions.retrieve(String(invoiceAny.subscription));
+            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub, { paymentFailed: false });
             if (userId) {
               console.log('💸 Invoice paid synced subscription:', { userId, status: normalizedStatus, invoiceId: invoice.id });
             }
@@ -2676,17 +3080,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
+        const invoiceAny = invoice as any;
         try {
-          const paymentIntentId = invoice.payment_intent ? String(invoice.payment_intent) : '';
+          const paymentIntentId = invoiceAny.payment_intent ? String(invoiceAny.payment_intent) : '';
           if (paymentIntentId) {
             await executeQuery(
               'UPDATE billing_transactions SET status = ?, updated_at = NOW() WHERE stripe_payment_intent_id = ?',
               ['failed', paymentIntentId]
             );
           }
-          if (invoice.subscription) {
-            const stripeSub = await stripe.subscriptions.retrieve(String(invoice.subscription));
-            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub);
+          if (invoiceAny.subscription) {
+            const stripeSub = await webhookStripe.subscriptions.retrieve(String(invoiceAny.subscription));
+            const { userId, normalizedStatus } = await syncSubscriptionFromStripe(stripeSub, { paymentFailed: true });
             if (userId) {
               console.log('⚠️ Invoice payment failed synced subscription:', { userId, status: normalizedStatus, invoiceId: invoice.id });
             }
@@ -2701,28 +3106,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const stripeSub = event.data.object as Stripe.Subscription;
         try {
           const customerId = String(stripeSub.customer);
-          const userRows = await executeQuery<any[]>(
-            'SELECT id FROM users WHERE stripe_customer_id = ? LIMIT 1',
-            [customerId]
-          );
-          let userId: number | undefined = undefined;
-          if (Array.isArray(userRows) && userRows.length > 0) {
-            userId = userRows[0].id;
-          } else {
-            const affRows = await executeQuery<any[]>(
-              'SELECT id FROM affiliates WHERE stripe_customer_id = ? LIMIT 1',
-              [customerId]
-            );
-            if (Array.isArray(affRows) && affRows.length > 0) {
-              userId = affRows[0].id;
-            }
-          }
+          const userLookup = await findUserByStripeCustomerId(webhookContext, customerId);
+          const userId = userLookup.userId;
 
           if (userId) {
             await executeQuery(
               'UPDATE subscriptions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
               ['canceled', userId]
             );
+            syncGhlAdminLifecycleTagsInBackground(Number(userId));
             console.log('🛑 Subscription canceled via webhook:', { userId });
           }
         } catch (delErr) {

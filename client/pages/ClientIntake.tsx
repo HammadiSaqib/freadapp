@@ -9,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { buildOnboardingIntakeUrl } from "@/lib/hostRouting";
 import { clientsApi } from "@/lib/api";
+import {
+  closeReportPullLoading,
+  openReportPullLoading,
+  showReportPullError,
+} from "@/lib/reportPullFeedback";
 import { Eye, EyeOff, ArrowRight, CheckCircle2, Link as LinkIcon, User, ShieldCheck, FileText, Globe, Mail, Phone, Target, TrendingUp, Sparkles } from "lucide-react";
 
 const PLATFORM_OPTIONS = [
@@ -164,7 +169,14 @@ const ClientIntake = () => {
     }
 
     setIsSubmitting(true);
+    let reportPullFeedbackOpen = false;
     try {
+      openReportPullLoading({
+        title: "Pulling Your Credit Report",
+        description: "Securely connecting to your monitoring portal, verifying credentials, and fetching your latest report.",
+      });
+      reportPullFeedbackOpen = true;
+
       const response = await clientsApi.submitClientIntake({
         token,
         slug: intakeSlug || undefined,
@@ -173,6 +185,9 @@ const ClientIntake = () => {
         password: formData.password,
         ssnLast4: requiresSsn ? formData.ssnLast4 : undefined,
       });
+      closeReportPullLoading();
+      reportPullFeedbackOpen = false;
+
       const data = response.data?.data || response.data;
       setSuccessData({
         clientName: data?.clientName || "",
@@ -190,6 +205,13 @@ const ClientIntake = () => {
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to submit intake form.";
+      if (reportPullFeedbackOpen) {
+        showReportPullError({
+          title: "We Couldn't Pull Your Report",
+          description: message,
+        });
+        reportPullFeedbackOpen = false;
+      }
       toast({
         title: "Submission failed",
         description: message,
@@ -387,7 +409,12 @@ const ClientIntake = () => {
             <div>
               <div className="text-center lg:hidden mb-8">
                 {intakeConfig.logoUrl ? (
-                  <img src={intakeConfig.logoUrl} alt="Brand logo" className="mx-auto mb-4 max-h-12 object-contain" />
+                  <img
+                    src={intakeConfig.logoUrl}
+                    alt="Brand logo"
+                    className="mx-auto mb-4 max-h-12 object-contain"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
                 ) : (
                   <div className="mx-auto mb-4 p-3 rounded-full w-fit" style={{ backgroundColor: intakeTint }}>
                     <User className="h-6 w-6" style={{ color: intakePrimaryColor }} />

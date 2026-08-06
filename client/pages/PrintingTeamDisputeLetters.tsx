@@ -590,7 +590,7 @@ export default function PrintingTeamDisputeLetters() {
         <div className="flex items-center justify-between px-6 py-4 max-w-[1600px] mx-auto">
           <div className="flex items-center gap-4">
             <div className="bg-gradient-to-br from-[#00d4ff]/20 to-[#7000ff]/20 p-2 rounded-2xl shadow-inner border border-white">
-              <img src="/image.png" alt="The Capsol" className="w-9 h-9 rounded-xl shadow-md object-contain" />
+              <img src="/capsol-fav.png" alt="CapSol" className="w-9 h-9 rounded-xl shadow-md object-contain" />
             </div>
             <div>
               <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-[#7000ff] to-[#00d4ff] tracking-tight">

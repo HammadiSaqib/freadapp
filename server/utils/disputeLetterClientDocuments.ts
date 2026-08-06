@@ -7,7 +7,7 @@ import { allQuery, getQuery } from '../database/databaseAdapter.js';
 export type ClientDocumentEntry = {
   label: string;
   url: string;
-  kind: 'primary' | 'other';
+  kind: 'power_of_attorney' | 'primary' | 'other';
 };
 
 type StoredOtherClientDocument = {
@@ -106,6 +106,32 @@ export const loadClientDocumentsForClient = async (clientId: number): Promise<Cl
   const seenUrls = new Set<string>();
 
   try {
+    const powerOfAttorneyRows = (await allQuery(
+      `SELECT file_url, original_name
+       FROM client_additional_documents
+       WHERE client_id = ?
+         AND document_type = 'power_of_attorney'
+       ORDER BY created_at ASC, id ASC`,
+      [clientId],
+    )) as any[];
+
+    powerOfAttorneyRows.forEach((row, index) => {
+      pushUniqueDocument(documents, seenUrls, {
+        label:
+          typeof row?.original_name === 'string' && row.original_name.trim().length > 0
+            ? `Power of Attorney: ${row.original_name.trim()}`
+            : `Power of Attorney ${index + 1}`,
+        url: String(row?.file_url || '').trim(),
+        kind: 'power_of_attorney',
+      });
+    });
+  } catch (error: any) {
+    if (!/doesn't exist|unknown table|no such table/i.test(String(error?.message || ''))) {
+      console.error('Failed to load Power of Attorney documents for dispute PDF:', error);
+    }
+  }
+
+  try {
     const columnRows = (await allQuery(
       `SELECT COLUMN_NAME
        FROM INFORMATION_SCHEMA.COLUMNS
@@ -187,14 +213,16 @@ const shouldLimitPdfDocumentToFirstPage = (entry: ClientDocumentEntry) => entry.
 export const appendClientDocumentsToPdf = async (basePdf: Buffer, documents: ClientDocumentEntry[]): Promise<Buffer> => {
   if (!documents.length) return basePdf;
 
-  const pdfDoc = await PDFLibDocument.load(basePdf);
+  const pdfDoc = await PDFLibDocument.create();
+  const baseDocument = await PDFLibDocument.load(basePdf);
 
   type PreviewBox = { x: number; y: number; width: number; height: number };
   type PreviewItem = {
     draw: (page: any, box: PreviewBox) => void;
   };
 
-  const previewItems: PreviewItem[] = [];
+  const powerOfAttorneyItems: PreviewItem[] = [];
+  const trailingItems: PreviewItem[] = [];
 
   for (const entry of documents) {
     try {
@@ -212,7 +240,8 @@ export const appendClientDocumentsToPdf = async (basePdf: Buffer, documents: Cli
 
         const embeddedPages = await pdfDoc.embedPdf(docData.buffer, selectedPageIndices);
         embeddedPages.forEach((embeddedPage) => {
-          previewItems.push({
+          const targetItems = entry.kind === 'power_of_attorney' ? powerOfAttorneyItems : trailingItems;
+          targetItems.push({
             draw: (page, box) => {
               const scale = Math.min(box.width / embeddedPage.width, box.height / embeddedPage.height);
               const drawWidth = embeddedPage.width * scale;
@@ -232,7 +261,8 @@ export const appendClientDocumentsToPdf = async (basePdf: Buffer, documents: Cli
           : await pdfDoc.embedJpg(docData.buffer);
         const baseSize = image.scale(1);
 
-        previewItems.push({
+        const targetItems = entry.kind === 'power_of_attorney' ? powerOfAttorneyItems : trailingItems;
+        targetItems.push({
           draw: (page, box) => {
             const scale = Math.min(box.width / baseSize.width, box.height / baseSize.height);
             const drawWidth = baseSize.width * scale;
@@ -248,20 +278,30 @@ export const appendClientDocumentsToPdf = async (basePdf: Buffer, documents: Cli
     }
   }
 
-  if (!previewItems.length) return basePdf;
+  if (!powerOfAttorneyItems.length && !trailingItems.length) return basePdf;
 
-  const { width, height } = pdfDoc.getPage(0).getSize();
+  const firstBasePage = baseDocument.getPage(0);
+  const { width, height } = firstBasePage?.getSize() || { width: 612, height: 792 };
   const pageMargin = 20;
 
-  for (const item of previewItems) {
-    const page = pdfDoc.addPage([width, height]);
-    item.draw(page, {
-      x: pageMargin,
-      y: pageMargin,
-      width: width - pageMargin * 2,
-      height: height - pageMargin * 2,
-    });
-  }
+  const addPreviewPages = (items: PreviewItem[]) => {
+    for (const item of items) {
+      const page = pdfDoc.addPage([width, height]);
+      item.draw(page, {
+        x: pageMargin,
+        y: pageMargin,
+        width: width - pageMargin * 2,
+        height: height - pageMargin * 2,
+      });
+    }
+  };
+
+  addPreviewPages(powerOfAttorneyItems);
+
+  const basePages = await pdfDoc.copyPages(baseDocument, baseDocument.getPageIndices());
+  basePages.forEach((page) => pdfDoc.addPage(page));
+
+  addPreviewPages(trailingItems);
 
   return Buffer.from(await pdfDoc.save());
 };

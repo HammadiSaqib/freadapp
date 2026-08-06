@@ -14,6 +14,120 @@ import {
 } from './taskRouteUtils.js';
 
 const router = Router();
+const TASK_CONTROL_SETTING_KEY = 'support.tasks.pause_control';
+const TASK_CONTROL_EMAILS = new Set([
+  'munibahmeed@gmail.com',
+  'munibahmed125521@gmail.com',
+]);
+
+type TaskPauseControl = {
+  title: string;
+  description: string;
+  continue_anyway: boolean;
+  start_at: string;
+  end_at: string | null;
+  created_at: string;
+  updated_by: number;
+};
+
+const getRequestUserEmail = async (req: any) => {
+  const tokenEmail = String(req.user?.email || '').trim().toLowerCase();
+  if (tokenEmail) return tokenEmail;
+  const userId = Number(req.user?.id || 0);
+  if (!userId) return '';
+  const db = getDatabaseAdapter();
+  const user = await db.getQuery('SELECT email FROM users WHERE id = ? LIMIT 1', [userId]);
+  return String(user?.email || '').trim().toLowerCase();
+};
+
+const parseTaskPauseControl = (value: unknown): TaskPauseControl | null => {
+  if (!value) return null;
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const candidate = parsed as Record<string, unknown>;
+    const title = String(candidate.title || '').trim();
+    const description = String(candidate.description || '').trim();
+    const startAt = String(candidate.start_at || '').trim();
+    if (!title || !description || !startAt || Number.isNaN(new Date(startAt).getTime())) return null;
+    const rawEndAt = candidate.end_at ? String(candidate.end_at) : null;
+    const endAt = rawEndAt && !Number.isNaN(new Date(rawEndAt).getTime()) ? rawEndAt : null;
+    return {
+      title,
+      description,
+      continue_anyway: candidate.continue_anyway === true,
+      start_at: new Date(startAt).toISOString(),
+      end_at: endAt ? new Date(endAt).toISOString() : null,
+      created_at: String(candidate.created_at || startAt),
+      updated_by: Number(candidate.updated_by || 0),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const getTaskPauseControl = async () => {
+  const db = getDatabaseAdapter();
+  try {
+    const row = await db.getQuery(
+      'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+      [TASK_CONTROL_SETTING_KEY],
+    );
+    return parseTaskPauseControl(row?.setting_value);
+  } catch {
+    return null;
+  }
+};
+
+const saveTaskPauseControl = async (control: TaskPauseControl, updatedBy: number) => {
+  const db = getDatabaseAdapter();
+  const value = JSON.stringify(control);
+  const description = 'Global pause control for the support project tasks page';
+  const params = [TASK_CONTROL_SETTING_KEY, value, description, updatedBy];
+
+  if (db.getType() === 'sqlite') {
+    await db.executeQuery(
+      `INSERT INTO system_settings
+       (setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+       VALUES (?, ?, 'json', 'features', ?, 0, ?)
+       ON CONFLICT(setting_key) DO UPDATE SET
+         setting_value = excluded.setting_value,
+         updated_by = excluded.updated_by,
+         updated_at = CURRENT_TIMESTAMP`,
+      params,
+    );
+    return;
+  }
+
+  await db.executeQuery(
+    `INSERT INTO system_settings
+     (id, setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+     SELECT COALESCE(MAX(id), 0) + 1, ?, ?, 'json', 'features', ?, 0, ?
+     FROM system_settings
+     ON DUPLICATE KEY UPDATE
+       setting_value = VALUES(setting_value),
+       updated_by = VALUES(updated_by),
+       updated_at = NOW()`,
+    params,
+  );
+};
+
+const deleteTaskPauseControl = async () => {
+  const db = getDatabaseAdapter();
+  await db.executeQuery('DELETE FROM system_settings WHERE setting_key = ?', [TASK_CONTROL_SETTING_KEY]);
+};
+
+const getTaskPauseState = (control: TaskPauseControl | null) => {
+  if (!control) return { active: false, scheduled: false, expired: false };
+  const now = Date.now();
+  const startsAt = new Date(control.start_at).getTime();
+  const endsAt = control.end_at ? new Date(control.end_at).getTime() : null;
+  return {
+    active: now >= startsAt && (endsAt === null || now < endsAt),
+    scheduled: now < startsAt,
+    expired: endsAt !== null && now >= endsAt,
+  };
+};
 const ensureSupportAccess = (req: any, res: any, next: any) => {
   const role = req.user?.role;
   if (!role) {
@@ -82,6 +196,80 @@ router.get('/tasks', ensureSupportAccess, async (req, res) => {
   } catch (error) {
     console.error('Error fetching project tasks:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch project tasks' });
+  }
+});
+
+router.get('/tasks/control', ensureSupportAccess, async (req, res) => {
+  try {
+    const email = await getRequestUserEmail(req);
+    const control = await getTaskPauseControl();
+    res.json({
+      success: true,
+      data: {
+        control,
+        ...getTaskPauseState(control),
+        can_control: TASK_CONTROL_EMAILS.has(email),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching task pause control:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch task pause control' });
+  }
+});
+
+router.put('/tasks/control', ensureSupportAccess, async (req, res) => {
+  try {
+    const email = await getRequestUserEmail(req);
+    if (!TASK_CONTROL_EMAILS.has(email)) {
+      return res.status(403).json({ success: false, error: 'Task control access is restricted' });
+    }
+
+    const userId = Number((req as any).user?.id || 0);
+    const title = String(req.body?.title || '').trim();
+    const description = String(req.body?.description || '').trim();
+    const startNow = req.body?.start_now !== false;
+    const neverEnds = req.body?.never_ends !== false;
+    const startDate = startNow ? new Date() : new Date(String(req.body?.start_at || ''));
+    const endDate = neverEnds ? null : new Date(String(req.body?.end_at || ''));
+
+    if (!title || !description) {
+      return res.status(400).json({ success: false, error: 'Pause title and description are required' });
+    }
+    if (Number.isNaN(startDate.getTime())) {
+      return res.status(400).json({ success: false, error: 'Choose a valid start date and time' });
+    }
+    if (endDate && (Number.isNaN(endDate.getTime()) || endDate.getTime() <= startDate.getTime())) {
+      return res.status(400).json({ success: false, error: 'End date must be after the start date' });
+    }
+
+    const control: TaskPauseControl = {
+      title,
+      description,
+      continue_anyway: req.body?.continue_anyway === true,
+      start_at: startDate.toISOString(),
+      end_at: endDate ? endDate.toISOString() : null,
+      created_at: new Date().toISOString(),
+      updated_by: userId,
+    };
+    await saveTaskPauseControl(control, userId);
+    res.json({ success: true, data: { control, ...getTaskPauseState(control), can_control: true } });
+  } catch (error) {
+    console.error('Error saving task pause control:', error);
+    res.status(500).json({ success: false, error: 'Failed to save task pause control' });
+  }
+});
+
+router.delete('/tasks/control', ensureSupportAccess, async (req, res) => {
+  try {
+    const email = await getRequestUserEmail(req);
+    if (!TASK_CONTROL_EMAILS.has(email)) {
+      return res.status(403).json({ success: false, error: 'Task control access is restricted' });
+    }
+    await deleteTaskPauseControl();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error removing task pause control:', error);
+    res.status(500).json({ success: false, error: 'Failed to remove task pause control' });
   }
 });
 

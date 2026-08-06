@@ -43,20 +43,22 @@ import supportTicketsRoutes from "./routes/supportTickets.js";
 import supportChatRoutes from "./routes/supportChat.js";
 import supportReportsRoutes from "./routes/supportReports.js";
 import supportDashboardRoutes from "./routes/supportDashboard.js";
+import employeeProgressRoutes, { supportEmployeeProgressRouter } from "./routes/employeeProgress.js";
 import supportSettingsRoutes from "./routes/supportSettings.js";
 import emailCampaignRoutes from "./routes/emailCampaign.js";
 import adminNotificationRoutes from "./routes/adminNotifications.js";
 import knowledgeBaseRoutes from "./routes/knowledgeBase.js";
 import pricingRoutes from "./routes/pricing.js";
-import appointmentRoutes from "./routes/appointments.js";
 import billingRoutes from "./routes/billing.js";
 import { initializeStripe } from "./routes/billing.js";
+import kycRoutes, { superAdminKycRoutes } from "./routes/kyc.js";
 import invoicesRoutes from "./routes/invoices.js";
 import payslipsRoutes from "./routes/payslips.js";
 import { initializeWebSocketService } from "./services/websocketService.js";
 import creditReportScraperRoutes from "./routes/creditreportscraper.js";
 import scraperLogsRoutes from "./routes/scraperLogs.js";
 import aiRoutes from "./routes/ai.js";
+import aiPlansRoutes from "./routes/aiPlans.js";
 import proxyRoutes from "./routes/proxy.js";
 import warMachineRoutes from "./routes/warMachine.js";
 import contractsRoutes from "./routes/contracts.js";
@@ -71,6 +73,9 @@ import integrationsRoutes from "./routes/integrations.js";
 import { emailService } from "./services/emailService.js";
 
 import { reminderService } from "./services/reminderService.js";
+import { ghlAdminLifecycleScheduler } from "./services/ghlAdminLifecycleService.js";
+import { adminInactivityEmailScheduler } from "./services/adminInactivityEmailService.js";
+import { reportPullReminderEmailScheduler } from "./services/reportPullEmailService.js";
 
 // Course routes
 import {
@@ -631,6 +636,7 @@ export async function createServer(vite?: ViteDevServer) {
     }
   });
   app.use("/api/profile", profileUploadRoutes);
+  app.use("/api/kyc", kycRoutes);
 
   // =============================================================================
   // COMMUNITY ROUTES
@@ -656,6 +662,8 @@ export async function createServer(vite?: ViteDevServer) {
   // SUPER ADMIN ROUTES
   // =============================================================================
   console.log('🔍 Registering super admin routes at /api/super-admin');
+  app.use("/api/super-admin/kyc", superAdminKycRoutes);
+  app.use("/api/super-admin/employee-progress", employeeProgressRoutes);
   app.use("/api/super-admin", superAdminRoutes);
   app.use("/api/super-admin/affiliate-trial-plans", affiliateTrialPlansRoutes);
   app.use("/api/support/blog", supportBlogRoutes);
@@ -716,6 +724,7 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // SUPPORT DASHBOARD ROUTES
   // =============================================================================
   app.use("/api/support/dashboard", supportDashboardRoutes);
+  app.use("/api/support/employee-progress", supportEmployeeProgressRouter);
   // Support-only testimonials management
   app.use("/api/support/testimonials", testimonialsRoutes);
 
@@ -734,7 +743,6 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // PUBLIC PRICING ROUTES
   // =============================================================================
   app.use("/api/pricing", pricingRoutes);
-  app.use("/api/appointments", appointmentRoutes);
   app.use("/api/shop", shopRoutes);
   // Proxy routes (e.g., Google Drive streaming)
   app.use("/api/proxy", proxyRoutes);
@@ -752,6 +760,7 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // AI ROUTES
   // =============================================================================
   app.use("/api/ai", aiRoutes);
+  app.use("/api/ai-plans", aiPlansRoutes);
 
   // =============================================================================
   // CONTRACTS ROUTES
@@ -1088,6 +1097,15 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // Initialize Reminder Service
   console.log('📅 Initializing Reminder Service...');
   reminderService.start();
+
+  // Keep ScoreMachine-owned GHL admin tags repaired even if an event was missed during downtime.
+  ghlAdminLifecycleScheduler.start();
+
+  // Notify active admins once when they cross two days without a login.
+  adminInactivityEmailScheduler.start();
+
+  // Remind admins when a client's most recent successful report pull is 30 days old.
+  reportPullReminderEmailScheduler.start();
   
   // Initialize WebSocket service
   const websocketService = initializeWebSocketService(httpServer);

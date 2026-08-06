@@ -5,12 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CreditCard, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarDays, CheckCircle2, Eye, EyeOff, Lock, Mail, Shield, Sparkles, TrendingUp } from 'lucide-react';
 import { toast } from "sonner";
 import { authApi, setAuthToken } from "@/lib/api";
 import { clearPortalReturnContext } from "@/lib/authStorage";
 import { usePortalLoginRedirect } from "@/hooks/usePortalLoginRedirect";
 import { getPortalNavigationTarget } from "@/lib/hostRouting";
+
+const clientBenefits = [
+  "Private member dashboard access",
+  "Track account and portal activity",
+  "Stay aligned with your next steps",
+];
 
 const ClientLogin = () => {
   const navigate = useNavigate();
@@ -23,7 +29,7 @@ const ClientLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  usePortalLoginRedirect({ allowedRoles: ['client'] });
+  usePortalLoginRedirect({ allowedRoles: ['client'], portalAlias: 'member' });
 
   useEffect(() => {
     const prefillEmail = searchParams.get('email');
@@ -45,75 +51,26 @@ const ClientLogin = () => {
     setLoading(true);
 
     try {
-      console.log('🔄 ClientLogin: Starting login process for:', formData.email);
-      
       const response = await authApi.clientLogin(
         formData.email,
         formData.password
       );
 
-      console.log('📥 ClientLogin: Raw API response:', response);
-      console.log('📥 ClientLogin: Response structure:', {
-        success: response.data?.success,
-        hasToken: !!response.data?.token,
-        hasUser: !!response.data?.user,
-        userRole: response.data?.user?.role
-      });
-
       if (response.data?.success) {
-        console.log('✅ ClientLogin: Login successful, storing token...');
-        console.log('🔑 ClientLogin: Token to store:', response.data.token?.substring(0, 50) + '...');
-        
-        // Store token using the consistent method
         setAuthToken(response.data.token);
-        
-        // Verify token was stored
-        const storedToken = localStorage.getItem('auth_token');
-        console.log('🔍 ClientLogin: Token verification after setAuthToken:', {
-          tokenStored: !!storedToken,
-          tokensMatch: storedToken === response.data.token,
-          storedTokenPreview: storedToken?.substring(0, 50) + '...'
-        });
-        
-        // Store user info in localStorage (consistent with other login pages)
+
         if (response.data.user) {
-          console.log('👤 ClientLogin: Storing user info:', {
-            role: response.data.user.role,
-            id: response.data.user.id,
-            name: `${response.data.user.first_name} ${response.data.user.last_name}`
-          });
-          
           localStorage.setItem('userRole', response.data.user.role);
           localStorage.setItem('userId', response.data.user.id.toString());
           localStorage.setItem('userName', `${response.data.user.first_name} ${response.data.user.last_name}`);
-          
-          // Verify user info was stored
-          console.log('🔍 ClientLogin: User info verification:', {
-            storedRole: localStorage.getItem('userRole'),
-            storedUserId: localStorage.getItem('userId'),
-            storedUserName: localStorage.getItem('userName')
-          });
         }
-        
-        // Final localStorage check
-        console.log('📋 ClientLogin: Final localStorage state:', {
-          auth_token: localStorage.getItem('auth_token')?.substring(0, 50) + '...',
-          userRole: localStorage.getItem('userRole'),
-          userId: localStorage.getItem('userId'),
-          userName: localStorage.getItem('userName')
-        });
-        
-        // Check if user is a client
+
         if (response.data.user.role === 'client') {
-          console.log('🎯 ClientLogin: User is client, navigating to dashboard...');
           toast.success('Welcome back!');
           clearPortalReturnContext();
-          // Set a session flag so dashboard can refresh once after login
           try {
             sessionStorage.setItem('client_just_logged_in', '1');
-          } catch (e) {
-            // ignore storage errors
-          }
+          } catch (e) {}
           const dashboardTarget = getPortalNavigationTarget('member', '/dashboard');
           if (dashboardTarget.external) {
             window.location.href = dashboardTarget.target;
@@ -121,20 +78,12 @@ const ClientLogin = () => {
           }
           navigate(dashboardTarget.target);
         } else {
-          console.log('❌ ClientLogin: User is not a client, role:', response.data.user.role);
           toast.error('Access denied. Client credentials required.');
         }
       } else {
-        console.log('❌ ClientLogin: Login failed:', response.data?.message);
         toast.error(response.data?.message || 'Login failed');
       }
     } catch (error) {
-      console.error('💥 ClientLogin: Login error:', error);
-      console.error('💥 ClientLogin: Error details:', {
-        message: error.message,
-        stack: error.stack,
-        response: error.response
-      });
       toast.error('An error occurred during login');
     } finally {
       setLoading(false);
@@ -142,132 +91,190 @@ const ClientLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Back to Home */}
-        <div className="mb-6">
-          <Link 
-            to="/" 
-            className="inline-flex items-center text-green-600 hover:text-green-700 transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Link>
-        </div>
+    <div className="min-h-screen overflow-hidden bg-[#f7fbf8] text-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.12),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.12),transparent_28%),linear-gradient(180deg,#f7fbf8_0%,#ffffff_45%,#eef8f1_100%)]" />
 
-        <Card className="shadow-xl border-0">
-          <CardHeader className="text-center pb-6">
-            <div className="mx-auto mb-4 p-3 bg-green-100 rounded-full w-fit">
-              <CreditCard className="h-8 w-8 text-green-600" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              Client Portal
-            </CardTitle>
-            <CardDescription className="text-gray-600">
-              Access Professional Dashboard
-            </CardDescription>
-          </CardHeader>
+      <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <div className="grid w-full max-w-6xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_30px_120px_rgba(15,23,42,0.12)] lg:grid-cols-[1.02fr_.98fr]">
+          <section className="border-b border-slate-200 px-6 py-8 sm:px-8 lg:border-b-0 lg:border-r lg:px-12 lg:py-12 xl:px-14">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700 transition hover:text-teal-900">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Home
+            </Link>
 
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                  Email Address
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  className="h-11"
-                />
+            <div className="mt-8">
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800">
+                <Sparkles className="h-4 w-4" />
+                CapSol Member Portal
               </div>
+              <h1 className="mt-6 text-4xl font-black leading-[1.02] tracking-[-0.045em] text-slate-950 sm:text-5xl xl:text-6xl">
+                Pick up right where
+                <span className="block bg-gradient-to-r from-teal-700 via-emerald-600 to-lime-600 bg-clip-text text-transparent">
+                  your portal journey left off.
+                </span>
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
+                Sign in to your private member workspace to review updates, monitor movement, and stay connected to your CapSol process.
+              </p>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                  Password
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                    className="h-11 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {clientBenefits.map((item) => (
+                <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <CheckCircle2 className="h-5 w-5 text-teal-700" />
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-800">{item}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 grid gap-4">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="inline-flex rounded-2xl bg-teal-50 p-3 text-teal-700">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black">Stay in sync with progress</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Your member portal is the central place for visibility, updates, and the next actions connected to your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                  <div className="inline-flex rounded-2xl bg-teal-50 p-3 text-teal-700">
+                    <Shield className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black">Protected member access</h2>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      Your login is designed for secure portal access so your account information stays private and controlled.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-10 lg:py-12">
+            <Card className="w-full max-w-xl rounded-[1.75rem] border border-slate-200 bg-white shadow-none">
+              <CardHeader className="space-y-5 px-6 pt-6 sm:px-8 sm:pt-8">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-950 text-white shadow-lg">
+                  <CalendarDays className="h-8 w-8" />
+                </div>
+                <div>
+                  <CardTitle className="text-3xl font-black tracking-tight sm:text-4xl">
+                    Member Login
+                  </CardTitle>
+                  <CardDescription className="mt-3 text-base leading-7 text-slate-600">
+                    Access your CapSol member dashboard with the same functionality as before in a cleaner, more modern layout.
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="px-6 pb-6 sm:px-8 sm:pb-8">
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-bold text-slate-800">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
+                        className="h-14 rounded-2xl border-slate-200 pl-12 text-base focus-visible:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-bold text-slate-800">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                        className="h-14 rounded-2xl border-slate-200 pl-12 pr-12 text-base focus-visible:ring-teal-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="rememberMe"
+                        checked={formData.rememberMe}
+                        onCheckedChange={(checked) =>
+                          setFormData(prev => ({ ...prev, rememberMe: checked as boolean }))
+                        }
+                      />
+                      <Label
+                        htmlFor="rememberMe"
+                        className="cursor-pointer text-sm font-medium text-slate-700"
+                      >
+                        Remember me
+                      </Label>
+                    </div>
+
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm font-semibold text-teal-700 transition hover:text-teal-900"
+                    >
+                      Forgot password?
+                    </Link>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="h-14 w-full rounded-2xl bg-slate-950 text-base font-bold text-white hover:bg-teal-700"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
+                    {loading ? 'Signing in...' : (
+                      <span className="flex items-center gap-2">
+                        Sign In
+                        <ArrowRight className="h-5 w-5" />
+                      </span>
                     )}
-                  </button>
-                </div>
-              </div>
+                  </Button>
+                </form>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="rememberMe"
-                    checked={formData.rememberMe}
-                    onCheckedChange={(checked) => 
-                      setFormData(prev => ({ ...prev, rememberMe: checked as boolean }))
-                    }
-                  />
-                  <Label 
-                    htmlFor="rememberMe" 
-                    className="text-sm text-gray-600 cursor-pointer"
-                  >
-                    Remember me
-                  </Label>
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-center text-sm leading-6 text-slate-600">
+                    Use your monitoring site email and password to log in.
+                  </p>
                 </div>
 
-                <Link 
-                  to="/forgot-password" 
-                  className="text-sm text-green-600 hover:text-green-700 hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full h-11 bg-green-600 hover:bg-green-700 text-white font-medium"
-              >
-                {loading ? 'Signing in...' : 'Sign In'}
-              </Button>
-            </form>
-
-
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="text-center">
-                <Link 
-                  to="/contact" 
-                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                  User Your Monitoring Site Email and Password to login
-                </Link>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Security Notice */}
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Your information is protected with bank-level security
-          </p>
+                <div className="mt-6 text-center text-xs text-slate-500">
+                  Your information is protected with bank-level security.
+                </div>
+              </CardContent>
+            </Card>
+          </section>
         </div>
       </div>
     </div>

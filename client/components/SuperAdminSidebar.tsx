@@ -27,9 +27,11 @@ import {
   ClipboardList,
   Mail,
   CalendarClock,
-  CalendarDays,
   AlertTriangle,
   Building2,
+  Brain,
+  ShieldCheck,
+  UserRoundCog,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 
@@ -51,15 +53,21 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       badge: null,
     },
     {
-      name: "Appointments",
-      href: "/super-admin/appointments",
-      icon: CalendarDays,
-      badge: null,
-    },
-    {
       name: "Plans",
       href: "/super-admin/plans",
       icon: Package,
+      badge: null,
+    },
+    {
+      name: "AI Plans & Credits",
+      href: "/super-admin/ai-plans-credits",
+      icon: Brain,
+      badge: null,
+    },
+    {
+      name: "KYC Verification",
+      href: "/super-admin/kyc-verification",
+      icon: ShieldCheck,
       badge: null,
     },
     {
@@ -102,6 +110,12 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       name: "Support Users",
       href: "/super-admin/support-users",
       icon: Headphones,
+      badge: null,
+    },
+    {
+      name: "Employee Progress",
+      href: "/super-admin/employee-progress",
+      icon: UserRoundCog,
       badge: null,
     },
     {
@@ -227,14 +241,15 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       <div className="p-4 border-b border-border/40 dark:border-slate-700">
         <div className="flex items-center justify-between">
           {!collapsed && (
-            <Link to="/super-admin/overview" className="flex flex-1 items-center">
-              <img src="/capsol-logo.png" alt="CapSol" className="h-12 w-full max-w-[180px] object-contain" />
+            <Link to="/super-admin/overview" className="flex items-center">
+               <img src="/capsol-logo.png" alt="CapSol" className="h-10 w-auto object-contain dark:hidden" />
+               <img src="/capsol-logo-white.png" alt="CapSol" className="hidden h-10 w-auto object-contain dark:block" />
             </Link>
           )}
           {collapsed && (
-            <Link to="/super-admin/overview" className="mx-auto">
-              <img src="/capsol-logo.png" alt="CapSol" className="h-9 w-9 object-contain" />
-            </Link>
+            <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center shadow-lg mx-auto">
+              <Crown className="h-5 w-5 text-white" />
+            </div>
           )}
           <Button
             variant="ghost"

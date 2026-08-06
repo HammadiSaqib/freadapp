@@ -22,11 +22,12 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { useToast } from '../hooks/use-toast';
-import { billingApi, getAuthToken, pricingApi, superAdminApi, contractsApi } from '../lib/api';
+import { billingApi, calendarApi, getAuthToken, kycApi, pricingApi, superAdminApi, contractsApi } from '../lib/api';
 import DashboardLayout from '../components/DashboardLayout';
 import PaymentForm from '../components/PaymentForm';
 import BillingHistory from '../components/BillingHistory';
 import EliteSubscription from '../components/EliteSubscription';
+import KycVerificationDialog from '../components/KycVerificationDialog';
 import { usePagePermissions } from '@/hooks/usePagePermissions';
 import { useScoreMachineEliteStatus } from '@/hooks/useScoreMachineEliteStatus';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -79,15 +80,72 @@ interface UserSubscription {
 }
 
 type CancellationReason = 'affordability' | 'guidance' | 'other';
+type GuidanceCancellationChoice = '' | 'join_class_now' | 'not_now' | 'still_cancel';
 
-const SUPPORT_PHONE = '(704) 966-9919';
-const SUPPORT_PHONE_LINK = 'tel:+17049669919';
+interface ClassTiming {
+  id: number;
+  title: string;
+  type: 'webinar' | 'workshop' | 'office_hours' | string;
+  date: string;
+  time?: string;
+  meeting_link?: string;
+}
+
+const SUPPORT_PHONE = '(475) 259-8768';
+const SUPPORT_PHONE_LINK = 'tel:4752598768';
 const CONSULTATION_ROUTE = '/contact';
+const MAX_OTHER_REASON_WORDS = 30;
 const CANCELLATION_REASON_LABELS: Record<CancellationReason, string> = {
   affordability: "Can't afford it right now",
   guidance: "Don't know how to use it for the business",
   other: 'Other',
 };
+
+const getWordCount = (value: string) =>
+  value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .length;
+
+const formatClassDateTime = (date: string, time?: string) => {
+  const parsedDate = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  if (!time || time.trim().length === 0) {
+    return parsedDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  const parsedDateTime = new Date(`${date}T${time}`);
+  if (Number.isNaN(parsedDateTime.getTime())) {
+    return parsedDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  return parsedDateTime.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const normalizeClassTypeLabel = (type: string) =>
+  type
+    .replace(/_/g, ' ')
+    .split(' ')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 
 // Initialize Stripe with dynamic configuration
 let stripePromise: Promise<any> | null = null;
@@ -107,7 +165,7 @@ const getStripePromise = async () => {
         console.log('⚠️ Using fallback Stripe publishable key from environment');
         stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching Stripe config, using fallback:', error);
       // Fallback to environment variable
       stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -120,7 +178,7 @@ const SubscriptionContent: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isEliteActive } = useScoreMachineEliteStatus();
-  const { userProfile } = useAuthContext();
+  const { userProfile, refreshProfile } = useAuthContext();
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,6 +194,17 @@ const SubscriptionContent: React.FC = () => {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState<CancellationReason | ''>('');
   const [otherCancellationReason, setOtherCancellationReason] = useState('');
+  const [guidanceChoice, setGuidanceChoice] = useState<GuidanceCancellationChoice>('');
+  const [classTimings, setClassTimings] = useState<ClassTiming[]>([]);
+  const [loadingClassTimings, setLoadingClassTimings] = useState(false);
+  const [kycDialogOpen, setKycDialogOpen] = useState(false);
+  const [kycLoading, setKycLoading] = useState(true);
+  const [kycState, setKycState] = useState<{
+    kyc_required: boolean;
+    kyc_status: 'not_started' | 'pending' | 'approved' | 'failed' | 'manual_review';
+    admin_notes?: string | null;
+    support_phone?: string;
+  } | null>(null);
 
   // Enhanced plan data with better descriptions and icons
   const enhancedPlans: SubscriptionPlan[] = [
@@ -338,7 +407,7 @@ const SubscriptionContent: React.FC = () => {
         console.log('Has success:', !!subscriptionResponse.data?.success);
         console.log('Has subscription:', !!subscriptionResponse.data?.subscription);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error fetching subscription data:', error);
       toast({
         title: 'Error',
@@ -401,13 +470,29 @@ const SubscriptionContent: React.FC = () => {
           variant: 'destructive'
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('🔴 [REGULAR] Plan selection error:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to select plan. Please try again.',
-        variant: 'destructive'
-      });
+      const errorCode = error?.response?.data?.code;
+      const kycStatus = error?.response?.data?.kyc_status;
+
+      if (errorCode === 'KYC_REQUIRED') {
+        await loadKycState();
+        if (kycStatus === 'not_started' || kycStatus === 'failed') {
+          setKycDialogOpen(true);
+        } else {
+          toast({
+            title: 'KYC required',
+            description: error?.response?.data?.error || 'Your KYC is still under review before checkout can continue.',
+            variant: 'destructive'
+          });
+        }
+      } else {
+        toast({
+          title: 'Error',
+          description: 'Failed to select plan. Please try again.',
+          variant: 'destructive'
+        });
+      }
     } finally {
       setUpgrading(false);
     }
@@ -439,6 +524,9 @@ const SubscriptionContent: React.FC = () => {
   const resetCancelDialog = () => {
     setCancelReason('');
     setOtherCancellationReason('');
+    setGuidanceChoice('');
+    setClassTimings([]);
+    setLoadingClassTimings(false);
   };
 
   const handleCancelDialogChange = (open: boolean) => {
@@ -473,8 +561,111 @@ const SubscriptionContent: React.FC = () => {
     }
   };
 
+  const loadKycState = async () => {
+    setKycLoading(true);
+    try {
+      const response = await kycApi.getMe();
+      setKycState({
+        kyc_required: !!response.data?.kyc_required,
+        kyc_status: response.data?.kyc_status || 'not_started',
+        admin_notes: response.data?.admin_notes || null,
+        support_phone: response.data?.support_phone || SUPPORT_PHONE,
+      });
+    } catch (error: any) {
+      console.error('Failed to load KYC state:', error);
+      setKycState({
+        kyc_required: false,
+        kyc_status: 'not_started',
+        admin_notes: null,
+        support_phone: SUPPORT_PHONE,
+      });
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadKycState();
+  }, []);
+
+  const fetchClassTimings = async () => {
+    try {
+      setLoadingClassTimings(true);
+
+      const today = new Date().toISOString().split('T')[0];
+      const response: any = await calendarApi.getEvents({
+        page: 1,
+        limit: 100,
+        date_from: today,
+      });
+
+      const rawEvents = Array.isArray(response?.data?.data)
+        ? response.data.data
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+
+      const classTypes = new Set(['webinar', 'workshop', 'office_hours']);
+      const nowTimestamp = Date.now();
+
+      const upcomingClassTimings = rawEvents
+        .filter((event: any) => classTypes.has(String(event?.type || '').toLowerCase()))
+        .map((event: any) => {
+          const normalizedType = String(event?.type || 'other').toLowerCase();
+          const dateValue = String(event?.date || '');
+          const timeValue = event?.time ? String(event.time) : '23:59:59';
+          const timestamp = new Date(`${dateValue}T${timeValue}`).getTime();
+
+          return {
+            id: Number(event?.id || 0),
+            title: String(event?.title || 'Class Session'),
+            type: normalizedType,
+            date: dateValue,
+            time: event?.time ? String(event.time) : undefined,
+            meeting_link: event?.meeting_link ? String(event.meeting_link) : undefined,
+            timestamp,
+          };
+        })
+        .filter((event: any) => Number.isFinite(event.timestamp) && event.timestamp >= nowTimestamp)
+        .sort((a: any, b: any) => a.timestamp - b.timestamp)
+        .slice(0, 20)
+        .map(({ timestamp, ...event }: any) => event as ClassTiming);
+
+      setClassTimings(upcomingClassTimings);
+    } catch (error) {
+      console.error('Failed to load class timings for cancellation guidance:', error);
+      toast({
+        title: 'Unable to load classes',
+        description: 'We could not fetch class timings right now. Please try again.',
+        variant: 'destructive',
+      });
+      setClassTimings([]);
+    } finally {
+      setLoadingClassTimings(false);
+    }
+  };
+
+  const handleGuidanceChoiceChange = (value: GuidanceCancellationChoice) => {
+    setGuidanceChoice(value);
+
+    if (value) {
+      void billingApi.trackCancellationGuidanceChoice({ guidanceChoice: value }).catch((error) => {
+        console.error('Failed to track cancellation guidance choice:', error);
+      });
+    }
+
+    if (value === 'join_class_now' && classTimings.length === 0 && !loadingClassTimings) {
+      void fetchClassTimings();
+    }
+  };
+
+  const otherReasonWordCount = getWordCount(otherCancellationReason);
+  const isOtherReasonWithinLimit = otherReasonWordCount <= MAX_OTHER_REASON_WORDS;
+
   const canContinueCancellation =
-    !!cancelReason && (cancelReason !== 'other' || otherCancellationReason.trim().length > 0);
+    !!cancelReason &&
+    (cancelReason !== 'guidance' || guidanceChoice === 'still_cancel') &&
+    (cancelReason !== 'other' || (otherCancellationReason.trim().length > 0 && isOtherReasonWithinLimit));
 
   const visiblePlans = availablePlans.filter((plan) => plan.billing_cycle === billingFilter);
   const planGridClassName =
@@ -486,6 +677,24 @@ const SubscriptionContent: React.FC = () => {
 
   const handleCancelSubscription = async () => {
     if (!canContinueCancellation) {
+      if (cancelReason === 'guidance' && guidanceChoice !== 'still_cancel') {
+        toast({
+          title: 'Class Help Available',
+          description: 'Choose "Still want to cancel" only if you still want to proceed after class support.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      if (cancelReason === 'other' && !isOtherReasonWithinLimit) {
+        toast({
+          title: 'Maximum 30 Words',
+          description: 'Please keep the "Other" explanation within 30 words.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
       toast({
         title: 'Reason Required',
         description: 'Please tell us why you are leaving before continuing.',
@@ -508,7 +717,13 @@ const SubscriptionContent: React.FC = () => {
         reasonText:
           cancelReason === 'other'
             ? otherCancellationReason.trim()
+            : cancelReason === 'guidance' && guidanceChoice === 'still_cancel'
+              ? `${CANCELLATION_REASON_LABELS[cancelReason]} (still wants to cancel)`
             : CANCELLATION_REASON_LABELS[cancelReason],
+        guidanceChoice:
+          cancelReason === 'guidance' && guidanceChoice
+            ? guidanceChoice
+            : undefined,
       });
       
       // Fix: Check response.data.success instead of response.success (Axios wraps response in data)
@@ -620,7 +835,16 @@ const SubscriptionContent: React.FC = () => {
               <p className="text-sm font-medium text-slate-900">Why are you thinking about canceling?</p>
               <RadioGroup
                 value={cancelReason}
-                onValueChange={(value) => setCancelReason(value as CancellationReason)}
+                onValueChange={(value) => {
+                  const nextReason = value as CancellationReason;
+                  setCancelReason(nextReason);
+
+                  if (nextReason !== 'guidance') {
+                    setGuidanceChoice('');
+                    setClassTimings([]);
+                    setLoadingClassTimings(false);
+                  }
+                }}
                 className="mt-4 space-y-3"
               >
                 <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:border-ocean-blue/40 hover:bg-blue-50/40">
@@ -701,6 +925,103 @@ const SubscriptionContent: React.FC = () => {
                 </p>
 
                 <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+                  <p className="text-sm font-medium text-slate-900">Are you joining the class?</p>
+                  <RadioGroup
+                    value={guidanceChoice}
+                    onValueChange={(value) => handleGuidanceChoiceChange(value as GuidanceCancellationChoice)}
+                    className="mt-3 space-y-3"
+                  >
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+                      <RadioGroupItem value="join_class_now" id="guidance-join-class-now" className="mt-1" />
+                      <div className="flex-1">
+                        <Label htmlFor="guidance-join-class-now" className="cursor-pointer text-sm font-semibold text-slate-900">
+                          Yes, show class timings now
+                        </Label>
+                        <p className="mt-1 text-xs text-slate-600">We&apos;ll show live timings directly from the calendar.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
+                      <RadioGroupItem value="not_now" id="guidance-not-now" className="mt-1" />
+                      <div className="flex-1">
+                        <Label htmlFor="guidance-not-now" className="cursor-pointer text-sm font-semibold text-slate-900">
+                          Not now
+                        </Label>
+                        <p className="mt-1 text-xs text-slate-600">I&apos;ll book a class or consultation later.</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3">
+                      <RadioGroupItem value="still_cancel" id="guidance-still-cancel" className="mt-1" />
+                      <div className="flex-1">
+                        <Label htmlFor="guidance-still-cancel" className="cursor-pointer text-sm font-semibold text-rose-800">
+                          Still want to cancel
+                        </Label>
+                        <p className="mt-1 text-xs text-rose-700">Select this if you still want to proceed with cancellation.</p>
+                      </div>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {guidanceChoice === 'join_class_now' && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-900">Upcoming class timings from calendar</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 px-3 text-xs"
+                        onClick={() => void fetchClassTimings()}
+                        disabled={loadingClassTimings}
+                      >
+                        {loadingClassTimings ? (
+                          <>
+                            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            Loading
+                          </>
+                        ) : (
+                          'Refresh'
+                        )}
+                      </Button>
+                    </div>
+
+                    {loadingClassTimings ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading class timings...
+                      </div>
+                    ) : classTimings.length === 0 ? (
+                      <p className="text-sm text-slate-600">No upcoming class timings found right now.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {classTimings.map((classTiming) => (
+                          <div key={`${classTiming.id}-${classTiming.date}`} className="rounded-lg border border-slate-200 p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{classTiming.title}</p>
+                                <p className="text-xs text-slate-600">
+                                  {normalizeClassTypeLabel(classTiming.type)} · {formatClassDateTime(classTiming.date, classTiming.time)}
+                                </p>
+                              </div>
+                              {classTiming.meeting_link && (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="h-8 px-3 text-xs"
+                                  onClick={() => window.open(classTiming.meeting_link, '_blank', 'noopener,noreferrer')}
+                                >
+                                  Open class link
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
                   <p className="text-sm text-slate-500">Call us directly</p>
                   <p className="text-lg font-bold text-slate-900">{SUPPORT_PHONE}</p>
                 </div>
@@ -724,11 +1045,21 @@ const SubscriptionContent: React.FC = () => {
                 <Textarea
                   id="other-cancellation-reason"
                   value={otherCancellationReason}
-                  onChange={(event) => setOtherCancellationReason(event.target.value)}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    const wordCount = getWordCount(nextValue);
+
+                    if (wordCount <= MAX_OTHER_REASON_WORDS) {
+                      setOtherCancellationReason(nextValue);
+                    }
+                  }}
                   placeholder="What made you decide to cancel?"
                   rows={4}
                   className="resize-none border-slate-200"
                 />
+                <p className="text-xs text-slate-500">
+                  {otherReasonWordCount}/{MAX_OTHER_REASON_WORDS} words
+                </p>
               </div>
             )}
 
@@ -829,14 +1160,14 @@ const SubscriptionContent: React.FC = () => {
       <div className="space-y-8 max-w-7xl mx-auto">
         {/* Enhanced Header */}
         <div className="text-center space-y-4 py-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
             <Sparkles className="h-4 w-4" />
             Subscription Management
           </div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-ocean-blue to-sea-green bg-clip-text text-transparent">
             Choose Your Perfect Plan
           </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             Unlock powerful funding tools and grow your business with our comprehensive platform
           </p>
         </div>
@@ -863,6 +1194,58 @@ const SubscriptionContent: React.FC = () => {
         )}
 
         {cancellationDialog}
+        <KycVerificationDialog
+          open={kycDialogOpen}
+          onOpenChange={setKycDialogOpen}
+          status={kycState?.kyc_status || 'not_started'}
+          adminNotes={kycState?.admin_notes || null}
+          onSubmitted={async () => {
+            await loadKycState();
+            await refreshProfile();
+          }}
+        />
+
+        {kycLoading ? (
+          <Card className="border border-slate-200 bg-white">
+            <CardContent className="flex items-center gap-3 py-4 text-sm text-slate-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading KYC status...
+            </CardContent>
+          </Card>
+        ) : kycState?.kyc_required && kycState.kyc_status !== 'approved' ? (
+          <Card className="border-amber-200 bg-amber-50/80 shadow-sm">
+            <CardContent className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-1">
+                <div className="text-sm font-semibold text-amber-900">Identity verification required for additional client profiles</div>
+                <div className="text-sm text-amber-900/80">
+                  {kycState.kyc_status === 'pending'
+                    ? 'Your KYC has been submitted and is waiting for review.'
+                    : kycState.kyc_status === 'manual_review'
+                      ? 'Your verification is undergoing manual review.'
+                      : kycState.kyc_status === 'failed'
+                        ? 'Your verification needs to be resubmitted before you can add another client.'
+                        : 'Complete identity verification before adding another client profile.'}
+                </div>
+                {kycState.admin_notes ? (
+                  <div className="text-sm text-amber-900/80">Admin notes: {kycState.admin_notes}</div>
+                ) : null}
+                <div className="text-sm text-amber-900/80">
+                  Need same-time help? Call{" "}
+                  <a href={SUPPORT_PHONE_LINK} className="font-semibold underline underline-offset-2">
+                    {kycState.support_phone || SUPPORT_PHONE}
+                  </a>
+                  .
+                </div>
+              </div>
+              {(kycState.kyc_status === 'not_started' || kycState.kyc_status === 'failed') ? (
+                <Button onClick={() => setKycDialogOpen(true)} className="bg-amber-600 text-white hover:bg-amber-700">
+                  <Shield className="mr-2 h-4 w-4" />
+                  {kycState.kyc_status === 'failed' ? 'Resubmit Verification' : 'Start Verification'}
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Current Subscription Card */}
         {subscription && (
@@ -978,8 +1361,8 @@ const SubscriptionContent: React.FC = () => {
         {/* Available Plans */}
         <div className="space-y-6">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Choose Your Plan</h2>
-            <p className="text-gray-600">Select the perfect plan for your funding business</p>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Choose Your Plan</h2>
+            <p className="text-gray-600 dark:text-gray-300">Select the perfect plan for your funding business</p>
           </div>
 
           {/* Billing Cycle Tabs */}
@@ -993,21 +1376,6 @@ const SubscriptionContent: React.FC = () => {
                 <TabsTrigger value="yearly">Yearly</TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
-
-          <div className="flex justify-center">
-            <div className="w-full max-w-3xl rounded-lg border border-slate-200 bg-white/90 p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="recurring-consent"
-                  checked={recurringConsent}
-                  onCheckedChange={(checked) => setRecurringConsent(checked === true)}
-                />
-                <Label htmlFor="recurring-consent" className="text-sm text-slate-700">
-                  By checking this box and providing my payment information, I agree that my account will be automatically charged each month on a recurring basis until I cancel.
-                </Label>
-              </div>
-            </div>
           </div>
 
           <div className={`grid gap-8 ${planGridClassName}`}>
@@ -1090,7 +1458,19 @@ const SubscriptionContent: React.FC = () => {
                       </div>
                     </div>
                     
-                    <div className="pt-4">
+                    <div className="pt-4 space-y-4">
+                      {!isCurrentPlan && !isPendingPlan && (
+                        <div className="flex items-start gap-3 border-t pt-4">
+                          <Checkbox
+                            id={`recurring-consent-${plan.id}`}
+                            checked={recurringConsent}
+                            onCheckedChange={(checked) => setRecurringConsent(checked === true)}
+                          />
+                          <Label htmlFor={`recurring-consent-${plan.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                            By checking this box, I agree that my account will be automatically charged on a recurring basis until I cancel.
+                          </Label>
+                        </div>
+                      )}
                       {isCurrentPlan ? (
                         <Button 
                           disabled
@@ -1121,7 +1501,9 @@ const SubscriptionContent: React.FC = () => {
                             <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                           ) : (
                             <>
-                              Select Plan
+                              {plan.price === 1 || plan.name.toLowerCase().includes('trial') 
+                                ? "Start Your 7-Day Free Trial for $1" 
+                                : "Select Plan"}
                               <ArrowRight className="h-4 w-4 ml-2" />
                             </>
                           )}

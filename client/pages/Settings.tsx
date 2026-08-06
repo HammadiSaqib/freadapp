@@ -129,6 +129,15 @@ type GhlActivityLog = {
   message?: string | null;
   client_id?: number | null;
   client_email?: string | null;
+  client_first_name?: string | null;
+  client_last_name?: string | null;
+  admin_email?: string | null;
+  admin_first_name?: string | null;
+  admin_last_name?: string | null;
+  response_code?: number | null;
+  error_message?: string | null;
+  data_fields?: string | string[] | null;
+  retry_status?: string | null;
   created_at: string;
 };
 
@@ -156,6 +165,8 @@ export default function Settings() {
   const [fundingOverrideAcknowledged, setFundingOverrideAcknowledged] = useState(false);
   const [fundingOverrideSignature, setFundingOverrideSignature] = useState("");
   const [fundingOverrideSaving, setFundingOverrideSaving] = useState(false);
+  const [notifyClientAfterReportPull, setNotifyClientAfterReportPull] = useState(true);
+  const [notifyClientAfterReportPullSaving, setNotifyClientAfterReportPullSaving] = useState(false);
   const [savingFunding, setSavingFunding] = useState(false);
   const { toast } = useToast();
   const { userProfile, refreshProfile } = useAuthContext();
@@ -220,7 +231,33 @@ export default function Settings() {
       testMode: !!(userProfile as any).nmi_test_mode,
     }));
     setFundingOverrideEnabled(!!(userProfile as any).funding_override_enabled);
+    setNotifyClientAfterReportPull((userProfile as any).notify_client_after_report_pull !== false);
   }, [userProfile]);
+
+  const handleNotifyClientAfterReportPullChange = async (enabled: boolean) => {
+    const previousValue = notifyClientAfterReportPull;
+    setNotifyClientAfterReportPull(enabled);
+    setNotifyClientAfterReportPullSaving(true);
+    try {
+      await authApi.updateProfile({ notify_client_after_report_pull: enabled } as any);
+      await refreshProfile();
+      toast({
+        title: 'Saved',
+        description: enabled
+          ? 'Clients will be notified after successful report pulls'
+          : 'Client report-pull notifications are disabled'
+      });
+    } catch (error: any) {
+      setNotifyClientAfterReportPull(previousValue);
+      toast({
+        title: 'Error',
+        description: error?.response?.data?.error || 'Failed to update report notification preference',
+        variant: 'destructive'
+      });
+    } finally {
+      setNotifyClientAfterReportPullSaving(false);
+    }
+  };
 
   // Initialize credit repair URL input from profile
   useEffect(() => {
@@ -288,8 +325,9 @@ export default function Settings() {
 
   const ghlStatusLabel = useMemo(() => {
     if (!ghlIntegration) return "Not Configured";
-    if (!ghlIntegration.isActive) return "Disabled";
-    if (ghlIntegration.hasToken) return "Connected";
+    if (ghlIntegration.status === "connected") return "Connected";
+    if (ghlIntegration.status === "invalid") return "Invalid Credentials";
+    if (!ghlIntegration.isActive && ghlIntegration.hasToken) return "Disabled";
     return "Not Configured";
   }, [ghlIntegration]);
 
@@ -576,10 +614,10 @@ export default function Settings() {
       try {
         return URL.createObjectURL(fundingSettings.gatewayLogoFile);
       } catch {
-        return (userProfile as any)?.nmi_gateway_logo || "/image.png";
+        return (userProfile as any)?.nmi_gateway_logo || "/capsol-fav.png";
       }
     }
-    return (userProfile as any)?.nmi_gateway_logo || "/image.png";
+    return (userProfile as any)?.nmi_gateway_logo || "/capsol-fav.png";
   }, [fundingSettings.gatewayLogoFile, userProfile]);
 
   // Revoke object URL when file changes/unmount to prevent memory leaks
@@ -794,10 +832,10 @@ export default function Settings() {
 
   const handleSaveGhlIntegration = async () => {
     const token = ghlAccessToken.trim();
-    if (!token) {
+    if (!token || !ghlLocationId.trim()) {
       toast({
-        title: "Missing token",
-        description: "Paste your GoHighLevel Private Integration token.",
+        title: "Missing credentials",
+        description: "Enter both a GoHighLevel Private Integration token and Location ID.",
         variant: "destructive",
       });
       return;
@@ -806,7 +844,7 @@ export default function Settings() {
       setGhlSaving(true);
       await integrationsApi.saveGhlIntegration({
         access_token: token,
-        location_id: ghlLocationId.trim() || null,
+        location_id: ghlLocationId.trim(),
       });
       setGhlAccessToken("");
       await fetchGhlIntegration();
@@ -1124,6 +1162,7 @@ export default function Settings() {
       case "Invited":
       case "Disconnected":
       case "Error":
+      case "Invalid Credentials":
       case "Disabled":
         return "bg-red-100 text-red-800 border-red-200";
       default:
@@ -1622,23 +1661,23 @@ export default function Settings() {
                 ) : null}
                 <ScrollArea className="h-[420px] rounded-md border border-border/40 bg-white/50 dark:bg-slate-900/30 p-4">
                   <div className="space-y-4 text-sm leading-relaxed">
-                    <div className="text-base font-semibold">THE CAPSOL</div>
+                    <div className="text-base font-semibold">THE SCORE MACHINE</div>
                     <div className="text-sm font-semibold">Funding Module Override Agreement</div>
                     <div className="text-xs uppercase tracking-wide text-muted-foreground">
                       Mandatory Electronic Acceptance Required
                     </div>
                     <div>
                       This Funding Module Override Agreement (“Agreement”) is entered into by and between:
-                      The Capsol, a SaaS credit analytics and educational software platform (“Company”),
+                      The Score Machine, a SaaS credit analytics and educational software platform (“Company”),
                       and The User / Affiliate / Partner enabling this setting (“User”).
                       By enabling the Funding Module Override setting inside the platform, User agrees to the following terms:
                     </div>
                     <div className="space-y-2">
                       <div className="font-semibold">1. Purpose of the Funding Module</div>
                       <div>
-                        The Capsol software provides automated credit analytics, risk indicators, and fundability
+                        The Score Machine software provides automated credit analytics, risk indicators, and fundability
                         readiness metrics based on data supplied by the User and/or the end client. The standard system
-                        configuration requires certain The Capsol minimum qualification thresholds before a client is
+                        configuration requires certain Score Machine minimum qualification thresholds before a client is
                         permitted access to the Funding Page. These thresholds exist to reduce client decline risk, improve
                         approval probability, protect affiliate conversion ratios, and maintain underwriting integrity.
                       </div>
@@ -1646,7 +1685,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">2. Override Election by User</div>
                       <div>
-                        The User is voluntarily choosing to disable The Capsol fundability requirements and allow all
+                        The User is voluntarily choosing to disable Score Machine fundability requirements and allow all
                         clients access to the Funding Page regardless of qualification status. By selecting this option,
                         User acknowledges that they are overriding the system’s recommended underwriting safeguards.
                       </div>
@@ -1654,10 +1693,10 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">3. Assumption of Risk</div>
                       <div>
-                        If User disables The Capsol fundability requirements: the Company makes no representation
+                        If User disables the Score Machine fundability requirements: the Company makes no representation
                         regarding approval likelihood; the Company does not guarantee funding outcomes; the Company does not
                         guarantee lender engagement, approval, terms, rates, or funding amounts. User understands that the
-                        The Capsol’s qualification system is designed to reduce denials and bypassing these safeguards
+                        Score Machine’s qualification system is designed to reduce denials and bypassing these safeguards
                         increases the probability of declines. User assumes full responsibility for client approval or denial
                         outcomes, client dissatisfaction, chargebacks or refund disputes, commission losses, reputation
                         damage, and any business loss resulting from funding denials.
@@ -1666,7 +1705,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">4. No Liability Clause</div>
                       <div>
-                        Under no circumstances shall The Capsol, its owners, officers, developers, affiliates, or
+                        Under no circumstances shall The Score Machine, its owners, officers, developers, affiliates, or
                         representatives be liable for funding denials, reduced approval rates, client complaints related to
                         funding outcomes, lost revenue or commissions, or any indirect, incidental, consequential, or special
                         damages. If User elects to override system requirements, all resulting outcomes are the sole
@@ -1676,7 +1715,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">5. No Guarantee of Lender Approval</div>
                       <div>
-                        The Capsol is not a lender, does not issue credit, does not make underwriting decisions, does
+                        The Score Machine is not a lender, does not issue credit, does not make underwriting decisions, does
                         not control lender criteria, and does not control approval algorithms. All funding decisions are made
                         solely by independent third-party lenders.
                       </div>
@@ -1684,7 +1723,7 @@ export default function Settings() {
                     <div className="space-y-2">
                       <div className="font-semibold">6. Indemnification</div>
                       <div>
-                        User agrees to indemnify, defend, and hold harmless The Capsol from and against any claims,
+                        User agrees to indemnify, defend, and hold harmless The Score Machine from and against any claims,
                         client disputes, regulatory complaints, chargebacks, lawsuits, damages, and legal fees arising from
                         the User’s decision to override system fundability requirements.
                       </div>
@@ -1700,7 +1739,7 @@ export default function Settings() {
                       <div className="font-semibold">8. Electronic Acceptance</div>
                       <div>
                         By enabling the Funding Override setting, User confirms they understand the risks, accept full
-                        responsibility, waive claims against The Capsol, and legally agree to this Agreement.
+                        responsibility, waive claims against The Score Machine, and legally agree to this Agreement.
                         Electronic activation constitutes binding acceptance.
                       </div>
                     </div>
@@ -1725,8 +1764,8 @@ export default function Settings() {
                     <DialogHeader>
                       <DialogTitle>⚠️ Warning</DialogTitle>
                       <DialogDescription>
-                        You are disabling The Capsol’s minimum fundability safeguards. This may increase client denials.
-                        All approval outcomes will be your responsibility. The Capsol is not liable for funding results.
+                        You are disabling The Score Machine’s minimum fundability safeguards. This may increase client denials.
+                        All approval outcomes will be your responsibility. The Score Machine is not liable for funding results.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -1994,23 +2033,27 @@ export default function Settings() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Timestamp</TableHead>
+                        <TableHead>Admin</TableHead>
                         <TableHead>Direction</TableHead>
                         <TableHead>Event</TableHead>
                         <TableHead>Client</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Response</TableHead>
+                        <TableHead>Fields Attempted</TableHead>
+                        <TableHead>Retry</TableHead>
                         <TableHead>Message</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {ghlActivityLoading ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6">
+                          <TableCell colSpan={10} className="text-center py-6">
                             Loading activity...
                           </TableCell>
                         </TableRow>
                       ) : ghlActivity.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                          <TableCell colSpan={10} className="text-center py-6 text-muted-foreground">
                             No integration activity yet.
                           </TableCell>
                         </TableRow>
@@ -2018,9 +2061,14 @@ export default function Settings() {
                         ghlActivity.map((log) => (
                           <TableRow key={log.id}>
                             <TableCell>{formatTimestamp(log.created_at)}</TableCell>
+                            <TableCell>
+                              {[log.admin_first_name, log.admin_last_name].filter(Boolean).join(" ") || log.admin_email || "-"}
+                            </TableCell>
                             <TableCell className="capitalize">{log.direction}</TableCell>
                             <TableCell>{formatEventType(log.event_type)}</TableCell>
-                            <TableCell>{maskEmail(log.client_email)}</TableCell>
+                            <TableCell>
+                              {[log.client_first_name, log.client_last_name].filter(Boolean).join(" ") || maskEmail(log.client_email)}
+                            </TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
@@ -2029,7 +2077,22 @@ export default function Settings() {
                                 {log.status === "success" ? "Success" : "Failed"}
                               </Badge>
                             </TableCell>
-                            <TableCell>{log.message || "-"}</TableCell>
+                            <TableCell>{log.response_code || "-"}</TableCell>
+                            <TableCell className="max-w-56 whitespace-normal">
+                              {Array.isArray(log.data_fields)
+                                ? log.data_fields.join(", ")
+                                : (() => {
+                                    try {
+                                      return JSON.parse(log.data_fields || "[]").join(", ");
+                                    } catch {
+                                      return log.data_fields || "-";
+                                    }
+                                  })()}
+                            </TableCell>
+                            <TableCell>{log.retry_status || "-"}</TableCell>
+                            <TableCell className="max-w-80 whitespace-normal">
+                              {log.error_message || log.message || "-"}
+                            </TableCell>
                           </TableRow>
                         ))
                       )}
@@ -2739,7 +2802,13 @@ export default function Settings() {
         title="Settings"
         description="Manage your account, preferences, and system configuration"
       >
-        <EliteSettings activeTab={activeTab} setActiveTab={setActiveTab}>
+        <EliteSettings
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          notifyClientAfterReportPull={notifyClientAfterReportPull}
+          notifyClientAfterReportPullSaving={notifyClientAfterReportPullSaving}
+          onNotifyClientAfterReportPullChange={handleNotifyClientAfterReportPullChange}
+        >
           {settingsContent}
         </EliteSettings>
       </DashboardLayout>

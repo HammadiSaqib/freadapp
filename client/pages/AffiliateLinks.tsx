@@ -268,7 +268,7 @@ export default function AffiliateLinks() {
                       <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">Customer Sales</Badge>
                     </div>
                     <p className="max-w-3xl text-sm leading-6 text-slate-700">
-                      Share this link with customers who want to purchase The Capsol. You earn commissions every time someone buys through your referral link.
+                      Share this link with customers who want to purchase The Score Machine. You earn commissions every time someone buys through your referral link.
                     </p>
                     <div className="inline-flex rounded-xl border border-blue-200/80 bg-white/80 px-3 py-2 text-xs font-medium text-blue-800 shadow-sm">
                       Best for direct customer sharing in DMs, email, text, or social posts.

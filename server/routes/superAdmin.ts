@@ -31,6 +31,20 @@ import {
   getBusinessDirectoryById,
   listBusinessDirectories,
 } from '../utils/businessDirectories.js';
+import { checkClientCreationKyc, ensureKycSchema, isKycDatabaseRejection, KYC_REQUIRED_RESPONSE } from '../utils/kyc.js';
+import {
+  getDisputeLetterAdminEmailEnabled,
+  setDisputeLetterAdminEmailEnabled,
+} from '../services/disputeLetterNotificationService.js';
+import {
+  getAdminInactivityEmailEnabled,
+  setAdminInactivityEmailEnabled,
+} from '../services/adminInactivityEmailService.js';
+import {
+  getReportPullReminderEmailEnabled,
+  setReportPullReminderEmailEnabled,
+} from '../services/reportPullEmailService.js';
+import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -70,6 +84,8 @@ const affiliateCommissionSettingsSchema = z.object({
 });
 
 const OPEN_AI_CONFIGURATION_SETTING_KEY = 'ai.openai_coach_configuration';
+const ADMIN_CUSTOM_FILTERS_SETTING_KEY = 'super_admin.admin_custom_filters';
+const SUPPORT_ADMIN_FILTER_ACCESS_SETTING_KEY = 'super_admin.support_admin_filter_access';
 
 const openAiConfigurationSchema = z.object({
   template: z.string().max(50000)
@@ -80,6 +96,11 @@ const businessDirectorySchema = z.object({
   business_email: z.string().trim().email().max(255),
   business_phone_number: z.string().trim().min(1).max(50),
   business_address: z.string().trim().min(1).max(1000),
+  description: z.string().trim().max(5000).optional().default(''),
+});
+
+const businessDirectoryStatusSchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected']),
 });
 
 const businessDirectoryLogoStorage = multer.diskStorage({
@@ -254,6 +275,121 @@ async function upsertOpenAiConfiguration(db: any, userId: number, template: stri
     `INSERT INTO system_settings
      (setting_key, setting_value, setting_type, category, description, is_public, updated_by)
      VALUES (?, ?, 'string', 'features', ?, 0, ?)
+     ON DUPLICATE KEY UPDATE
+       setting_value = VALUES(setting_value),
+       setting_type = VALUES(setting_type),
+       category = VALUES(category),
+       description = VALUES(description),
+       is_public = VALUES(is_public),
+       updated_by = VALUES(updated_by),
+       updated_at = NOW()`,
+    params
+  );
+}
+
+const requireSuperAdminOrSupportRead = async (req: any, res: Response, next: any) => {
+  if (req.user?.role === 'support' && req.method === 'GET') {
+    next();
+    return;
+  }
+
+  return requireSuperAdmin(req, res, next);
+};
+
+async function getAdminCustomFilters(db: any): Promise<any[]> {
+  try {
+    const rows = await db.executeQuery(
+      'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+      [ADMIN_CUSTOM_FILTERS_SETTING_KEY]
+    );
+    const rawValue = Array.isArray(rows) && rows.length > 0 ? String((rows[0] as any)?.setting_value || '[]') : '[]';
+    const parsed = JSON.parse(rawValue);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function upsertAdminCustomFilters(db: any, userId: number, filters: any[]): Promise<void> {
+  const description = 'Saved custom filters for the super-admin administrator accounts table';
+  const params = [ADMIN_CUSTOM_FILTERS_SETTING_KEY, JSON.stringify(filters), description, userId];
+
+  if (db.getType() === 'sqlite') {
+    await db.executeQuery(
+      `INSERT INTO system_settings
+       (setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+       VALUES (?, ?, 'json', 'features', ?, 0, ?)
+       ON CONFLICT(setting_key) DO UPDATE SET
+         setting_value = excluded.setting_value,
+         setting_type = excluded.setting_type,
+         category = excluded.category,
+         description = excluded.description,
+         is_public = excluded.is_public,
+         updated_by = excluded.updated_by,
+         updated_at = CURRENT_TIMESTAMP`,
+      params
+    );
+    return;
+  }
+
+  await db.executeQuery(
+    `INSERT INTO system_settings
+     (id, setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+     SELECT COALESCE(MAX(id), 0) + 1, ?, ?, 'json', 'features', ?, 0, ?
+     FROM system_settings
+     ON DUPLICATE KEY UPDATE
+       setting_value = VALUES(setting_value),
+       setting_type = VALUES(setting_type),
+       category = VALUES(category),
+       description = VALUES(description),
+       is_public = VALUES(is_public),
+       updated_by = VALUES(updated_by),
+       updated_at = NOW()`,
+    params
+  );
+}
+
+async function getSupportAdminFilterAccess(db: any): Promise<Record<string, any>> {
+  try {
+    const rows = await db.executeQuery(
+      'SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1',
+      [SUPPORT_ADMIN_FILTER_ACCESS_SETTING_KEY]
+    );
+    const rawValue = Array.isArray(rows) && rows.length > 0 ? String((rows[0] as any)?.setting_value || '{}') : '{}';
+    const parsed = JSON.parse(rawValue);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function upsertSupportAdminFilterAccess(db: any, userId: number, settings: Record<string, any>): Promise<void> {
+  const description = 'Per-support user access and default filters for the admin management custom filters';
+  const params = [SUPPORT_ADMIN_FILTER_ACCESS_SETTING_KEY, JSON.stringify(settings || {}), description, userId];
+
+  if (db.getType() === 'sqlite') {
+    await db.executeQuery(
+      `INSERT INTO system_settings
+       (setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+       VALUES (?, ?, 'json', 'features', ?, 0, ?)
+       ON CONFLICT(setting_key) DO UPDATE SET
+         setting_value = excluded.setting_value,
+         setting_type = excluded.setting_type,
+         category = excluded.category,
+         description = excluded.description,
+         is_public = excluded.is_public,
+         updated_by = excluded.updated_by,
+         updated_at = CURRENT_TIMESTAMP`,
+      params
+    );
+    return;
+  }
+
+  await db.executeQuery(
+    `INSERT INTO system_settings
+     (id, setting_key, setting_value, setting_type, category, description, is_public, updated_by)
+     SELECT COALESCE(MAX(id), 0) + 1, ?, ?, 'json', 'features', ?, 0, ?
+     FROM system_settings
      ON DUPLICATE KEY UPDATE
        setting_value = VALUES(setting_value),
        setting_type = VALUES(setting_type),
@@ -661,7 +797,10 @@ const createAdminProfileSchema = z.object({
   title: z.string().optional(),
   phone: z.string().optional(),
   emergency_contact: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  sendDisputeLetterEmail: z.boolean().default(true),
+  sendInactivityEmail: z.boolean().default(true),
+  sendReportPullReminderEmail: z.boolean().default(true)
 });
 
 const updateAdminProfileSchema = z.object({
@@ -676,7 +815,14 @@ const updateAdminProfileSchema = z.object({
   title: z.string().optional(),
   phone: z.string().optional(),
   emergency_contact: z.string().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  sendDisputeLetterEmail: z.boolean().optional(),
+  sendInactivityEmail: z.boolean().optional(),
+  sendReportPullReminderEmail: z.boolean().optional()
+});
+
+const updateAdminAffiliateReferralSchema = z.object({
+  affiliateId: z.coerce.number().int().positive()
 });
 
 const parseAdminPermissions = (permissions: unknown): string[] => {
@@ -755,7 +901,8 @@ const systemSettingSchema = z.object({
 router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, search, is_active } = req.query;
-    const offset = (Number(page) - 1) * Number(limit);
+    const isAll = String(limit).toLowerCase() === 'all' || Number(limit) <= 0;
+    const offset = isAll ? 0 : (Number(page) - 1) * Number(limit);
     const requesterRole = String((req as any)?.user?.role || '').toLowerCase();
 
     let whereClause = 'WHERE 1=1';
@@ -787,6 +934,7 @@ router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: 
     // Get plans with pagination
     const safeLimit = Math.max(1, Math.min(100, Number(limit)));
     const safeOffset = Math.max(0, offset);
+    const limitClause = isAll ? '' : `LIMIT ${safeLimit} OFFSET ${safeOffset}`;
     const plans = await db.allQuery(
       `SELECT sp.*, u1.first_name as created_by_name, u1.last_name as created_by_lastname,
               u2.first_name as updated_by_name, u2.last_name as updated_by_lastname
@@ -795,7 +943,7 @@ router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: 
        LEFT JOIN users u2 ON sp.updated_by = u2.id
        ${whereClause}
        ORDER BY sp.sort_order ASC, sp.created_at DESC
-       LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+       ${limitClause}`,
       params
     );
 
@@ -948,10 +1096,12 @@ router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: 
       data: filteredPlans,
       pagination: {
         page: Number(page),
-        limit: Number(limit),
+        limit: isAll ? (requesterRole === 'super_admin' ? (countResult?.total || 0) : filteredPlans.length) : Number(limit),
         total: requesterRole === 'super_admin' ? (countResult?.total || 0) : filteredPlans.length,
         pages:
-          requesterRole === 'super_admin'
+          isAll
+            ? 1
+            : requesterRole === 'super_admin'
             ? Math.ceil((countResult?.total || 0) / Number(limit))
             : Math.ceil(filteredPlans.length / Number(limit))
       }
@@ -1843,8 +1993,173 @@ router.delete('/tasks/:id', authenticateToken, requireSuperAdmin, async (req: Re
   }
 });
 
+router.get('/admin-custom-filters', authenticateToken, requireSuperAdminOrSupportRead, async (_req: Request, res: Response) => {
+  try {
+    const db = getDatabaseAdapter();
+    const filters = await getAdminCustomFilters(db);
+    res.json({ success: true, data: filters });
+  } catch (error) {
+    console.error('Error fetching admin custom filters:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch admin custom filters' });
+  }
+});
+
+router.put('/admin-custom-filters', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const filters = Array.isArray(req.body?.filters) ? req.body.filters : [];
+    const db = getDatabaseAdapter();
+    await upsertAdminCustomFilters(db, Number(req.user?.id || 0), filters);
+    res.json({ success: true, data: filters });
+  } catch (error) {
+    console.error('Error saving admin custom filters:', error);
+    res.status(500).json({ success: false, error: 'Failed to save admin custom filters' });
+  }
+});
+
+router.get('/dispute-letter-email-settings', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const enabled = await getDisputeLetterAdminEmailEnabled();
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    console.error('Error loading dispute letter email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to load dispute letter email settings' });
+  }
+});
+
+router.put('/dispute-letter-email-settings', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+    await setDisputeLetterAdminEmailEnabled(enabled, Number(req.user?.id || 0));
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'Enabled must be true or false' });
+    }
+    console.error('Error saving dispute letter email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to save dispute letter email settings' });
+  }
+});
+
+router.get('/admin-inactivity-email-settings', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const enabled = await getAdminInactivityEmailEnabled();
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    console.error('Error loading admin inactivity email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to load admin inactivity email settings' });
+  }
+});
+
+router.put('/admin-inactivity-email-settings', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+    await setAdminInactivityEmailEnabled(enabled, Number(req.user?.id || 0));
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'Enabled must be true or false' });
+    }
+    console.error('Error saving admin inactivity email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to save admin inactivity email settings' });
+  }
+});
+
+router.get('/report-pull-reminder-email-settings', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const enabled = await getReportPullReminderEmailEnabled();
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    console.error('Error loading report pull reminder email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to load report pull reminder email settings' });
+  }
+});
+
+router.put('/report-pull-reminder-email-settings', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+    await setReportPullReminderEmailEnabled(enabled, Number(req.user?.id || 0));
+    res.json({ success: true, data: { enabled } });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: 'Enabled must be true or false' });
+    }
+    console.error('Error saving report pull reminder email settings:', error);
+    res.status(500).json({ success: false, error: 'Failed to save report pull reminder email settings' });
+  }
+});
+
+router.get('/support-admin-filter-access', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
+  try {
+    const db = getDatabaseAdapter();
+    const settings = await getSupportAdminFilterAccess(db);
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    console.error('Error fetching support admin filter access:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch support admin filter access' });
+  }
+});
+
+router.put('/support-admin-filter-access', authenticateToken, requireSuperAdmin, async (req: any, res: Response) => {
+  try {
+    const settings = req.body?.settings && typeof req.body.settings === 'object' && !Array.isArray(req.body.settings)
+      ? req.body.settings
+      : {};
+    const db = getDatabaseAdapter();
+    await upsertSupportAdminFilterAccess(db, Number(req.user?.id || 0), settings);
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    console.error('Error saving support admin filter access:', error);
+    res.status(500).json({ success: false, error: 'Failed to save support admin filter access' });
+  }
+});
+
+router.get('/support-admin-filter-access/me', authenticateToken, requireSuperAdminOrSupportRead, async (req: any, res: Response) => {
+  try {
+    const db = getDatabaseAdapter();
+    const settings = await getSupportAdminFilterAccess(db);
+    const supportUserId = String(req.user?.id || '');
+    res.json({ success: true, data: supportUserId ? settings[supportUserId] || null : null });
+  } catch (error) {
+    console.error('Error fetching current support admin filter access:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch support admin filter access' });
+  }
+});
+
+router.patch('/support-admin-filter-access/me/follow-up', authenticateToken, async (req: any, res: Response) => {
+  if (req.user?.role !== 'support') {
+    res.status(403).json({ success: false, error: 'Support access required' });
+    return;
+  }
+
+  try {
+    const supportUserId = String(req.user?.id || '');
+    if (!supportUserId) {
+      res.status(400).json({ success: false, error: 'Support user not found' });
+      return;
+    }
+
+    const enabled = req.body?.enabled === true;
+    const db = getDatabaseAdapter();
+    const settings = await getSupportAdminFilterAccess(db);
+    const currentSetting = settings[supportUserId] && typeof settings[supportUserId] === 'object'
+      ? settings[supportUserId]
+      : {};
+    const nextSetting = {
+      ...currentSetting,
+      supportStartFollowUp: enabled,
+    };
+
+    settings[supportUserId] = nextSetting;
+    await upsertSupportAdminFilterAccess(db, Number(req.user.id), settings);
+    res.json({ success: true, data: nextSetting });
+  } catch (error) {
+    console.error('Error updating current support follow-up setting:', error);
+    res.status(500).json({ success: false, error: 'Failed to update follow-up setting' });
+  }
+});
+
 // Get all admin profiles
-router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
+router.get('/admins', authenticateToken, requireSuperAdminOrSupportRead, async (req: Request, res: Response) => {
   try {
     const { page = 1, limit = 10, search, is_active, access_level } = req.query;
     console.log('🔍 Admin API called with params:', { page, limit, search, is_active, access_level });
@@ -1920,20 +2235,21 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
         extras.push(`(SELECT s.plan_name FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.created_at DESC LIMIT 1) AS plan_name`);
         extras.push(`(SELECT s.plan_type FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.created_at DESC LIMIT 1) AS plan_type`);
         extras.push(`(SELECT s.current_period_end FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.created_at DESC LIMIT 1) AS next_billing_date`);
+        extras.push(`(SELECT s.status FROM subscriptions s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 1) AS plan_status`);
       }
       if (hasSubscriptions && hasSubscriptionPlans) {
         extras.push(`(SELECT sp.price FROM subscription_plans sp JOIN subscriptions s2 ON sp.name = s2.plan_name AND sp.billing_cycle = s2.plan_type WHERE s2.user_id = u.id AND s2.status = 'active' ORDER BY s2.created_at DESC LIMIT 1) AS plan_price`);
         extras.push(`(SELECT spm.price FROM subscription_plans spm JOIN subscriptions s2 ON spm.name = s2.plan_name WHERE s2.user_id = u.id AND s2.status = 'active' AND spm.billing_cycle = 'monthly' ORDER BY s2.created_at DESC LIMIT 1) AS plan_monthly_price`);
       }
       const selectExtras = extras.length ? `, ${extras.join(', ')}` : '';
-      const query = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, ${statusColumn} as status,
+      const query = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.send_dispute_letter_email, u.send_inactivity_email, u.send_report_pull_reminder_email, ${statusColumn} as status,
                 u.last_login, u.created_at, u.updated_at,
                 u.role as access_level, 'General' as department, 1 as is_active,
                 CASE WHEN u.role = 'super_admin' THEN 'Super Administrator' ELSE 'Admin User' END as title,
                 '{}' as permissions${selectExtras}
          FROM users u
          ${whereClause}
-         ORDER BY u.created_at DESC
+        ORDER BY clients_count DESC, u.created_at DESC
          ${limitClause}`;
       admins = await db.allQuery(query, params);
       console.log('📋 Admins list fetched', { count: Array.isArray(admins) ? admins.length : 0 });
@@ -1963,13 +2279,14 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
           extras.push('(SELECT COUNT(*) FROM clients c WHERE c.user_id = u.id) AS clients_count');
           if (hasSubscriptions) {
             extras.push(`(SELECT s.current_period_end FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.created_at DESC LIMIT 1) AS next_billing_date`);
+            extras.push(`(SELECT s.status FROM subscriptions s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 1) AS plan_status`);
           }
           if (hasSubscriptions && hasSubscriptionPlans) {
             extras.push(`(SELECT sp.price FROM subscription_plans sp JOIN subscriptions s2 ON sp.name = s2.plan_name AND sp.billing_cycle = s2.plan_type WHERE s2.user_id = u.id AND s2.status = 'active' ORDER BY s2.created_at DESC LIMIT 1) AS plan_price`);
             extras.push(`(SELECT spm.price FROM subscription_plans spm JOIN subscriptions s2 ON spm.name = s2.plan_name WHERE s2.user_id = u.id AND s2.status = 'active' AND spm.billing_cycle = 'monthly' ORDER BY s2.created_at DESC LIMIT 1) AS plan_monthly_price`);
           }
           const selectExtras = extras.length ? `, ${extras.join(', ')}` : '';
-          const q = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role,
+          const q = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, 1 AS send_dispute_letter_email, 1 AS send_inactivity_email, 1 AS send_report_pull_reminder_email,
                     ${statusColumn} as status,
                     u.created_at,
                     u.role as access_level,
@@ -1979,7 +2296,7 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
                     '{}' as permissions${selectExtras}
              FROM users u
              ${whereClause}
-             ORDER BY u.created_at DESC
+             ORDER BY clients_count DESC, u.created_at DESC
              ${limitClause}`;
           admins = await diagDb.allQuery(q, Array.isArray(params) ? params : []);
           console.log('📋 Admins diagnostic fallback list fetched', { count: Array.isArray(admins) ? admins.length : 0 });
@@ -1995,13 +2312,14 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
         extras.push('(SELECT COUNT(*) FROM clients c WHERE c.user_id = u.id) AS clients_count');
         if (hasSubscriptions) {
           extras.push(`(SELECT s.current_period_end FROM subscriptions s WHERE s.user_id = u.id AND s.status = 'active' ORDER BY s.created_at DESC LIMIT 1) AS next_billing_date`);
+          extras.push(`(SELECT s.status FROM subscriptions s WHERE s.user_id = u.id ORDER BY s.created_at DESC LIMIT 1) AS plan_status`);
         }
         if (hasSubscriptions && hasSubscriptionPlans) {
           extras.push(`(SELECT sp.price FROM subscription_plans sp JOIN subscriptions s2 ON sp.name = s2.plan_name AND sp.billing_cycle = s2.plan_type WHERE s2.user_id = u.id AND s2.status = 'active' ORDER BY s2.created_at DESC LIMIT 1) AS plan_price`);
           extras.push(`(SELECT spm.price FROM subscription_plans spm JOIN subscriptions s2 ON spm.name = s2.plan_name WHERE s2.user_id = u.id AND s2.status = 'active' AND spm.billing_cycle = 'monthly' ORDER BY s2.created_at DESC LIMIT 1) AS plan_monthly_price`);
         }
         const selectExtras = extras.length ? `, ${extras.join(', ')}` : '';
-        const qq = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role,
+        const qq = `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, 1 AS send_dispute_letter_email, 1 AS send_inactivity_email, 1 AS send_report_pull_reminder_email,
                   ${statusColumn} as status,
                   u.created_at,
                   u.role as access_level,
@@ -2011,7 +2329,7 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
                   '{}' as permissions${selectExtras}
            FROM users u
            ${whereClause}
-           ORDER BY u.created_at DESC
+            ORDER BY clients_count DESC, u.created_at DESC
            ${limitClause}`;
         admins = await db.allQuery(qq, params);
         console.log('📋 Admins fallback list fetched', { count: Array.isArray(admins) ? admins.length : 0 });
@@ -2020,34 +2338,76 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
       }
     }
 
-    let profilesByUserId = new Map<number, any>();
-
-    if (Array.isArray(admins) && admins.length > 0) {
-      try {
-        const adminIds = admins
+    const adminIds = Array.isArray(admins)
+      ? admins
           .map((admin: any) => Number(admin.id))
-          .filter((adminId) => Number.isFinite(adminId));
+          .filter((adminId) => Number.isFinite(adminId))
+      : [];
 
-        if (adminIds.length > 0) {
-          const placeholders = adminIds.map(() => '?').join(', ');
-          const profileRows = await db.allQuery(
-            `SELECT user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active
-             FROM admin_profiles
-             WHERE user_id IN (${placeholders})`,
-            adminIds
-          );
+    let profilesByUserId = new Map<number, any>();
+    let referralByUserId = new Map<number, {
+      affiliate_id: number;
+      affiliate_name: string;
+      affiliate_email: string | null;
+    }>();
 
-          profilesByUserId = new Map(
-            (Array.isArray(profileRows) ? profileRows : []).map((profile: any) => [Number(profile.user_id), profile])
-          );
-        }
+    if (adminIds.length > 0) {
+      try {
+        const placeholders = adminIds.map(() => '?').join(', ');
+        const profileRows = await db.allQuery(
+          `SELECT user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active
+           FROM admin_profiles
+           WHERE user_id IN (${placeholders})`,
+          adminIds
+        );
+
+        profilesByUserId = new Map(
+          (Array.isArray(profileRows) ? profileRows : []).map((profile: any) => [Number(profile.user_id), profile])
+        );
       } catch (profileError) {
         console.warn('⚠️ Failed to hydrate admin profile permissions for admin list:', profileError);
+      }
+
+      try {
+        const placeholders = adminIds.map(() => '?').join(', ');
+        const referralRows = await db.allQuery(
+          `SELECT ar.referred_user_id, ar.affiliate_id,
+                  a.first_name AS affiliate_first_name,
+                  a.last_name AS affiliate_last_name,
+                  a.email AS affiliate_email
+             FROM affiliate_referrals ar
+             LEFT JOIN affiliates a ON a.id = ar.affiliate_id
+            WHERE ar.referred_user_id IN (${placeholders})
+            ORDER BY ar.referred_user_id ASC, ar.created_at ASC, ar.id ASC`,
+          adminIds
+        );
+
+        for (const referral of Array.isArray(referralRows) ? referralRows : []) {
+          const referredUserId = Number(referral.referred_user_id);
+          if (!Number.isFinite(referredUserId) || referralByUserId.has(referredUserId)) {
+            continue;
+          }
+
+          const affiliateId = Number(referral.affiliate_id);
+          const affiliateName = [referral.affiliate_first_name, referral.affiliate_last_name]
+            .filter((part: unknown): part is string => typeof part === 'string' && part.trim().length > 0)
+            .join(' ')
+            .trim();
+
+          referralByUserId.set(referredUserId, {
+            affiliate_id: Number.isFinite(affiliateId) ? affiliateId : 0,
+            affiliate_name: affiliateName || String(referral.affiliate_email || `Affiliate #${affiliateId}`),
+            affiliate_email: referral.affiliate_email ? String(referral.affiliate_email) : null,
+          });
+        }
+      } catch (referralError) {
+        console.warn('⚠️ Failed to hydrate admin affiliate referrals for admin list:', referralError);
       }
     }
 
     const adminsWithPermissions = admins.map((admin: any) => {
       const profile = profilesByUserId.get(Number(admin.id));
+      const referral = referralByUserId.get(Number(admin.id));
 
       return {
         ...admin,
@@ -2058,7 +2418,10 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
         emergency_contact: profile?.emergency_contact || admin.emergency_contact,
         notes: profile?.notes || admin.notes,
         is_active: profile?.is_active ?? admin.is_active,
-        permissions: parseAdminPermissions(profile?.permissions ?? admin.permissions)
+        permissions: parseAdminPermissions(profile?.permissions ?? admin.permissions),
+        referred_by_affiliate_id: referral?.affiliate_id ?? null,
+        referred_by_affiliate_name: referral?.affiliate_name ?? null,
+        referred_by_affiliate_email: referral?.affiliate_email ?? null
       };
     });
 
@@ -2082,6 +2445,7 @@ router.get('/admins', authenticateToken, requireSuperAdmin, async (req: Request,
 router.get('/admins/:id', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const adminId = parseInt(req.params.id);
+    await ensureKycSchema();
     
     const db = getDatabaseAdapter();
     const dbType = db.getType();
@@ -2132,6 +2496,20 @@ router.get('/admins/:id', authenticateToken, requireAdmin, async (req: Request, 
       console.warn('⚠️ Failed to hydrate admin profile details:', profileError);
     }
 
+    let latestKyc = null;
+    try {
+      latestKyc = await db.getQuery(
+        `SELECT id, status, admin_notes, reviewed_by, reviewed_at, created_at, updated_at
+         FROM kyc_verifications
+         WHERE user_id = ?
+         ORDER BY updated_at DESC, id DESC
+         LIMIT 1`,
+        [adminId]
+      );
+    } catch (kycError) {
+      console.warn('Failed to hydrate admin KYC details:', kycError);
+    }
+
     res.json({
       success: true,
       data: {
@@ -2143,7 +2521,12 @@ router.get('/admins/:id', authenticateToken, requireAdmin, async (req: Request, 
         emergency_contact: adminProfile?.emergency_contact || admin.emergency_contact,
         notes: adminProfile?.notes || admin.notes,
         is_active: adminProfile?.is_active ?? admin.is_active,
-        permissions: parseAdminPermissions(adminProfile?.permissions ?? admin.permissions)
+        permissions: parseAdminPermissions(adminProfile?.permissions ?? admin.permissions),
+        latest_kyc: latestKyc ? {
+          ...latestKyc,
+          image_url: `/api/super-admin/kyc/${latestKyc.id}/image`,
+          download_url: `/api/super-admin/kyc/${latestKyc.id}/image?download=1`
+        } : null
       }
     });
   } catch (error) {
@@ -2347,7 +2730,7 @@ router.get('/admins/:id/tsm-elite-agreements', authenticateToken, requireSuperAd
 
       return {
         id: row.template_id,
-        title: row.name || 'The Capsol Elite Agreement',
+        title: row.name || 'The Score Machine Elite Agreement',
         description: row.description ?? null,
         content,
         status: normalizedStatus,
@@ -2362,8 +2745,8 @@ router.get('/admins/:id/tsm-elite-agreements', authenticateToken, requireSuperAd
 
     res.json({ success: true, data: agreements });
   } catch (error) {
-    console.error('Error fetching admin The Capsol Elite agreements:', error);
-    res.status(500).json({ success: false, error: 'Failed to fetch admin The Capsol Elite agreements' });
+    console.error('Error fetching admin Score Machine Elite agreements:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch admin Score Machine Elite agreements' });
   }
 });
 
@@ -2401,7 +2784,7 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
           );
 
       if (!template) {
-        return res.status(404).json({ success: false, error: 'No The Capsol Elite agreement found' });
+        return res.status(404).json({ success: false, error: 'No Score Machine Elite agreement found' });
       }
 
       const signatureRow = await db.getQuery(
@@ -2440,12 +2823,12 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
 
       const adminName = [adminUser.first_name, adminUser.last_name].filter(Boolean).join(' ').trim();
 
-      doc.fontSize(20).text('The Capsol Elite Agreement', { align: 'center' });
+      doc.fontSize(20).text('Score Machine Elite Agreement', { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(11);
       doc.text(`Admin: ${adminName || adminUser.email || `#${adminId}`}`);
       if (adminUser.email) doc.text(`Email: ${adminUser.email}`);
-      doc.text(`Template: ${template.name || 'The Capsol Elite Agreement'}`);
+      doc.text(`Template: ${template.name || 'The Score Machine Elite Agreement'}`);
       doc.text(`Status: ${templateStatus}`);
       if (template.created_at) doc.text(`Created: ${new Date(template.created_at).toISOString()}`);
       if (signatureSignedAt) doc.text(`Signed At: ${new Date(signatureSignedAt).toISOString()}`);
@@ -2647,13 +3030,13 @@ router.get('/admins/:id/agreement.pdf', authenticateToken, requireSuperAdmin, as
   }
 });
 
-const DEFAULT_TEMPLATE_NAME = 'THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT';
+const DEFAULT_TEMPLATE_NAME = 'SCORE MACHINE MASTER SOFTWARE & SERVICES AGREEMENT';
 const DEFAULT_TEMPLATE_DESCRIPTION = 'Default master agreement template';
-const DEFAULT_TEMPLATE_CONTENT = `<h1>THE CAPSOL MASTER SOFTWARE & SERVICES AGREEMENT</h1>
-<p>This Master Software &amp; Services Agreement (this “Agreement”) is a binding legal contract entered into by and between ADR Wealth Advisors LLC, doing business as The Capsol (hereinafter referred to as the “Company”), and the individual or legal entity that (a) creates a user account on the Platform, (b) executes or accepts this Agreement in connection with the use of the Platform or Services, or (c) otherwise accesses, interacts with, or utilizes any functionality, component, or feature of The Capsol software platform.</p>
+const DEFAULT_TEMPLATE_CONTENT = `<h1>SCORE MACHINE MASTER SOFTWARE & SERVICES AGREEMENT</h1>
+<p>This Master Software &amp; Services Agreement (this “Agreement”) is a binding legal contract entered into by and between ADR Wealth Advisors LLC, doing business as The Score Machine (hereinafter referred to as the “Company”), and the individual or legal entity that (a) creates a user account on the Platform, (b) executes or accepts this Agreement in connection with the use of the Platform or Services, or (c) otherwise accesses, interacts with, or utilizes any functionality, component, or feature of the Score Machine software platform.</p>
 <p>This Agreement shall be effective as of the date on which User signifies assent by clicking an acceptance button, checking an acknowledgment box, executing an electronic or handwritten signature, or otherwise performing any affirmative act evidencing acceptance of this Agreement, including by accessing or using the Platform or any portion thereof (the “Effective Date”).</p>
 <h2>RECITALS</h2>
-<p>A. The Company has conceived, designed, engineered, developed, authored, and currently owns and operates a proprietary and confidential suite of integrated software systems, databases, source and object code, proprietary algorithms, models, user interfaces, dashboards, application-programming interfaces (“APIs”), analytic engines, data integrations, documentation, and related technological and functional assets (collectively referred to as the “Platform,” and marketed as “The Capsol”).</p>
+<p>A. The Company has conceived, designed, engineered, developed, authored, and currently owns and operates a proprietary and confidential suite of integrated software systems, databases, source and object code, proprietary algorithms, models, user interfaces, dashboards, application-programming interfaces (“APIs”), analytic engines, data integrations, documentation, and related technological and functional assets (collectively referred to as the “Platform,” and marketed as “The Score Machine”).</p>
 <p>B. The Platform presently integrates, and is expressly designed to integrate and interoperate in the future, with a variety of third-party credit-data providers, financial-information repositories, and ancillary data-aggregation services (including, without limitation, MyFreeScoreNow®, MyScoreIQ®, IdentityIQ®, and any successor, replacement, licensed, or proprietary data providers collectively referred to herein as the “Third-Party Data Providers”).</p>
 <p>C. The User desires to obtain access to and utilize the Platform and the Services for the User’s own legitimate internal purposes and, in consideration of such access, expressly agrees to be bound by all terms, conditions, restrictions, and limitations set forth in this Agreement.</p>
 <h2>ARTICLE I — GRANT OF LICENSE; SCOPE OF SERVICES; ACCESS; THIRD-PARTY SOURCES</h2>`;
@@ -2789,9 +3172,9 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
     let result;
     try {
       result = await db.executeQuery(
-        `INSERT INTO users (first_name, last_name, email, password_hash, role, status, created_by, updated_by)
-         VALUES (?, ?, ?, ?, 'admin', ?, ?, ?)`,
-        [firstName, lastName, adminData.email, hashedPassword, normalizedStatus, userId, userId]
+        `INSERT INTO users (first_name, last_name, email, password_hash, role, status, send_dispute_letter_email, send_inactivity_email, send_report_pull_reminder_email, created_by, updated_by)
+         VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?, ?)`,
+        [firstName, lastName, adminData.email, hashedPassword, normalizedStatus, adminData.sendDisputeLetterEmail, adminData.sendInactivityEmail, adminData.sendReportPullReminderEmail, userId, userId]
       );
     } catch (insertErr: any) {
       // Fallback for MySQL databases missing audit columns
@@ -2800,9 +3183,9 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
       if (code === 'ER_BAD_FIELD_ERROR' || msg.includes("Unknown column 'created_by'")) {
         console.warn('⚠️  users.created_by/updated_by missing; inserting without audit columns');
         result = await db.executeQuery(
-          `INSERT INTO users (first_name, last_name, email, password_hash, role, status)
-           VALUES (?, ?, ?, ?, 'admin', ?)`,
-          [firstName, lastName, adminData.email, hashedPassword, normalizedStatus]
+          `INSERT INTO users (first_name, last_name, email, password_hash, role, status, send_dispute_letter_email, send_inactivity_email, send_report_pull_reminder_email)
+           VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?)`,
+          [firstName, lastName, adminData.email, hashedPassword, normalizedStatus, adminData.sendDisputeLetterEmail, adminData.sendInactivityEmail, adminData.sendReportPullReminderEmail]
         );
       } else {
         throw insertErr;
@@ -3001,6 +3384,21 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
       userValues.push(adminData.role);
     }
 
+    if (adminData.sendDisputeLetterEmail !== undefined) {
+      userUpdates.push('send_dispute_letter_email = ?');
+      userValues.push(adminData.sendDisputeLetterEmail);
+    }
+
+    if (adminData.sendInactivityEmail !== undefined) {
+      userUpdates.push('send_inactivity_email = ?');
+      userValues.push(adminData.sendInactivityEmail);
+    }
+
+    if (adminData.sendReportPullReminderEmail !== undefined) {
+      userUpdates.push('send_report_pull_reminder_email = ?');
+      userValues.push(adminData.sendReportPullReminderEmail);
+    }
+
     // Update users table if there are changes
     if (userUpdates.length > 0) {
       const updatesWithAudit = [...userUpdates, 'updated_by = ?', 'updated_at = CURRENT_TIMESTAMP'];
@@ -3197,6 +3595,195 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
     }
 
     res.status(500).json({ success: false, error: 'Failed to update admin profile' });
+  }
+});
+
+router.put('/admins/:id/referrer', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const adminId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(adminId) || adminId <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid admin id is required' });
+    }
+
+    const { affiliateId } = updateAdminAffiliateReferralSchema.parse(req.body);
+    const db = getDatabaseAdapter();
+
+    const existingAdmin = await db.getQuery(
+      `SELECT id, first_name, last_name, email, role
+         FROM users
+        WHERE id = ? AND (role = 'admin' OR role = 'super_admin')
+        LIMIT 1`,
+      [adminId]
+    );
+
+    if (!existingAdmin) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+
+    const affiliate = await db.getQuery(
+      `SELECT id, first_name, last_name, email, commission_rate, status
+         FROM affiliates
+        WHERE id = ?
+        LIMIT 1`,
+      [affiliateId]
+    );
+
+    if (!affiliate) {
+      return res.status(404).json({ success: false, error: 'Affiliate not found' });
+    }
+
+    if (String(affiliate.status || '').toLowerCase() !== 'active') {
+      return res.status(400).json({ success: false, error: 'Only active affiliates can be assigned' });
+    }
+
+    let hasReferralPurchaseAmount = true;
+    try {
+      if (db.getType() === 'mysql') {
+        const cols = await db.allQuery('SHOW COLUMNS FROM affiliate_referrals');
+        const names = Array.isArray(cols) ? cols.map((column: any) => String(column.Field || '').toLowerCase()) : [];
+        hasReferralPurchaseAmount = names.includes('purchase_amount');
+      } else {
+        const cols = await db.allQuery("PRAGMA table_info('affiliate_referrals')");
+        const names = Array.isArray(cols) ? cols.map((column: any) => String(column.name || '').toLowerCase()) : [];
+        hasReferralPurchaseAmount = names.includes('purchase_amount');
+      }
+    } catch {}
+
+    const commissionRate = Number(affiliate.commission_rate || 0);
+    const existingReferralRows = await db.allQuery(
+      `SELECT id
+         FROM affiliate_referrals
+        WHERE referred_user_id = ?
+        ORDER BY created_at ASC, id ASC`,
+      [adminId]
+    );
+
+    if (Array.isArray(existingReferralRows) && existingReferralRows.length > 0) {
+      await db.executeQuery(
+        `UPDATE affiliate_referrals
+            SET affiliate_id = ?, commission_rate = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE referred_user_id = ?`,
+        [affiliateId, commissionRate, adminId]
+      );
+    } else if (hasReferralPurchaseAmount) {
+      await db.executeQuery(
+        `INSERT INTO affiliate_referrals (
+           affiliate_id,
+           referred_user_id,
+           purchase_amount,
+           commission_amount,
+           commission_rate,
+           status,
+           referral_date,
+           created_at,
+           updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [affiliateId, adminId, 0, 0, commissionRate, 'pending']
+      );
+    } else {
+      await db.executeQuery(
+        `INSERT INTO affiliate_referrals (
+           affiliate_id,
+           referred_user_id,
+           commission_amount,
+           commission_rate,
+           status,
+           referral_date,
+           created_at,
+           updated_at
+         ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        [affiliateId, adminId, 0, commissionRate, 'pending']
+      );
+    }
+
+    try {
+      await db.executeQuery(
+        `UPDATE affiliate_commissions
+            SET affiliate_id = ?, commission_rate = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE customer_id = ?`,
+        [affiliateId, commissionRate, adminId]
+      );
+    } catch (commissionUpdateError) {
+      console.warn('⚠️ Failed to sync affiliate commissions after admin referrer update:', commissionUpdateError);
+    }
+
+    const affiliateName = [affiliate.first_name, affiliate.last_name]
+      .filter((part: unknown): part is string => typeof part === 'string' && part.trim().length > 0)
+      .join(' ')
+      .trim();
+
+    res.json({
+      success: true,
+      data: {
+        admin_id: adminId,
+        referred_by_affiliate_id: Number(affiliate.id),
+        referred_by_affiliate_name: affiliateName || affiliate.email,
+        referred_by_affiliate_email: affiliate.email,
+      }
+    });
+  } catch (error) {
+    console.error('Error updating admin affiliate referrer:', error);
+
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid affiliate referrer payload',
+        details: error.errors
+      });
+    }
+
+    res.status(500).json({ success: false, error: 'Failed to update admin affiliate referrer' });
+  }
+});
+
+router.delete('/admins/:id/referrer', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const adminId = parseInt(req.params.id, 10);
+    if (!Number.isFinite(adminId) || adminId <= 0) {
+      return res.status(400).json({ success: false, error: 'Valid admin id is required' });
+    }
+
+    const db = getDatabaseAdapter();
+    const existingAdmin = await db.getQuery(
+      `SELECT id
+         FROM users
+        WHERE id = ? AND (role = 'admin' OR role = 'super_admin')
+        LIMIT 1`,
+      [adminId]
+    );
+
+    if (!existingAdmin) {
+      return res.status(404).json({ success: false, error: 'Admin user not found' });
+    }
+
+    try {
+      await db.executeQuery(
+        `DELETE FROM affiliate_commissions
+          WHERE customer_id = ?`,
+        [adminId]
+      );
+    } catch (commissionDeleteError) {
+      console.warn('⚠️ Failed to delete affiliate commissions while clearing admin referrer:', commissionDeleteError);
+    }
+
+    await db.executeQuery(
+      `DELETE FROM affiliate_referrals
+        WHERE referred_user_id = ?`,
+      [adminId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        admin_id: adminId,
+        referred_by_affiliate_id: null,
+        referred_by_affiliate_name: null,
+        referred_by_affiliate_email: null,
+      }
+    });
+  } catch (error) {
+    console.error('Error clearing admin affiliate referrer:', error);
+    res.status(500).json({ success: false, error: 'Failed to clear admin affiliate referrer' });
   }
 });
 
@@ -3650,8 +4237,9 @@ router.get('/subscriptions/recent-cancellations', authenticateToken, requireSupe
              OR COALESCE(u.phone, '') LIKE ?
              OR COALESCE(s.cancellation_reason_text, '') LIKE ?
              OR COALESCE(s.cancellation_reason_code, '') LIKE ?
+             OR COALESCE(s.cancellation_guidance_choice, '') LIKE ?
            )`;
-      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
     
     console.log('Fetching recent cancellations with params:', { page: pageNum, limit: limitNum, days: safeDays, offset: safeOffset });
@@ -3711,6 +4299,50 @@ router.get('/subscriptions/recent-cancellations', authenticateToken, requireSupe
   } catch (error) {
     console.error('Error fetching recent cancellations:', error);
     res.status(500).json({ success: false, error: 'Failed to fetch recent cancellations' });
+  }
+});
+
+// Get guidance-choice analytics for cancellation flow
+router.get('/subscriptions/cancellation-guidance-stats', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const safeDays = Math.max(1, parseInt(String(days), 10) || 30);
+    const db = getDatabaseAdapter();
+
+    const rows = await db.allQuery(
+      `SELECT cancellation_guidance_choice AS choice, COUNT(*) AS count
+       FROM subscriptions
+       WHERE cancellation_guidance_choice IS NOT NULL
+         AND COALESCE(cancellation_guidance_updated_at, updated_at) >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       GROUP BY cancellation_guidance_choice`,
+      [safeDays]
+    );
+
+    const counts: Record<string, number> = {
+      join_class_now: 0,
+      not_now: 0,
+      still_cancel: 0,
+    };
+
+    for (const row of rows || []) {
+      const key = String(row?.choice || '');
+      const count = Number(row?.count || 0);
+      if (Object.prototype.hasOwnProperty.call(counts, key)) {
+        counts[key] = count;
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        days: safeDays,
+        counts,
+        total: counts.join_class_now + counts.not_now + counts.still_cancel,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching cancellation guidance stats:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch cancellation guidance stats' });
   }
 });
 
@@ -4026,6 +4658,245 @@ router.get('/analytics/subscriptions', authenticateToken, requireAdmin, async (r
   }
 });
 
+const parseStripeAnalyticsBoundaryDate = (
+  rawValue: unknown,
+  fallback: Date,
+  boundary: 'start' | 'end'
+) => {
+  const raw = typeof rawValue === 'string' ? rawValue.trim() : String(rawValue ?? '').trim();
+  let date = new Date(fallback);
+
+  const dateMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (dateMatch) {
+    date = new Date(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]));
+  } else if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      date = parsed;
+    }
+  }
+
+  if (boundary === 'start') {
+    date.setHours(0, 0, 0, 0);
+  } else {
+    date.setHours(23, 59, 59, 999);
+  }
+
+  return date;
+};
+
+const formatStripeAnalyticsDateKey = (date: Date) => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+const normalizeStripeRecurringAmountToMonthly = (
+  unitAmount: number,
+  recurring: { interval?: string | null; interval_count?: number | null } | null | undefined,
+  quantity = 1
+) => {
+  if (!recurring || !unitAmount) {
+    return 0;
+  }
+
+  const intervalCount = Math.max(1, Number(recurring.interval_count || 1));
+  const subtotal = unitAmount * quantity;
+
+  if (recurring.interval === 'year') {
+    return subtotal / (12 * intervalCount);
+  }
+
+  if (recurring.interval === 'week') {
+    return (subtotal * 52) / (12 * intervalCount);
+  }
+
+  if (recurring.interval === 'day') {
+    return (subtotal * 365) / (12 * intervalCount);
+  }
+
+  return subtotal / intervalCount;
+};
+
+const getStripeSubscriptionMonthlyAmount = (subscription: any) => {
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  let monthlyAmount = 0;
+  let primaryRecurring: { interval?: string | null; interval_count?: number | null } | null = null;
+  let primarySubtotal = 0;
+
+  for (const item of items) {
+    const quantity = Number(item?.quantity || 1);
+    const unitAmount = typeof item?.price?.unit_amount === 'number' ? Number(item.price.unit_amount) / 100 : 0;
+    const recurring = item?.price?.recurring;
+
+    if (!recurring || !unitAmount) {
+      continue;
+    }
+
+    monthlyAmount += normalizeStripeRecurringAmountToMonthly(unitAmount, recurring, quantity);
+
+    const rawSubtotal = unitAmount * quantity;
+    if (rawSubtotal > primarySubtotal) {
+      primarySubtotal = rawSubtotal;
+      primaryRecurring = recurring;
+    }
+  }
+
+  if (!monthlyAmount) {
+    return 0;
+  }
+
+  const rawDiscounts = [subscription?.discount, ...(Array.isArray(subscription?.discounts?.data) ? subscription.discounts.data : [])]
+    .filter(Boolean);
+  const seenDiscountIds = new Set<string>();
+
+  for (const discount of rawDiscounts) {
+    const discountId = String(discount?.id || '');
+    if (discountId && seenDiscountIds.has(discountId)) {
+      continue;
+    }
+
+    if (discountId) {
+      seenDiscountIds.add(discountId);
+    }
+
+    const coupon = discount?.coupon;
+    if (!coupon) {
+      continue;
+    }
+
+    const discountEnd = typeof discount?.end === 'number' ? discount.end * 1000 : null;
+    if (discountEnd && discountEnd < Date.now()) {
+      continue;
+    }
+
+    const percentOff = Number(coupon.percent_off || 0);
+    if (percentOff > 0) {
+      monthlyAmount -= monthlyAmount * (percentOff / 100);
+      continue;
+    }
+
+    const amountOff = typeof coupon.amount_off === 'number' ? Number(coupon.amount_off) / 100 : 0;
+    const duration = String(coupon.duration || '').toLowerCase();
+    if (amountOff > 0 && duration !== 'once') {
+      monthlyAmount -= normalizeStripeRecurringAmountToMonthly(amountOff, primaryRecurring, 1);
+    }
+  }
+
+  return Math.max(0, monthlyAmount);
+};
+
+const getStripeSubscriptionIntervalAmount = (subscription: any, interval: 'month' | 'year') => {
+  const items = Array.isArray(subscription?.items?.data) ? subscription.items.data : [];
+  let intervalAmount = 0;
+  let primaryRecurring: { interval?: string | null; interval_count?: number | null } | null = null;
+  let primarySubtotal = 0;
+
+  for (const item of items) {
+    const quantity = Math.max(1, Number(item?.quantity || 1));
+    const unitAmount = typeof item?.price?.unit_amount === 'number' ? Number(item.price.unit_amount) / 100 : 0;
+    const recurring = item?.price?.recurring;
+
+    if (!recurring || recurring.interval !== interval || !unitAmount) {
+      continue;
+    }
+
+    const subtotal = unitAmount * quantity;
+    intervalAmount += subtotal;
+
+    if (subtotal > primarySubtotal) {
+      primarySubtotal = subtotal;
+      primaryRecurring = recurring;
+    }
+  }
+
+  if (!intervalAmount) {
+    return 0;
+  }
+
+  const rawDiscounts = [subscription?.discount, ...(Array.isArray(subscription?.discounts?.data) ? subscription.discounts.data : [])]
+    .filter(Boolean);
+  const seenDiscountIds = new Set<string>();
+
+  for (const discount of rawDiscounts) {
+    const discountId = String(discount?.id || '');
+    if (discountId && seenDiscountIds.has(discountId)) {
+      continue;
+    }
+
+    if (discountId) {
+      seenDiscountIds.add(discountId);
+    }
+
+    const coupon = discount?.coupon;
+    if (!coupon) {
+      continue;
+    }
+
+    const discountEnd = typeof discount?.end === 'number' ? discount.end * 1000 : null;
+    if (discountEnd && discountEnd < Date.now()) {
+      continue;
+    }
+
+    const percentOff = Number(coupon.percent_off || 0);
+    if (percentOff > 0) {
+      intervalAmount -= intervalAmount * (percentOff / 100);
+      continue;
+    }
+
+    const amountOff = typeof coupon.amount_off === 'number' ? Number(coupon.amount_off) / 100 : 0;
+    const duration = String(coupon.duration || '').toLowerCase();
+    if (amountOff > 0 && duration !== 'once' && primaryRecurring) {
+      intervalAmount -= amountOff;
+    }
+  }
+
+  return Math.max(0, intervalAmount);
+};
+
+const shouldDebugStripeAnalytics = () => String(process.env.STRIPE_ANALYTICS_DEBUG || '').toLowerCase() === 'true';
+
+const logStripeAnalyticsBalanceTransaction = (kind: string, txn: any) => {
+  if (!shouldDebugStripeAnalytics()) {
+    return;
+  }
+
+  const sourceObject = typeof txn?.source === 'object' && txn?.source
+    ? String(txn.source.object || '')
+    : typeof txn?.source === 'string'
+      ? 'id_only'
+      : '';
+
+  console.log('[STRIPE_ANALYTICS_BALANCE_TXN]', {
+    kind,
+    id: txn?.id || null,
+    type: txn?.type || null,
+    reporting_category: txn?.reporting_category || null,
+    amount: typeof txn?.amount === 'number' ? Number(txn.amount) / 100 : null,
+    fee: typeof txn?.fee === 'number' ? Number(txn.fee) / 100 : null,
+    net: typeof txn?.net === 'number' ? Number(txn.net) / 100 : null,
+    source_object: sourceObject,
+  });
+};
+
+const resolveStripeBalanceTransaction = async (stripe: Stripe, balanceTransaction: any) => {
+  if (!balanceTransaction) {
+    return null;
+  }
+
+  if (typeof balanceTransaction === 'string') {
+    return stripe.balanceTransactions.retrieve(balanceTransaction, { expand: ['source'] as any });
+  }
+
+  return balanceTransaction;
+};
+
+const isStripeTimestampInRange = (timestamp: number | undefined, fromUnix: number, toUnix: number) => {
+  if (typeof timestamp !== 'number' || Number.isNaN(timestamp)) {
+    return false;
+  }
+
+  return timestamp >= fromUnix && timestamp <= toUnix;
+};
+
 // Stripe Revenue (platform-wide)
 router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
@@ -4038,9 +4909,13 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
     const stripe = new Stripe(secret);
 
     const { from, to, group_by } = req.query as any;
-    const fromDate = from ? new Date(String(from)) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const toDate = to ? new Date(String(to)) : new Date();
     const groupBy: 'day' | 'month' = (String(group_by || 'day') === 'month') ? 'month' : 'day';
+    const fromDate = parseStripeAnalyticsBoundaryDate(
+      from,
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      'start'
+    );
+    const toDate = parseStripeAnalyticsBoundaryDate(to, new Date(), 'end');
 
     const fromUnix = Math.floor(fromDate.getTime() / 1000);
     const toUnix = Math.floor(toDate.getTime() / 1000);
@@ -4048,7 +4923,7 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
     const getBucketKey = (date: Date) => (
       groupBy === 'month'
         ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-        : date.toISOString().slice(0, 10)
+        : formatStripeAnalyticsDateKey(date)
     );
 
     const bucketDates: Array<{ key: string; start: Date; end: Date }> = [];
@@ -4082,6 +4957,8 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
       newCustomers: number;
       activeSubscribers: number;
       mrr: number;
+      yearlySubscriptionRevenue: number;
+      chargebackAmount: number;
       failedPayments: number;
       refundedVolume: number;
     }>();
@@ -4099,6 +4976,8 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
         newCustomers: 0,
         activeSubscribers: 0,
         mrr: 0,
+        yearlySubscriptionRevenue: 0,
+        chargebackAmount: 0,
         failedPayments: 0,
         refundedVolume: 0,
       };
@@ -4114,6 +4993,9 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
     let hasMore = true;
     let totalRevenue = 0;
     let grossVolume = 0;
+    let netVolume = 0;
+    let refundedVolume = 0;
+    let chargebackAmount = 0;
     let failedPayments = 0;
     const seriesMap = new Map<string, number>();
     const failedPaymentList: Array<{
@@ -4135,64 +5017,194 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
     }>();
 
     while (hasMore) {
-      const list = await stripe.paymentIntents.list({
+      const list = await stripe.charges.list({
         limit: 100,
         created: { gte: fromUnix, lte: toUnix },
-        expand: ['data.latest_charge', 'data.customer'],
+        expand: ['data.customer'],
         ...(startingAfter ? { starting_after: startingAfter } : {})
       });
-      for (const pi of list.data) {
-        const charge = pi.latest_charge && typeof pi.latest_charge !== 'string'
-          ? pi.latest_charge
+      for (const charge of list.data) {
+        const customer = charge.customer && typeof charge.customer !== 'string' && !('deleted' in charge.customer)
+          ? charge.customer
           : null;
-        const customer = pi.customer && typeof pi.customer !== 'string' && !('deleted' in pi.customer)
-          ? pi.customer
-          : null;
-        const email = pi.receipt_email || charge?.billing_details?.email || customer?.email || null;
-        const customerName = charge?.billing_details?.name || customer?.name || null;
-        const customerKey = String(customer?.id || email || pi.id);
+        const email = charge.billing_details?.email || charge.receipt_email || customer?.email || null;
+        const customerName = charge.billing_details?.name || customer?.name || null;
+        const customerKey = String(customer?.id || email || charge.id);
+        // Stripe dashboard gross volume uses the presentment charge amount (before fees and refunds).
+        const amount = typeof charge.amount === 'number' ? Number(charge.amount) / 100 : 0;
+        const chargeDate = new Date(charge.created * 1000);
+        const key = getBucketKey(chargeDate);
 
-        if (pi.status === 'succeeded') {
-          const amount = typeof pi.amount === 'number' ? Number(pi.amount) / 100 : 0;
-          totalRevenue += amount;
-          grossVolume += amount;
-          const dt = new Date(pi.created * 1000);
-          const key = getBucketKey(dt);
-          seriesMap.set(key, (seriesMap.get(key) || 0) + amount);
-          getMetricPoint(key).grossVolume += amount;
-
+        if (charge.status === 'succeeded' && charge.paid) {
+          // Gross/Net/series financial totals are derived from balance transactions
+          // below (to match Stripe's dashboard). Here we only collect per-customer
+          // spend for the "Top customers" card.
           const existingCustomer = customerSpendMap.get(customerKey) || {
             customerKey,
             email,
             customerName,
             totalSpend: 0,
             paymentCount: 0,
-            currency: String(pi.currency || 'usd').toUpperCase(),
+            currency: String(charge.currency || 'usd').toUpperCase(),
           };
           existingCustomer.totalSpend += amount;
           existingCustomer.paymentCount += 1;
           existingCustomer.email = existingCustomer.email || email;
           existingCustomer.customerName = existingCustomer.customerName || customerName;
           customerSpendMap.set(customerKey, existingCustomer);
-        } else if (pi.last_payment_error || pi.status === 'canceled') {
+        } else if (charge.status === 'failed') {
           failedPayments += 1;
-          const failedDate = new Date(pi.created * 1000);
-          const failedKey = getBucketKey(failedDate);
-          getMetricPoint(failedKey).failedPayments += 1;
+          getMetricPoint(key).failedPayments += 1;
           failedPaymentList.push({
-            id: pi.id,
-            date: failedDate.toISOString(),
-            amount: typeof pi.amount === 'number' ? Number(pi.amount) / 100 : 0,
-            currency: String(pi.currency || 'usd').toUpperCase(),
+            id: charge.id,
+            date: chargeDate.toISOString(),
+            amount,
+            currency: String(charge.currency || 'usd').toUpperCase(),
             email,
             customerName,
-            status: String(pi.status || 'failed'),
+            status: String(charge.status || 'failed'),
           });
         }
       }
       hasMore = list.has_more;
       if (hasMore && list.data.length > 0) {
         startingAfter = list.data[list.data.length - 1].id;
+      }
+    }
+
+    let successfulChargeStartingAfter: string | undefined = undefined;
+    let successfulChargeHasMore = true;
+
+    while (successfulChargeHasMore) {
+      const charges = await stripe.charges.list({
+        limit: 100,
+        created: { gte: fromUnix, lte: toUnix },
+        expand: ['data.customer', 'data.balance_transaction'],
+        ...(successfulChargeStartingAfter ? { starting_after: successfulChargeStartingAfter } : {}),
+      });
+
+      for (const charge of charges.data) {
+        if (!(charge.status === 'succeeded' && charge.paid)) {
+          continue;
+        }
+
+        const balanceTxn = await resolveStripeBalanceTransaction(stripe, (charge as any).balance_transaction);
+        if (!balanceTxn) {
+          continue;
+        }
+
+        logStripeAnalyticsBalanceTransaction('charge', balanceTxn);
+
+        const amount = typeof balanceTxn.amount === 'number' ? Number(balanceTxn.amount) / 100 : 0;
+        const netAmount = typeof balanceTxn.net === 'number' ? Number(balanceTxn.net) / 100 : amount;
+        const txnDate = new Date((typeof balanceTxn.created === 'number' ? balanceTxn.created : charge.created) * 1000);
+        const key = getBucketKey(txnDate);
+        const metricPoint = getMetricPoint(key);
+
+        grossVolume += amount;
+        totalRevenue += amount;
+        netVolume += netAmount;
+        seriesMap.set(key, (seriesMap.get(key) || 0) + amount);
+        metricPoint.grossVolume += amount;
+        metricPoint.netVolume += netAmount;
+      }
+
+      successfulChargeHasMore = charges.has_more;
+      if (successfulChargeHasMore && charges.data.length > 0) {
+        successfulChargeStartingAfter = charges.data[charges.data.length - 1].id;
+      }
+    }
+
+    let refundStartingAfter: string | undefined = undefined;
+    let refundHasMore = true;
+    while (refundHasMore) {
+      const refunds = await stripe.refunds.list({
+        limit: 100,
+        created: { gte: fromUnix, lte: toUnix },
+        expand: ['data.balance_transaction'],
+        ...(refundStartingAfter ? { starting_after: refundStartingAfter } : {}),
+      });
+
+      for (const refund of refunds.data) {
+        const balanceTxn = await resolveStripeBalanceTransaction(stripe, (refund as any).balance_transaction);
+        if (!balanceTxn) {
+          continue;
+        }
+
+        logStripeAnalyticsBalanceTransaction('refund', balanceTxn);
+
+        const amount = typeof balanceTxn.amount === 'number' ? Number(balanceTxn.amount) / 100 : 0;
+        const netAmount = typeof balanceTxn.net === 'number' ? Number(balanceTxn.net) / 100 : amount;
+        const txnDate = new Date((typeof balanceTxn.created === 'number' ? balanceTxn.created : refund.created) * 1000);
+        const key = getBucketKey(txnDate);
+        const metricPoint = getMetricPoint(key);
+
+        netVolume += netAmount;
+        refundedVolume += Math.abs(amount);
+        metricPoint.netVolume += netAmount;
+        metricPoint.refundedVolume += Math.abs(amount);
+      }
+
+      refundHasMore = refunds.has_more;
+      if (refundHasMore && refunds.data.length > 0) {
+        refundStartingAfter = refunds.data[refunds.data.length - 1].id;
+      }
+    }
+
+    let disputeStartingAfter: string | undefined = undefined;
+    let disputeHasMore = true;
+    while (disputeHasMore) {
+      const disputes = await stripe.disputes.list({
+        limit: 100,
+        created: { gte: fromUnix, lte: toUnix },
+        ...(disputeStartingAfter ? { starting_after: disputeStartingAfter } : {}),
+      } as any);
+
+      for (const dispute of disputes.data) {
+        let disputeBalanceTransactions = Array.isArray((dispute as any).balance_transactions)
+          ? (dispute as any).balance_transactions
+          : [];
+
+        if (disputeBalanceTransactions.length === 0) {
+          const detailedDispute = await stripe.disputes.retrieve(
+            dispute.id,
+            { expand: ['balance_transactions'] as any } as any,
+          );
+
+          disputeBalanceTransactions = Array.isArray((detailedDispute as any).balance_transactions)
+            ? (detailedDispute as any).balance_transactions
+            : [];
+        }
+
+        for (const rawBalanceTxn of disputeBalanceTransactions) {
+          const balanceTxn = await resolveStripeBalanceTransaction(stripe, rawBalanceTxn);
+          if (!balanceTxn) {
+            continue;
+          }
+
+          if (!isStripeTimestampInRange(balanceTxn.created, fromUnix, toUnix)) {
+            continue;
+          }
+
+          logStripeAnalyticsBalanceTransaction('dispute', balanceTxn);
+
+          const amount = typeof balanceTxn.amount === 'number' ? Number(balanceTxn.amount) / 100 : 0;
+          const netAmount = typeof balanceTxn.net === 'number' ? Number(balanceTxn.net) / 100 : amount;
+          const txnDate = new Date((typeof balanceTxn.created === 'number' ? balanceTxn.created : dispute.created) * 1000);
+          const key = getBucketKey(txnDate);
+          const metricPoint = getMetricPoint(key);
+          const disputeDisplayAmount = Math.abs(amount || netAmount);
+
+          netVolume += netAmount;
+          chargebackAmount += disputeDisplayAmount;
+          metricPoint.netVolume += netAmount;
+          metricPoint.chargebackAmount += disputeDisplayAmount;
+        }
+      }
+
+      disputeHasMore = disputes.has_more;
+      if (disputeHasMore && disputes.data.length > 0) {
+        disputeStartingAfter = disputes.data[disputes.data.length - 1].id;
       }
     }
 
@@ -4207,53 +5219,35 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
     const prevFromUnix = Math.floor(prevFromDate.getTime() / 1000);
     const prevToUnix = Math.floor(prevToDate.getTime() / 1000);
 
-    let prevStartingAfter: string | undefined = undefined;
-    let prevHasMore = true;
+    let prevChargeStartingAfter: string | undefined = undefined;
+    let prevChargeHasMore = true;
     let previousRevenue = 0;
-    while (prevHasMore) {
-      const list = await stripe.paymentIntents.list({
+    while (prevChargeHasMore) {
+      const charges = await stripe.charges.list({
         limit: 100,
         created: { gte: prevFromUnix, lte: prevToUnix },
-        ...(prevStartingAfter ? { starting_after: prevStartingAfter } : {})
+        expand: ['data.balance_transaction'],
+        ...(prevChargeStartingAfter ? { starting_after: prevChargeStartingAfter } : {}),
       });
-      for (const pi of list.data) {
-        if (pi.status === 'succeeded') {
-          const amount = typeof pi.amount === 'number' ? Number(pi.amount) / 100 : 0;
-          previousRevenue += amount;
+      for (const charge of charges.data) {
+        if (!(charge.status === 'succeeded' && charge.paid)) {
+          continue;
         }
+
+        const balanceTxn = await resolveStripeBalanceTransaction(stripe, (charge as any).balance_transaction);
+        if (!balanceTxn) {
+          continue;
+        }
+
+        previousRevenue += typeof balanceTxn.amount === 'number' ? Number(balanceTxn.amount) / 100 : 0;
       }
-      prevHasMore = list.has_more;
-      if (prevHasMore && list.data.length > 0) {
-        prevStartingAfter = list.data[list.data.length - 1].id;
+      prevChargeHasMore = charges.has_more;
+      if (prevChargeHasMore && charges.data.length > 0) {
+        prevChargeStartingAfter = charges.data[charges.data.length - 1].id;
       }
     }
 
     const revenueGrowth = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
-
-    let refundedVolume = 0;
-    let refundStartingAfter: string | undefined = undefined;
-    let refundsHasMore = true;
-
-    while (refundsHasMore) {
-      const refunds = await stripe.refunds.list({
-        limit: 100,
-        created: { gte: fromUnix, lte: toUnix },
-        ...(refundStartingAfter ? { starting_after: refundStartingAfter } : {}),
-      });
-
-      for (const refund of refunds.data) {
-        const amount = typeof refund.amount === 'number' ? Number(refund.amount) / 100 : 0;
-        refundedVolume += amount;
-        const refundDate = new Date(refund.created * 1000);
-        const refundKey = getBucketKey(refundDate);
-        getMetricPoint(refundKey).refundedVolume += amount;
-      }
-
-      refundsHasMore = refunds.has_more;
-      if (refundsHasMore && refunds.data.length > 0) {
-        refundStartingAfter = refunds.data[refunds.data.length - 1].id;
-      }
-    }
 
     let newCustomers = 0;
     let customerStartingAfter: string | undefined = undefined;
@@ -4284,6 +5278,7 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
 
     let activeSubscribers = 0;
     let mrr = 0;
+    let yearlySubscriptionRevenue = 0;
     let subscriptionStartingAfter: string | undefined = undefined;
     let subscriptionsHasMore = true;
     const allSubscriptions: any[] = [];
@@ -4304,31 +5299,8 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
         }
 
         activeSubscribers += 1;
-
-        for (const item of subscription.items.data) {
-          const quantity = Number(item.quantity || 1);
-          const unitAmount = typeof item.price?.unit_amount === 'number' ? Number(item.price.unit_amount) / 100 : 0;
-          const recurring = item.price?.recurring;
-
-          if (!recurring || !unitAmount) {
-            continue;
-          }
-
-          const intervalCount = Number(recurring.interval_count || 1);
-          let monthlyAmount = unitAmount * quantity;
-
-          if (recurring.interval === 'year') {
-            monthlyAmount = (unitAmount * quantity) / (12 * intervalCount);
-          } else if (recurring.interval === 'week') {
-            monthlyAmount = ((unitAmount * quantity) * 52) / (12 * intervalCount);
-          } else if (recurring.interval === 'day') {
-            monthlyAmount = ((unitAmount * quantity) * 365) / (12 * intervalCount);
-          } else {
-            monthlyAmount = (unitAmount * quantity) / intervalCount;
-          }
-
-          mrr += monthlyAmount;
-        }
+        mrr += getStripeSubscriptionIntervalAmount(subscription, 'month');
+        yearlySubscriptionRevenue += getStripeSubscriptionIntervalAmount(subscription, 'year');
       }
 
       subscriptionsHasMore = subscriptions.has_more;
@@ -4350,29 +5322,10 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
             ? subscriptionAny.current_period_end * 1000
             : null;
 
-      let monthlyAmount = 0;
-      for (const item of subscription.items?.data || []) {
-        const quantity = Number(item.quantity || 1);
-        const unitAmount = typeof item.price?.unit_amount === 'number' ? Number(item.price.unit_amount) / 100 : 0;
-        const recurring = item.price?.recurring;
+      const monthlyAmount = getStripeSubscriptionIntervalAmount(subscription, 'month');
+      const yearlyAmount = getStripeSubscriptionIntervalAmount(subscription, 'year');
 
-        if (!recurring || !unitAmount) {
-          continue;
-        }
-
-        const intervalCount = Number(recurring.interval_count || 1);
-        if (recurring.interval === 'year') {
-          monthlyAmount += (unitAmount * quantity) / (12 * intervalCount);
-        } else if (recurring.interval === 'week') {
-          monthlyAmount += ((unitAmount * quantity) * 52) / (12 * intervalCount);
-        } else if (recurring.interval === 'day') {
-          monthlyAmount += ((unitAmount * quantity) * 365) / (12 * intervalCount);
-        } else {
-          monthlyAmount += (unitAmount * quantity) / intervalCount;
-        }
-      }
-
-      if (!createdAt || !monthlyAmount) {
+      if (!createdAt || (!monthlyAmount && !yearlyAmount)) {
         continue;
       }
 
@@ -4388,6 +5341,7 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
         const metricPoint = getMetricPoint(bucket.key);
         metricPoint.activeSubscribers += 1;
         metricPoint.mrr += monthlyAmount;
+        metricPoint.yearlySubscriptionRevenue += yearlyAmount;
       }
     }
 
@@ -4403,17 +5357,18 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
         currency: customer.currency,
       }));
 
-    const netVolume = grossVolume - refundedVolume;
     const summarySeries = bucketDates
       .map(({ key }) => {
         const point = getMetricPoint(key);
         return {
           date: key,
           grossVolume: Math.round(point.grossVolume * 100) / 100,
-          netVolume: Math.round((point.grossVolume - point.refundedVolume) * 100) / 100,
+          netVolume: Math.round(point.netVolume * 100) / 100,
           newCustomers: point.newCustomers,
           activeSubscribers: point.activeSubscribers,
           mrr: Math.round(point.mrr * 100) / 100,
+          yearlySubscriptionRevenue: Math.round(point.yearlySubscriptionRevenue * 100) / 100,
+          chargebackAmount: Math.round(point.chargebackAmount * 100) / 100,
           failedPayments: point.failedPayments,
         };
       })
@@ -4429,7 +5384,9 @@ router.get('/analytics/stripe-revenue', authenticateToken, requireSuperAdmin, as
         summary: {
           grossVolume: Math.round(grossVolume * 100) / 100,
           mrr: Math.round(mrr * 100) / 100,
+          yearlySubscriptionRevenue: Math.round(yearlySubscriptionRevenue * 100) / 100,
           netVolume: Math.round(netVolume * 100) / 100,
+          chargebackAmount: Math.round(chargebackAmount * 100) / 100,
           failedPayments,
           newCustomers,
           activeSubscribers,
@@ -4461,8 +5418,12 @@ router.get('/analytics/stripe-payments', authenticateToken, requireSuperAdmin, a
     const stripe = new Stripe(secret);
 
     const { from, to } = req.query as any;
-    const fromDate = from ? new Date(String(from)) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const toDate = to ? new Date(String(to)) : new Date();
+    const fromDate = parseStripeAnalyticsBoundaryDate(
+      from,
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      'start'
+    );
+    const toDate = parseStripeAnalyticsBoundaryDate(to, new Date(), 'end');
     const fromUnix = Math.floor(fromDate.getTime() / 1000);
     const toUnix = Math.floor(toDate.getTime() / 1000);
 
@@ -4478,28 +5439,25 @@ router.get('/analytics/stripe-payments', authenticateToken, requireSuperAdmin, a
     }> = [];
 
     while (hasMore) {
-      const list = await stripe.paymentIntents.list({
+      const list = await stripe.charges.list({
         limit: 100,
         created: { gte: fromUnix, lte: toUnix },
-        expand: ['data.latest_charge', 'data.customer'],
+        expand: ['data.customer'],
         ...(startingAfter ? { starting_after: startingAfter } : {})
       });
-      for (const pi of list.data) {
-        if (pi.status === 'succeeded') {
-          const amount = typeof pi.amount === 'number' ? Number(pi.amount) / 100 : 0;
-          const charge = pi.latest_charge && typeof pi.latest_charge !== 'string'
-            ? pi.latest_charge
+      for (const charge of list.data) {
+        if (charge.status === 'succeeded' && charge.paid) {
+          const amount = typeof charge.amount === 'number' ? Number(charge.amount) / 100 : 0;
+          const customer = charge.customer && typeof charge.customer !== 'string' && !('deleted' in charge.customer)
+            ? charge.customer
             : null;
-          const customer = pi.customer && typeof pi.customer !== 'string' && !('deleted' in pi.customer)
-            ? pi.customer
-            : null;
-          const email = pi.receipt_email || charge?.billing_details?.email || customer?.email || null;
-          const customerName = charge?.billing_details?.name || customer?.name || null;
+          const email = charge.billing_details?.email || charge.receipt_email || customer?.email || null;
+          const customerName = charge.billing_details?.name || customer?.name || null;
           payments.push({
-            date: new Date(pi.created * 1000).toISOString().slice(0, 10),
+            date: formatStripeAnalyticsDateKey(new Date(charge.created * 1000)),
             amount,
-            currency: (pi.currency || 'usd').toUpperCase(),
-            id: pi.id,
+            currency: (charge.currency || 'usd').toUpperCase(),
+            id: charge.id,
             email,
             customerName,
           });
@@ -4640,6 +5598,11 @@ router.post('/open-ai-configuration', authenticateToken, requireSuperAdmin, asyn
 
 router.get('/business-directories', authenticateToken, requireSuperAdmin, async (_req: Request, res: Response) => {
   try {
+    const requesterRole = String((_req as any).user?.role || '').toLowerCase();
+    if (requesterRole !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super admin access required' });
+    }
+
     const db = getDatabaseAdapter();
     const directories = await listBusinessDirectories(db);
     res.json({ success: true, directories });
@@ -4651,6 +5614,11 @@ router.get('/business-directories', authenticateToken, requireSuperAdmin, async 
 
 router.post('/business-directories', authenticateToken, requireSuperAdmin, businessDirectoryLogoUpload.single('logo'), async (req: Request, res: Response) => {
   try {
+    const requesterRole = String((req as any).user?.role || '').toLowerCase();
+    if (requesterRole !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super admin access required' });
+    }
+
     const parsed = businessDirectorySchema.parse(req.body);
     const userId = Number((req as any).user?.id || 0) || null;
     const logoUrl = (req as any).file ? `/uploads/business-directories/${(req as any).file.filename}` : null;
@@ -4660,14 +5628,16 @@ router.post('/business-directories', authenticateToken, requireSuperAdmin, busin
 
     const insertResult = await db.executeQuery(
       `INSERT INTO business_directories
-       (business_name, business_email, business_phone_number, business_address, logo_url, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+       (business_name, business_email, business_phone_number, business_address, description, logo_url, status, approved_by, approved_at, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, 'approved', ?, CURRENT_TIMESTAMP, ?, ?)`,
       [
         parsed.business_name,
         parsed.business_email,
         parsed.business_phone_number,
         parsed.business_address,
+        parsed.description,
         logoUrl,
+        userId,
         userId,
         userId,
       ],
@@ -4690,6 +5660,11 @@ router.post('/business-directories', authenticateToken, requireSuperAdmin, busin
 
 router.put('/business-directories/:id', authenticateToken, requireSuperAdmin, businessDirectoryLogoUpload.single('logo'), async (req: Request, res: Response) => {
   try {
+    const requesterRole = String((req as any).user?.role || '').toLowerCase();
+    if (requesterRole !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super admin access required' });
+    }
+
     const directoryId = Number(req.params.id);
     if (!Number.isInteger(directoryId) || directoryId <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid business directory id' });
@@ -4717,6 +5692,7 @@ router.put('/business-directories/:id', authenticateToken, requireSuperAdmin, bu
            business_email = ?,
            business_phone_number = ?,
            business_address = ?,
+           description = ?,
            logo_url = ?,
            updated_by = ?,
            updated_at = ${updatedAtSql}
@@ -4726,6 +5702,7 @@ router.put('/business-directories/:id', authenticateToken, requireSuperAdmin, bu
         parsed.business_email,
         parsed.business_phone_number,
         parsed.business_address,
+        parsed.description,
         nextLogoUrl,
         userId,
         directoryId,
@@ -4743,8 +5720,67 @@ router.put('/business-directories/:id', authenticateToken, requireSuperAdmin, bu
   }
 });
 
+router.patch('/business-directories/:id/status', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
+  try {
+    const requesterRole = String((req as any).user?.role || '').toLowerCase();
+    if (requesterRole !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super admin access required' });
+    }
+
+    const directoryId = Number(req.params.id);
+    if (!Number.isInteger(directoryId) || directoryId <= 0) {
+      return res.status(400).json({ success: false, error: 'Invalid business directory id' });
+    }
+
+    const parsed = businessDirectoryStatusSchema.parse(req.body);
+    const db = getDatabaseAdapter();
+    await ensureBusinessDirectoriesTable(db);
+
+    const existingDirectory = await getBusinessDirectoryById(db, directoryId);
+    if (!existingDirectory) {
+      return res.status(404).json({ success: false, error: 'Business directory not found' });
+    }
+
+    const userId = Number((req as any).user?.id || 0) || null;
+    const updatedAtSql = db.getType() === 'sqlite' ? 'CURRENT_TIMESTAMP' : 'NOW()';
+    const approvedAtSql = parsed.status === 'approved'
+      ? (db.getType() === 'sqlite' ? 'CURRENT_TIMESTAMP' : 'NOW()')
+      : 'NULL';
+
+    await db.executeQuery(
+      `UPDATE business_directories
+       SET status = ?,
+           approved_by = ?,
+           approved_at = ${approvedAtSql},
+           updated_by = ?,
+           updated_at = ${updatedAtSql}
+       WHERE id = ?`,
+      [
+        parsed.status,
+        parsed.status === 'approved' ? userId : null,
+        userId,
+        directoryId,
+      ],
+    );
+
+    const updatedDirectory = await getBusinessDirectoryById(db, directoryId);
+    res.json({ success: true, directory: updatedDirectory });
+  } catch (error: any) {
+    if (error?.name === 'ZodError') {
+      return res.status(400).json({ success: false, error: 'Invalid business directory status payload' });
+    }
+    console.error('Error updating business directory status:', error);
+    res.status(500).json({ success: false, error: 'Failed to update business directory status' });
+  }
+});
+
 router.delete('/business-directories/:id', authenticateToken, requireSuperAdmin, async (req: Request, res: Response) => {
   try {
+    const requesterRole = String((req as any).user?.role || '').toLowerCase();
+    if (requesterRole !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'Super admin access required' });
+    }
+
     const directoryId = Number(req.params.id);
     if (!Number.isInteger(directoryId) || directoryId <= 0) {
       return res.status(400).json({ success: false, error: 'Invalid business directory id' });
@@ -4775,6 +5811,7 @@ router.post('/admins/import-csv', authenticateToken, requireSuperAdmin, upload.s
     if (!file || !file.buffer) {
       return res.status(400).json({ success: false, error: 'CSV file is required' });
     }
+
     const text = file.buffer.toString('utf-8');
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) {
@@ -5072,6 +6109,19 @@ router.post('/clients/import-csv', authenticateToken, requireSuperAdmin, upload.
     if (!file || !file.buffer) {
       return res.status(400).json({ success: false, error: 'CSV file is required' });
     }
+    const kycGate = await checkClientCreationKyc({
+      userId: adminId,
+      source: 'super_admin_csv_import',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent') || null,
+    });
+    if (!kycGate.allowed) {
+      return res.status(403).json({
+        ...KYC_REQUIRED_RESPONSE,
+        kyc_status: kycGate.status,
+        existing_client_count: kycGate.clientCount,
+      });
+    }
     const text = file.buffer.toString('utf-8');
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) {
@@ -5269,13 +6319,22 @@ router.post('/clients/import-csv', authenticateToken, requireSuperAdmin, upload.
           ]
         );
         const clientId = ins.insertId || ins?.lastID || 0;
+        if (clientId) {
+          syncAdminClientToGhlInBackground(adminId, Number(clientId), 'client_imported');
+        }
         results.push({ email, status: 'imported', client_id: clientId });
       } catch (e: any) {
+        if (isKycDatabaseRejection(e)) {
+          throw e;
+        }
         results.push({ email: getAny(row, ['email']), status: 'error', error: e?.message || 'row failed' });
       }
     }
     res.json({ success: true, results });
   } catch (error: any) {
+    if (isKycDatabaseRejection(error)) {
+      return res.status(403).json(KYC_REQUIRED_RESPONSE);
+    }
     res.status(500).json({ success: false, error: error?.message || 'Failed to import CSV' });
   }
 });

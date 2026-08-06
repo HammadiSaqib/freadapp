@@ -28,6 +28,7 @@ import {
   Newspaper,
   ClipboardList,
   Mail,
+  TrendingUp,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
@@ -39,12 +40,16 @@ interface SupportLayoutProps {
   children: ReactNode;
   title?: string;
   description?: string;
+  fullWidth?: boolean;
+  noContentPadding?: boolean;
 }
 
 export default function SupportLayout({
   children,
   title,
   description,
+  fullWidth = false,
+  noContentPadding = false,
 }: SupportLayoutProps) {
   const { userProfile } = useAuthContext();
   const navigate = useNavigate();
@@ -63,6 +68,7 @@ export default function SupportLayout({
 
   const bottomNavItems = [
     { label: "Dashboard", href: "/support/dashboard", Icon: BarChart3 },
+    { label: "My Progress", href: "/support/my-progress", Icon: TrendingUp },
     { label: "Tickets", href: "/support/tickets", Icon: Ticket },
     { label: "Tasks", href: "/support/tasks", Icon: ClipboardList },
     { label: "Live Chat", href: "/support/live-chat", Icon: MessageSquare },
@@ -239,8 +245,8 @@ export default function SupportLayout({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6">
-          <div className="max-w-7xl mx-auto">
+        <main className={`flex-1 overflow-y-auto ${noContentPadding ? 'p-0 pb-20 lg:pb-0' : 'p-4 lg:p-6 pb-20 lg:pb-6'}`}>
+          <div className={fullWidth ? 'w-full' : 'max-w-7xl mx-auto'}>
             {children}
           </div>
         </main>

@@ -46,7 +46,7 @@ import ScoreChartsCard from "@/components/ScoreChartsCard";
 import NegativeAccountsCard from "@/components/NegativeAccountsCard";
 import { PrintRequestDialog, type PrintRequestSenderFormValues } from "@/components/PrintRequestDialog";
 import { TrialCreditReportWrapper, TrialScoreWrapper, TrialSensitiveWrapper } from "@/components/TrialCreditReportWrapper";
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, type ReactNode } from "react";
 import { useSearchParams, useNavigate, useParams } from "react-router-dom";
 import { shouldShowField, tabConfig } from "@/utils/fieldCategorization";
 import { calculateAccountUtilization } from "../utils/utilizationCalculator.js";
@@ -135,6 +135,11 @@ import { api } from "@/lib/api";
 import { hasAdminBasicPortalAccess } from "@/lib/adminPortalAccess";
 import { normalizeBasicAdminBooleanParam, rememberBasicAdminClientId } from "@/lib/basicAdminReportPull";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
+import {
+  isChargeOffNegativeAccount,
+  isLatePaymentNegativeAccount,
+} from "@/utils/negativeAccountClassification";
+import { mapCreditReportBureauName } from "@/utils/creditReportBureau";
 
 interface DebtConsolidationViewProps {
   accounts: any[];
@@ -1884,11 +1889,6 @@ const disputeContentTypeDescriptions: Record<DisputeContentType, string> = {
   UNLIMITED: "Use the unlimited wording path for recurring dispute workflows.",
 };
 
-const enabledDisputeContentTypes = new Set<DisputeContentType>(["STANDARD", "ENHANCED"]);
-const comingSoonDisputeContentTypes = new Set<DisputeContentType>(
-  disputeContentTypes.filter((type) => !enabledDisputeContentTypes.has(type)),
-);
-
 const FULL_ACCOUNT_LAWSET: Record<string, string[]> = {
   FCRA: ["§602", "§603", "§604(a–f)", "§605", "§605A", "§605B", "§606", "§607(a)", "§607(b)", "§607(c)", "§609(a)(1)", "§609(a)(2)", "§609(a)(3)", "§611(a–e)", "§615", "§616", "§617", "§623(a)(1)", "§623(a)(2)", "§623(a)(5)", "§623(a)(7)", "§623(b)"],
   FACTA: ["§112", "§113", "§151", "§153", "§315"],
@@ -1933,16 +1933,7 @@ const supportTemplateBureauCode: Record<string, string> = {
   transunion: "TU",
 };
 
-const mapReportBureauName = (value: any): string => {
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue)) {
-    if (numericValue === 1) return 'TransUnion';
-    if (numericValue === 2) return 'Experian';
-    if (numericValue === 3) return 'Equifax';
-  }
-  const text = String(value ?? '').trim();
-  return text || 'Unknown';
-};
+const mapReportBureauName = mapCreditReportBureauName;
 
 const getNegativeItemAccountKey = (value: any, fallback: any = ''): string => {
   const digitsOnly = String(value ?? '').replace(/\D/g, '');
@@ -1980,49 +1971,6 @@ const negativeItemMatchesBureauFilter = (item: any, bureauFilter: string): boole
   return normalizeNegativeItemBureaus(item?.bureau).some((bureau) => bureau.toLowerCase().includes(normalizedFilter));
 };
 
-const isLatePaymentNegativeAccount = (account: any): boolean => {
-  const status = String(account?.status || account?.AccountStatus || account?.AccountCondition || '').toLowerCase();
-  const paymentStatus = String(account?.paymentHistory || account?.PaymentStatus || '').toLowerCase();
-  const worstPayStatus = String(account?.WorstPayStatus || account?.worstStatus || '').toLowerCase();
-  const accountType = String(account?.AccountType || '').toLowerCase();
-  const accountTypeDescription = String(account?.AccountTypeDescription || '').toLowerCase();
-  const remark = String(account?.Remark || '').toLowerCase();
-  const payStatusHistory = String(account?.PayStatusHistory || account?.payStatusHistory || '').toUpperCase();
-  const lateCount = Number(account?.latePayments?.total ?? 0);
-  const amountPastDue = Number.parseFloat(String(account?.AmountPastDue ?? account?.amountPastDue ?? '0')) || 0;
-
-  const collectionLike =
-    paymentStatus.includes('collection') ||
-    accountType.includes('collection') ||
-    accountTypeDescription.includes('collection');
-  const chargeOffLike =
-    paymentStatus.includes('charge off') ||
-    paymentStatus.includes('charge-off') ||
-    paymentStatus.includes('chargeoff') ||
-    status.includes('charge off') ||
-    status.includes('charge-off') ||
-    status.includes('charge');
-
-  if (collectionLike || chargeOffLike) {
-    return false;
-  }
-
-  const lateTerms = ['late', 'past due', 'delinquent', 'default', 'overdue', 'was past due'];
-  const hasLateText = [status, paymentStatus, worstPayStatus, remark].some((text) =>
-    lateTerms.some((term) => text.includes(term))
-  );
-  const hasNumericLateStatus = /\b(?:30|60|90|120|150|180)\b/.test(`${paymentStatus} ${worstPayStatus} ${status}`);
-  const hasLateHistory = /[1-9]/.test(payStatusHistory);
-
-  return (
-    hasLateText ||
-    hasNumericLateStatus ||
-    hasLateHistory ||
-    lateCount > 0 ||
-    amountPastDue > 0
-  );
-};
-
 const getLatePaymentNegativeLabel = (account: any): string => {
   const status = String(account?.status || account?.AccountStatus || account?.AccountCondition || '').trim();
   const paymentStatus = String(account?.paymentHistory || account?.PaymentStatus || '').trim();
@@ -2054,19 +2002,6 @@ const getLatePaymentNegativeLabel = (account: any): string => {
   if (maxSeverityDigit === 1) return '30 Days Late';
 
   return paymentStatus || worstPayStatus || 'Late Payment';
-};
-
-const isChargeOffNegativeAccount = (account: any): boolean => {
-  const status = String(account?.status || account?.AccountStatus || account?.AccountCondition || '').toLowerCase();
-  const paymentHistory = String(account?.paymentHistory || account?.PaymentStatus || account?.WorstPayStatus || '').toLowerCase();
-
-  return (
-    paymentHistory.includes('charge') ||
-    status.includes('charge') ||
-    paymentHistory.includes('chargeoff') ||
-    paymentHistory.includes('charged off') ||
-    paymentHistory.includes('charge off')
-  );
 };
 
 const normalizeNegativeItemCategoryKey = (value: any): string => {
@@ -2499,6 +2434,51 @@ export default function CreditReport() {
   const { userProfile, isLoading: authLoading, refreshProfile } = useAuthContext();
   const { isEliteActive, isEliteStatusLoading } = useScoreMachineEliteStatus();
   const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
+  const basicPortalUpgradeUrl = "https://thescoremachine.com/pricing";
+  const creditReportPageTitle = isBasicAdminPortalUser ? 'My Report' : 'Credit Report';
+  const creditReportAnalysisTitle = isBasicAdminPortalUser ? 'My Report Analysis' : 'Credit Report Analysis';
+  const creditReportGroupTitle = isBasicAdminPortalUser ? 'My Report' : 'Credit Report';
+  const creditReportLawEngineTitle = isBasicAdminPortalUser ? 'My Report (Law Engine)' : 'Credit Report (Law Engine)';
+
+  const renderBasicUpgradeLockedCard = (
+    children: ReactNode,
+    className = "",
+    options?: {
+      title?: string;
+      description?: string;
+      buttonLabel?: string;
+    },
+  ) => {
+    if (!isBasicAdminPortalUser) {
+      return <>{children}</>;
+    }
+
+    const overlayTitle = options?.title || "Upgrade Your Package";
+    const overlayDescription = options?.description || "Unlock advanced tracking cards and deeper progress insights in the full portal.";
+    const overlayButtonLabel = options?.buttonLabel || "Upgrade";
+
+    return (
+      <div className={`relative overflow-hidden ${className}`.trim()}>
+        <div className="pointer-events-none select-none blur-[5px] opacity-45">
+          {children}
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="w-full max-w-xs rounded-2xl border border-sky-200 bg-white/95 p-5 text-center shadow-xl dark:border-slate-700 dark:bg-slate-950/95">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-r from-sky-500 to-emerald-400 text-white shadow-sm shadow-sky-200 dark:shadow-none">
+              <Lock className="h-6 w-6" />
+            </div>
+            <div className="text-lg font-black text-slate-900 dark:text-white">{overlayTitle}</div>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+              {overlayDescription}
+            </p>
+            <Button className="mt-4 w-full" onClick={() => window.location.assign(basicPortalUpgradeUrl)}>
+              {overlayButtonLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const [affiliateCreditRepairLink, setAffiliateCreditRepairLink] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -2538,6 +2518,7 @@ export default function CreditReport() {
   const [underwritingAccountsSearch, setUnderwritingAccountsSearch] = useState('');
   const [underwritingAccountsTypeFilter, setUnderwritingAccountsTypeFilter] = useState<'all' | 'revolving' | 'installment' | 'mortgage' | 'others'>('all');
   const [underwritingAccountsStatusFilter, setUnderwritingAccountsStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const [underwritingAccountsAgeSort, setUnderwritingAccountsAgeSort] = useState<'oldest' | 'newest'>('oldest');
   const shouldForceReportPullPrompt = normalizeBasicAdminBooleanParam(searchParams.get('reportPullPrompt'));
   const analysisRef = useRef<HTMLDivElement>(null);
   const [personalInfoMode, setPersonalInfoMode] = useState<'normal' | 'credit_repair'>('normal');
@@ -2553,7 +2534,7 @@ export default function CreditReport() {
   const [letterMeta, setLetterMeta] = useState<{ accountNumbers: string[]; lawCitations: string[] } | null>(null);
   const [letterPdfUrl, setLetterPdfUrl] = useState<string | null>(null);
   const [selectedDisputeRound, setSelectedDisputeRound] = useState<string>("1");
-  const [selectedDisputeContentType, setSelectedDisputeContentType] = useState<DisputeContentType>("STANDARD");
+  const [selectedDisputeContentType, setSelectedDisputeContentType] = useState<DisputeContentType>(isBasicAdminPortalUser ? "BASIC" : "STANDARD");
   const [confirmRoundOneRegenerate, setConfirmRoundOneRegenerate] = useState(false);
   const [selectedNegativeIndex, setSelectedNegativeIndex] = useState(0);
   const [generatedLetterExpandedBureaus, setGeneratedLetterExpandedBureaus] = useState<Record<string, boolean>>({});
@@ -2590,6 +2571,7 @@ export default function CreditReport() {
   const [fundingAuditNoticeOpen, setFundingAuditNoticeOpen] = useState(false);
   const [pendingFundingAuditTab, setPendingFundingAuditTab] = useState<string | null>(null);
   const creditReportTabs = ['overview', 'personal', 'inquiries', 'public', 'accounts'] as const;
+  const visibleDisputeContentTypes = isBasicAdminPortalUser ? (["BASIC"] as const) : disputeContentTypes;
   type CreditReportTab = (typeof creditReportTabs)[number];
   const updateCreditReportView = (nextTab: string, nextLawEngineAutoMode: boolean = lawEngineAutoMode) => {
     const normalizedTab = allowedCreditReportTabs.includes(nextTab as typeof allowedCreditReportTabs[number])
@@ -2613,7 +2595,8 @@ export default function CreditReport() {
     updateCreditReportView(activeTab, nextLawEngineAutoMode);
   };
   const isLawEngineView = lawEngineAutoMode && (creditReportTabs as readonly string[]).includes(activeTab);
-  const shouldEnforceEliteCreditRepairAccess = ['admin', 'employee', 'user', 'funding_manager'].includes(String(userProfile?.role || ''));
+  const shouldEnforceEliteCreditRepairAccess =
+    !isBasicAdminPortalUser && ['admin', 'employee', 'user', 'funding_manager'].includes(String(userProfile?.role || ''));
   const isCreditRepairAccessResolved =
     !authLoading && (!shouldEnforceEliteCreditRepairAccess || !isEliteStatusLoading);
   const canAccessCreditRepairTab =
@@ -2936,6 +2919,10 @@ export default function CreditReport() {
     if (nextTab === 'creditRepair' && !canAccessCreditRepairTab) {
       return;
     }
+    if (isBasicAdminPortalUser && nextTab === 'debtConsolidation') {
+      setActiveTab('underwriting');
+      return;
+    }
     if (nextTab === 'funding') {
       requestOpenFundingAudit();
       return;
@@ -2967,6 +2954,18 @@ export default function CreditReport() {
       setActiveTab('overview');
     }
   }, [activeTab, canAccessCreditRepairTab, isCreditRepairAccessResolved, shouldEnforceEliteCreditRepairAccess]);
+
+  useEffect(() => {
+    if (isBasicAdminPortalUser && activeTab === 'debtConsolidation') {
+      setActiveTab('underwriting');
+    }
+  }, [activeTab, isBasicAdminPortalUser]);
+
+  useEffect(() => {
+    if (isBasicAdminPortalUser && selectedDisputeContentType !== 'BASIC') {
+      setSelectedDisputeContentType('BASIC');
+    }
+  }, [isBasicAdminPortalUser, selectedDisputeContentType]);
   
   const [payoffPlans, setPayoffPlans] = useState<any[]>([]);
   const { clientId: urlClientId } = useParams<{ clientId: string }>();
@@ -3105,10 +3104,10 @@ export default function CreditReport() {
       .join(" ")
       .trim();
     const fallbackName = String(
-      clientRecord?.full_name || clientRecord?.name || searchParams.get("clientName") || "Client"
+      clientRecord?.full_name || clientRecord?.name || searchParams.get("clientName") || (isBasicAdminPortalUser ? "My Profile" : "Client")
     ).trim();
 
-    return fullName || fallbackName || "Client";
+    return fullName || fallbackName || (isBasicAdminPortalUser ? "My Profile" : "Client");
   };
 
   const getMissingDisputeLetterRequirements = (currentClientRecord = clientRecord, currentClientDocs = clientDocs) => {
@@ -3563,7 +3562,14 @@ export default function CreditReport() {
 
   const handleGenerateDisputeLetter = async (skipMissingInfoCheck = false) => {
     const selectedItems = negativeItems.filter((item) => selectedNegativeKeys.includes(item.key));
-    if (!clientId) { setLetterError("No client is associated with this report."); toast.error("No client is associated with this report."); return; }
+    if (!clientId) {
+      const missingProfileMessage = isBasicAdminPortalUser
+        ? 'No profile is associated with this report.'
+        : 'No client is associated with this report.';
+      setLetterError(missingProfileMessage);
+      toast.error(missingProfileMessage);
+      return;
+    }
     if (selectedItems.length === 0) { setLetterError("Select at least one negative item to build a letter."); toast.error("Select at least one negative item to build a letter."); return; }
 
     const liveDisputeLetterContext = await refreshDisputeLetterClientContext();
@@ -7092,7 +7098,27 @@ export default function CreditReport() {
     fundingProjection: calculateFundingProjections()
   };
 
-  const clientName = searchParams.get("clientName") || "Client";
+  const resolvedClientFullName = [clientRecord?.first_name, clientRecord?.middle_name, clientRecord?.last_name]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const reportPersonName = [
+    (reportData as any)?.personalInfo?.name?.FirstName,
+    (reportData as any)?.personalInfo?.name?.MiddleName,
+    (reportData as any)?.personalInfo?.name?.LastName,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const fallbackClientLabel = isBasicAdminPortalUser ? "Report Client" : "Client";
+  const clientName =
+    resolvedClientFullName ||
+    String(clientRecord?.full_name || clientRecord?.name || "").trim() ||
+    reportPersonName ||
+    String(searchParams.get("clientName") || "").trim() ||
+    fallbackClientLabel;
   const reportHistory = Array.isArray((reportData as any)?.reportHistory) ? (reportData as any).reportHistory : [];
 
   const parseLooseDate = (value: any) => {
@@ -7120,6 +7146,10 @@ export default function CreditReport() {
 
   const getHistoryDateValue = (row: any) =>
     row?.created_at || row?.report_date || row?.date || row?.reportDate || row?.reportDateTime || null;
+
+  // Prefer the time the report was pulled. Dates inside the report can describe
+  // bureau data, which may not match when the report was generated.
+  const getHistoryPullDateValue = (row: any) => getHistoryDateValue(row) || getHistoryReportDateValue(row);
 
   const getHistoryJson = (row: any) => row?.data || row?.reportData || row?.report_data || null;
 
@@ -7222,7 +7252,7 @@ export default function CreditReport() {
   const getScoreDelta = (bureau: 'experian' | 'transunion' | 'equifax') => {
     const historyWithDates = reportHistory
       .map((row) => {
-        const dateValue = getHistoryReportDateValue(row);
+        const dateValue = getHistoryPullDateValue(row);
         const date = parseLooseDate(dateValue);
         return { row, time: date ? date.getTime() : null };
       })
@@ -7501,13 +7531,20 @@ export default function CreditReport() {
           // Extract personal information
           console.log('🔍 DEBUG: Extracting personal info from:', data.data.reportData);
           const nameData = data.data.reportData.Name?.find(n => n.NameType === "Primary" && n.BureauId === 3);
-          const dobData = data.data.reportData.DOB?.find(d => d.BureauId === 3);
+          const dobEntries = Array.isArray(data.data.reportData.DOB)
+            ? data.data.reportData.DOB
+            : [];
+          const hasDob = (entry: any) =>
+            typeof entry?.DOB === 'string' && entry.DOB.trim().length > 0;
+          const dobData =
+            dobEntries.find((entry: any) => Number(entry?.BureauId) === 3 && hasDob(entry)) ||
+            dobEntries.find(hasDob);
           console.log('🔍 DEBUG: Found name data:', nameData);
           console.log('🔍 DEBUG: Found DOB data:', dobData);
           
           const personalInfo = {
             name: nameData || {},
-            dateOfBirth: dobData?.DOB || detailedReport.personalInfo.dateOfBirth,
+            dateOfBirth: dobData?.DOB?.trim() || '',
             addresses: (data.data.reportData.Address || []).map(addr => ({
               street: addr.StreetAddress || '',
               city: addr.City || '',
@@ -7593,6 +7630,22 @@ export default function CreditReport() {
 
           // Extract bureau-specific dates from Score array
           const getBureauDate = (bureauId) => {
+            // The report-level JSON date identifies the report the client is
+            // viewing and is more reliable than the database record timestamp.
+            const reportJsonDate =
+              data.data.reportData?.CreditReport?.[0]?.DateReport ||
+              data.data.reportData?.reportData?.CreditReport?.[0]?.DateReport ||
+              null;
+            if (reportJsonDate) {
+              const dateValue = /^\d{4}-\d{2}-\d{2}$/.test(String(reportJsonDate))
+                ? `${reportJsonDate}T12:00:00`
+                : reportJsonDate;
+              return new Date(dateValue).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              });
+            }
             const scoreArray = data.data.reportData.Score || data.data.reportData.Scores;
             const scoreEntry = Array.isArray(scoreArray) ? scoreArray.find((s: any) => s.BureauId === bureauId) : null;
             const ds = scoreEntry?.DateScore || scoreEntry?.DateReported || scoreEntry?.DateUpdated || null;
@@ -7711,6 +7764,36 @@ export default function CreditReport() {
 
           // Calculate qualification criteria
           const calculateQualificationCriteria = (apiData: any, debtUtilization: any, scoresData: any) => {
+            const toNumber = (value: any): number => {
+              if (value === null || value === undefined) return 0;
+              if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+              const normalized = String(value).replace(/[^0-9.-]/g, '');
+              const parsed = parseFloat(normalized);
+              return Number.isFinite(parsed) ? parsed : 0;
+            };
+
+            const isOpenAccount = (acc: any): boolean => {
+              const status = String(acc?.AccountStatus || '').toLowerCase();
+              const condition = String(acc?.AccountCondition || '').toLowerCase();
+              return status === 'open' || status === 'current' || condition === 'open';
+            };
+
+            const isPrimaryAccount = (acc: any): boolean => {
+              const designatorText = [
+                acc?.AccountDesignator,
+                acc?.AccountResponsibility,
+                acc?.Responsibility,
+                acc?.OwnershipType,
+              ]
+                .filter(Boolean)
+                .join(' ')
+                .toLowerCase();
+
+              return !/authorized|auth\s*user/.test(designatorText);
+            };
+
+            const allAccounts = apiData?.reportData?.Accounts || apiData?.Accounts || [];
+
             const criteria = {
               1: { // TransUnion
                 score700Plus: false,
@@ -7794,8 +7877,8 @@ export default function CreditReport() {
               }
 
               // Check accounts for this bureau
-              const bureauAccounts = apiData.reportData?.Accounts?.filter((acc: any) => acc.BureauId === bureauId) || [];
-              const openPrimaryRevolving = bureauAccounts.filter((acc: any) => {
+              const bureauAccounts = allAccounts.filter((acc: any) => Number(acc?.BureauId) === Number(bureauId));
+              const primaryRevolving = bureauAccounts.filter((acc: any) => {
                 const at = String(acc.AccountType || '').toLowerCase();
                 const ad = String(acc.AccountTypeDescription || '').toLowerCase();
                 const ct = String(acc.CreditType || '').toLowerCase();
@@ -7810,14 +7893,10 @@ export default function CreditReport() {
                   ad.includes('charge account') ||
                   ad.includes('flexible spending credit card') ||
                   ind.includes('bank credit cards');
-                const isOpen =
-                  acc.AccountStatus === 'Open' ||
-                  acc.AccountStatus === 'Current' ||
-                  acc.AccountCondition === 'Open';
-                const designator = String(acc.AccountDesignator || '').toLowerCase();
-                const isPrimary = !designator.includes('authorized');
-                return isRevolving && isOpen && isPrimary;
+                const isPrimary = isPrimaryAccount(acc);
+                return isRevolving && isPrimary;
               });
+              const openPrimaryRevolving = primaryRevolving.filter((acc: any) => isOpenAccount(acc));
               const withGoodHistory = openPrimaryRevolving.filter((acc: any) => {
                 if (!acc.DateOpened) return false;
                 const opened = new Date(acc.DateOpened);
@@ -7835,11 +7914,12 @@ export default function CreditReport() {
               criteria[bureauId].minFiveOpenRevolving = withGoodHistory.length >= 5;
 
               // Check for 2+ year old credit card with $5K+ limit
-              const qualifyingCards = openPrimaryRevolving.filter((acc: any) => {
+              const qualifyingCards = primaryRevolving.filter((acc: any) => {
                 if (!acc.DateOpened) return false;
                 const openDate = new Date(acc.DateOpened);
+                if (isNaN(openDate.getTime())) return false;
                 const yearsOld = (Date.now() - openDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
-                const creditLimit = parseFloat(acc.CreditLimit) || 0;
+                const creditLimit = toNumber(acc.CreditLimit);
                 return yearsOld >= 2 && creditLimit >= 5000;
               });
               criteria[bureauId].creditCard3YearsOld5KLimit = qualifyingCards.length >= 2;
@@ -8214,8 +8294,8 @@ export default function CreditReport() {
         && Boolean(c?.noBankruptcies)
         && Boolean(c?.noCollectionsLiensJudgements);
       const fundable_in_tu = isPass(qc?.[1], 'TransUnion');
-      const fundable_in_ex = isPass(qc?.[3], 'Experian');
-      const fundable_in_eq = isPass(qc?.[2], 'Equifax');
+      const fundable_in_ex = isPass(qc?.[2], 'Experian');
+      const fundable_in_eq = isPass(qc?.[3], 'Equifax');
       const fundable_status = (fundable_in_tu || fundable_in_ex || fundable_in_eq) ? 'fundable' : 'not_fundable';
       await clientsApi.updateClient(String(clientId), {
         fundable_in_tu,
@@ -8223,7 +8303,11 @@ export default function CreditReport() {
         fundable_in_eq,
         fundable_status
       });
-      setAuditResult(fundable_status === 'fundable' ? 'Client is fundable. Status saved.' : 'Client is not fundable. Status saved.');
+      setAuditResult(
+        fundable_status === 'fundable'
+          ? (isBasicAdminPortalUser ? 'Your report is fundable. Status saved.' : 'Client is fundable. Status saved.')
+          : (isBasicAdminPortalUser ? 'Your report is not fundable. Status saved.' : 'Client is not fundable. Status saved.')
+      );
       setShowEligibilityAuditModal(false);
     } catch (err) {
       console.error('Eligibility audit update failed:', err);
@@ -8265,7 +8349,7 @@ export default function CreditReport() {
   if (loading) {
     return (
       <DashboardLayout
-        title={`Credit Report - ${clientName}`}
+        title={`${creditReportPageTitle} - ${clientName}`}
         description="Loading credit report..."
       >
         <div className="flex items-center justify-center h-64">
@@ -8281,7 +8365,7 @@ export default function CreditReport() {
   if (error) {
     return (
       <DashboardLayout
-        title={`Credit Report - ${clientName}`}
+        title={`${creditReportPageTitle} - ${clientName}`}
         description="Error loading credit report"
       >
         <div className="flex items-center justify-center h-64">
@@ -8300,7 +8384,7 @@ export default function CreditReport() {
 
   return (
     <DashboardLayout
-      title={`Credit Report - ${clientName}`}
+      title={`${creditReportPageTitle} - ${clientName}`}
       description="Detailed credit report analysis and information"
     >
       <div className="relative min-h-screen">
@@ -8325,7 +8409,7 @@ export default function CreditReport() {
             </p>
             <p>This content is provided for educational purposes only.</p>
             <p>
-              The Capsol does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
+              Score Machine does not provide legal advice, and we do not assume responsibility for outcomes resulting from the use
               of Law Engine outputs.
             </p>
           </div>
@@ -8403,7 +8487,7 @@ export default function CreditReport() {
             <h1 className="text-3xl font-bold text-foreground">
               {clientName}
             </h1>
-            <p className="text-muted-foreground">Credit Report Analysis</p>
+            <p className="text-muted-foreground">{creditReportAnalysisTitle}</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={downloadAnalysisPdf} disabled={activeTab !== 'analysis'}>
@@ -8495,7 +8579,7 @@ export default function CreditReport() {
 
           {/* Credit Report */}
           <div>
-            <div className="text-xs font-semibold text-gray-500 mb-2">Credit Report</div>
+            <div className="text-xs font-semibold text-gray-500 mb-2">{creditReportGroupTitle}</div>
             <TabsList className="grid w-full grid-cols-5 gap-1 text-xs overflow-x-auto">
               <TabsTrigger
                 value="overview"
@@ -8537,6 +8621,7 @@ export default function CreditReport() {
           </div>
         </div>
         {/* Step-wise Navigation (grouped) */}
+        {!isBasicAdminPortalUser && (
         <div className="w-full mb-8 space-y-6">
           {/* Work Area group */}
           <div>
@@ -8815,7 +8900,7 @@ export default function CreditReport() {
 
           {lawEngineAutoMode ? (
             <div>
-              <div className="text-xs font-semibold text-muted-foreground mb-2">Credit Report (Law Engine)</div>
+              <div className="text-xs font-semibold text-muted-foreground mb-2">{creditReportLawEngineTitle}</div>
               <div className="hidden md:flex items-center justify-between bg-card rounded-2xl shadow-lg border border-border p-6 overflow-x-auto">
                 <div className="flex items-center">
                   <button
@@ -8942,7 +9027,7 @@ export default function CreditReport() {
             </div>
           ) : (
             <div>
-              <div className="text-xs font-semibold text-muted-foreground mb-2">Credit Report</div>
+              <div className="text-xs font-semibold text-muted-foreground mb-2">{creditReportGroupTitle}</div>
               <div className="hidden md:flex items-center justify-between bg-card rounded-2xl shadow-lg border border-border p-6 overflow-x-auto">
                 {/* Overview */}
                 <div className="flex items-center">
@@ -9091,6 +9176,7 @@ export default function CreditReport() {
             </div>
           )}
         </div>
+        )}
 
         {/* Underwriting Tab */}
         <TabsContent value="underwriting" className="space-y-6 mt-6">
@@ -9161,7 +9247,8 @@ export default function CreditReport() {
                 <div>
                   <span className="font-semibold">Date:</span>
                   <span className="ml-2">
-                    {apiData?.reportData?.reportData?.CreditReport?.[0]?.DateReport || 
+                    {apiData?.CreditReport?.[0]?.DateReport ||
+                     apiData?.reportData?.CreditReport?.[0]?.DateReport ||
                      new Date().toLocaleDateString()}
                   </span>
                 </div>
@@ -9528,7 +9615,8 @@ export default function CreditReport() {
           </div>
 
           {/* Debt Utilization - Full Width (Do You Qualify) */}
-          <Card id="uw-do-you-qualify" className={`${qualifyView === 'table' ? 'hidden' : ''} border-0 shadow-xl bg-card scroll-mt-24`}>
+          {qualifyView !== 'table' && renderBasicUpgradeLockedCard(
+          <Card id="uw-do-you-qualify" className="border-0 shadow-xl bg-card scroll-mt-24">
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
                 <CardTitle className="text-2xl font-bold text-foreground">Do You Qualify</CardTitle>
@@ -11389,6 +11477,7 @@ export default function CreditReport() {
             </div>
             </CardContent>
           </Card>
+          )}
 
 
 
@@ -11770,70 +11859,118 @@ export default function CreditReport() {
                       </td>
                       <td className="py-2 px-4">Under 4 inquiries (fundable on that bureau's cards)</td>
                     </tr>
-                    <tr className={`border-b transition-colors ${getRowBgColor(
-                      reportData?.qualificationCriteria?.[1]?.noCollections || false,
-                      reportData?.qualificationCriteria?.[2]?.noCollections || false,
-                      reportData?.qualificationCriteria?.[3]?.noCollections || false
-                    )}`}>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noCollections), isMissingTu)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noCollections), isMissingEx)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noCollections), isMissingEq)}
-                      </td>
-                      <td className="py-2 px-4">Collections</td>
-                    </tr>
-                    <tr className={`border-b transition-colors ${getRowBgColor(
-                      reportData?.qualificationCriteria?.[1]?.noChargeOffs || false,
-                      reportData?.qualificationCriteria?.[2]?.noChargeOffs || false,
-                      reportData?.qualificationCriteria?.[3]?.noChargeOffs || false
-                    )}`}>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noChargeOffs), isMissingTu)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noChargeOffs), isMissingEx)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noChargeOffs), isMissingEq)}
-                      </td>
-                      <td className="py-2 px-4">Charge offs</td>
-                    </tr>
-                    <tr className={`border-b transition-colors ${getRowBgColor(
-                      reportData?.qualificationCriteria?.[1]?.noLatePayments || false,
-                      reportData?.qualificationCriteria?.[2]?.noLatePayments || false,
-                      reportData?.qualificationCriteria?.[3]?.noLatePayments || false
-                    )}`}>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noLatePayments), isMissingTu)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noLatePayments), isMissingEx)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noLatePayments), isMissingEq)}
-                      </td>
-                      <td className="py-2 px-4">Late payments (all time)</td>
-                    </tr>
-                    <tr className={`border-b transition-colors ${getRowBgColor(
-                      reportData?.qualificationCriteria?.[1]?.noBankruptcies || false,
-                      reportData?.qualificationCriteria?.[2]?.noBankruptcies || false,
-                      reportData?.qualificationCriteria?.[3]?.noBankruptcies || false
-                    )}`}>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noBankruptcies), isMissingTu)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noBankruptcies), isMissingEx)}
-                      </td>
-                      <td className="text-center py-2 px-4">
-                        {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noBankruptcies), isMissingEq)}
-                      </td>
-                      <td className="py-2 px-4">Bankruptcy</td>
-                    </tr>
+                    {isBasicAdminPortalUser ? (
+                      <tr className={`border-b transition-colors ${getRowBgColor(
+                        Boolean(reportData?.qualificationCriteria?.[1]?.noCollections)
+                          && Boolean(reportData?.qualificationCriteria?.[1]?.noChargeOffs)
+                          && Boolean(reportData?.qualificationCriteria?.[1]?.noLatePayments)
+                          && Boolean(reportData?.qualificationCriteria?.[1]?.noBankruptcies),
+                        Boolean(reportData?.qualificationCriteria?.[2]?.noCollections)
+                          && Boolean(reportData?.qualificationCriteria?.[2]?.noChargeOffs)
+                          && Boolean(reportData?.qualificationCriteria?.[2]?.noLatePayments)
+                          && Boolean(reportData?.qualificationCriteria?.[2]?.noBankruptcies),
+                        Boolean(reportData?.qualificationCriteria?.[3]?.noCollections)
+                          && Boolean(reportData?.qualificationCriteria?.[3]?.noChargeOffs)
+                          && Boolean(reportData?.qualificationCriteria?.[3]?.noLatePayments)
+                          && Boolean(reportData?.qualificationCriteria?.[3]?.noBankruptcies)
+                      )}`}>
+                        <td className="text-center py-2 px-4">
+                          {renderStatus(
+                            Boolean(reportData?.qualificationCriteria?.[1]?.noCollections)
+                              && Boolean(reportData?.qualificationCriteria?.[1]?.noChargeOffs)
+                              && Boolean(reportData?.qualificationCriteria?.[1]?.noLatePayments)
+                              && Boolean(reportData?.qualificationCriteria?.[1]?.noBankruptcies),
+                            isMissingTu
+                          )}
+                        </td>
+                        <td className="text-center py-2 px-4">
+                          {renderStatus(
+                            Boolean(reportData?.qualificationCriteria?.[2]?.noCollections)
+                              && Boolean(reportData?.qualificationCriteria?.[2]?.noChargeOffs)
+                              && Boolean(reportData?.qualificationCriteria?.[2]?.noLatePayments)
+                              && Boolean(reportData?.qualificationCriteria?.[2]?.noBankruptcies),
+                            isMissingEx
+                          )}
+                        </td>
+                        <td className="text-center py-2 px-4">
+                          {renderStatus(
+                            Boolean(reportData?.qualificationCriteria?.[3]?.noCollections)
+                              && Boolean(reportData?.qualificationCriteria?.[3]?.noChargeOffs)
+                              && Boolean(reportData?.qualificationCriteria?.[3]?.noLatePayments)
+                              && Boolean(reportData?.qualificationCriteria?.[3]?.noBankruptcies),
+                            isMissingEq
+                          )}
+                        </td>
+                        <td className="py-2 px-4">Negative Items</td>
+                      </tr>
+                    ) : (
+                      <>
+                        <tr className={`border-b transition-colors ${getRowBgColor(
+                          reportData?.qualificationCriteria?.[1]?.noCollections || false,
+                          reportData?.qualificationCriteria?.[2]?.noCollections || false,
+                          reportData?.qualificationCriteria?.[3]?.noCollections || false
+                        )}`}>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noCollections), isMissingTu)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noCollections), isMissingEx)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noCollections), isMissingEq)}
+                          </td>
+                          <td className="py-2 px-4">Collections</td>
+                        </tr>
+                        <tr className={`border-b transition-colors ${getRowBgColor(
+                          reportData?.qualificationCriteria?.[1]?.noChargeOffs || false,
+                          reportData?.qualificationCriteria?.[2]?.noChargeOffs || false,
+                          reportData?.qualificationCriteria?.[3]?.noChargeOffs || false
+                        )}`}>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noChargeOffs), isMissingTu)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noChargeOffs), isMissingEx)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noChargeOffs), isMissingEq)}
+                          </td>
+                          <td className="py-2 px-4">Charge offs</td>
+                        </tr>
+                        <tr className={`border-b transition-colors ${getRowBgColor(
+                          reportData?.qualificationCriteria?.[1]?.noLatePayments || false,
+                          reportData?.qualificationCriteria?.[2]?.noLatePayments || false,
+                          reportData?.qualificationCriteria?.[3]?.noLatePayments || false
+                        )}`}>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noLatePayments), isMissingTu)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noLatePayments), isMissingEx)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noLatePayments), isMissingEq)}
+                          </td>
+                          <td className="py-2 px-4">Late payments (all time)</td>
+                        </tr>
+                        <tr className={`border-b transition-colors ${getRowBgColor(
+                          reportData?.qualificationCriteria?.[1]?.noBankruptcies || false,
+                          reportData?.qualificationCriteria?.[2]?.noBankruptcies || false,
+                          reportData?.qualificationCriteria?.[3]?.noBankruptcies || false
+                        )}`}>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[1]?.noBankruptcies), isMissingTu)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[2]?.noBankruptcies), isMissingEx)}
+                          </td>
+                          <td className="text-center py-2 px-4">
+                            {renderStatus(Boolean(reportData?.qualificationCriteria?.[3]?.noBankruptcies), isMissingEq)}
+                          </td>
+                          <td className="py-2 px-4">Bankruptcy</td>
+                        </tr>
+                      </>
+                    )}
                         </>
                       );
                     })()}
@@ -12453,7 +12590,7 @@ export default function CreditReport() {
                 </ToggleGroup>
               </div>
 
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px]">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px_180px_180px]">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Search:</Label>
                   <Input
@@ -12493,6 +12630,21 @@ export default function CreditReport() {
                       <SelectItem value="all">All</SelectItem>
                       <SelectItem value="open">Open</SelectItem>
                       <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Sort by Age:</Label>
+                  <Select
+                    value={underwritingAccountsAgeSort}
+                    onValueChange={(value) => setUnderwritingAccountsAgeSort((value as 'oldest' | 'newest') || 'oldest')}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sort by Age" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="oldest">Oldest First</SelectItem>
+                      <SelectItem value="newest">Newest First</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -12724,6 +12876,7 @@ export default function CreditReport() {
                             status,
                             designator,
                             opened,
+                            ageMonths: getAccountAge(opened).totalMonths,
                             age: formatAge(opened),
                             limit,
                             balance,
@@ -12749,6 +12902,22 @@ export default function CreditReport() {
                           return haystack.includes(underwritingAccountsSearch.trim().toLowerCase());
                         })
                         .sort((left, right) => {
+                          const leftAge = Number.isFinite(left.ageMonths) && left.ageMonths >= 0 ? left.ageMonths : null;
+                          const rightAge = Number.isFinite(right.ageMonths) && right.ageMonths >= 0 ? right.ageMonths : null;
+
+                          if (leftAge === null && rightAge !== null) return 1;
+                          if (rightAge === null && leftAge !== null) return -1;
+
+                          if (leftAge !== null && rightAge !== null && underwritingAccountsAgeSort === 'oldest') {
+                            const ageDiff = rightAge - leftAge;
+                            if (ageDiff !== 0) return ageDiff;
+                          }
+
+                          if (leftAge !== null && rightAge !== null && underwritingAccountsAgeSort === 'newest') {
+                            const ageDiff = leftAge - rightAge;
+                            if (ageDiff !== 0) return ageDiff;
+                          }
+
                           const bureauDiff = bureauOrder[left.bureauKey] - bureauOrder[right.bureauKey];
                           if (bureauDiff !== 0) return bureauDiff;
                           return left.creditor.localeCompare(right.creditor);
@@ -12787,13 +12956,14 @@ export default function CreditReport() {
           </Card>
 
           {/* Pay Down */}
-          <Card id="uw-paydown" className="border-0 shadow-xl bg-card scroll-mt-24 dark:bg-slate-800 dark:border dark:border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-2xl font-bold text-foreground dark:text-white">Pay Down</CardTitle>
-              <CardDescription className="text-muted-foreground">Payments needed to reach target utilization levels</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {(() => {
+          {renderBasicUpgradeLockedCard(
+            <Card id="uw-paydown" className="border-0 shadow-xl bg-card scroll-mt-24 dark:bg-slate-800 dark:border dark:border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-foreground dark:text-white">Pay Down</CardTitle>
+                <CardDescription className="text-muted-foreground">Payments needed to reach target utilization levels</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
                 // Include additional target utilization columns after 20%
                 const targets = [30, 25, 20, 15, 10, 5, 0];
                 const formatCurrency = (n: number) => `$${Math.round(n).toLocaleString()}`;
@@ -13014,9 +13184,16 @@ export default function CreditReport() {
                     </Table>
                   </div>
                 );
-              })()}
-            </CardContent>
-          </Card>
+                })()}
+              </CardContent>
+            </Card>,
+            "",
+            {
+              title: "Upgrade Your Package",
+              description: "Unlock advanced tracking cards and deeper progress insights in the full portal.",
+              buttonLabel: "Upgrade",
+            }
+          )}
           {/* Pay Down Plan Modal */}
           <Dialog
             open={paydownDialogOpen}
@@ -13146,7 +13323,7 @@ export default function CreditReport() {
           <div className="bg-card rounded-2xl p-8 border-0 shadow-lg pdf-avoid-break pdf-section">
             <div className="text-center">
               <h1 className="text-4xl font-bold text-foreground mb-2">
-                My Credit Analysis
+                {isBasicAdminPortalUser ? `My Credit Analysis Insight ${clientName}` : "My Credit Analysis"}
               </h1>
               <p className="text-xl text-gray-600 mb-6">
                 Understanding Your Credit • Analysis Tracking • Future Planning
@@ -13162,16 +13339,22 @@ export default function CreditReport() {
                   return 'Needs Improvement';
                 })()}</span>
                 {(() => {
-                  const lastRow = reportHistory.length > 0 ? reportHistory[0] : null;
-                  const compareRow = reportHistory.length > 1 ? reportHistory[1] : null;
-                  const lastDate = formatMonthDay(getHistoryReportDateValue(lastRow) || (reportData as any)?.bureauDates?.experian || (reportData as any)?.bureauDates?.transunion || (reportData as any)?.bureauDates?.equifax);
-                  const compareDate = formatMonthDay(getHistoryReportDateValue(compareRow));
+                  const historyByPullDate = reportHistory
+                    .map((row) => {
+                      const pullDate = parseLooseDate(getHistoryPullDateValue(row));
+                      return { row, time: pullDate?.getTime() ?? null };
+                    })
+                    .sort((a, b) => (b.time ?? -Infinity) - (a.time ?? -Infinity));
+                  const lastRow = historyByPullDate[0]?.row ?? null;
+                  const compareRow = historyByPullDate[1]?.row ?? null;
+                  const lastDate = formatMonthDay(getHistoryPullDateValue(lastRow) || (reportData as any)?.bureauDates?.experian || (reportData as any)?.bureauDates?.transunion || (reportData as any)?.bureauDates?.equifax);
+                  const compareDate = formatMonthDay(getHistoryPullDateValue(compareRow));
                   return (
                     <>
                       <span>•</span>
-                      <span>Last report date: {lastDate}</span>
+                      <span>Latest report pull: {lastDate}</span>
                       <span>•</span>
-                      <span>Compared with: {compareDate}</span>
+                      <span>Previous report pull: {compareDate}</span>
                     </>
                   );
                 })()}
@@ -13371,7 +13554,7 @@ export default function CreditReport() {
 
                       {/* Footer Delta */}
                       <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between gap-4">
-                        <span className="text-xl text-slate-400 font-medium">Monthly Change</span>
+                        <span className="text-xl text-slate-400 font-medium">Change Since Previous Pull</span>
                         {(() => {
                            const cls = delta === null ? 'text-slate-400' : (delta > 0 ? 'text-green-500' : (delta < 0 ? 'text-red-500' : 'text-slate-500'));
                            const icon = delta === null ? null : (delta > 0 ? <TrendingUp className="w-3 h-3" /> : (delta < 0 ? <TrendingDown className="w-3 h-3" /> : null));
@@ -13815,11 +13998,9 @@ export default function CreditReport() {
                     isLatePaymentNegativeAccount(account)
                   ).length;
                   const collections = reportData.collections.length;
-                  const chargeOffs = reportData.accounts.filter((account: any) => {
-                    const status = (account.status || account.AccountStatus || '').toString().toLowerCase();
-                    const paymentStatus = (account.paymentHistory || account.PaymentStatus || '').toString().toLowerCase();
-                    return status.includes('charge off') || status.includes('charge-off') || paymentStatus.includes('chargeoff');
-                  }).length;
+                  const chargeOffs = reportData.accounts.filter((account: any) =>
+                    isChargeOffNegativeAccount(account)
+                  ).length;
                   const inquiriesCount = reportData.inquiries.length;
                   const publicRecordsCount = reportData.publicRecords?.length || 0;
                   return { latePayments, collections, chargeOffs, publicRecords: publicRecordsCount, inquiries: inquiriesCount };
@@ -14039,53 +14220,57 @@ export default function CreditReport() {
                         </tbody>
                       </table>
                     </div>
-                    {comparisonRows.length > 0 && (
+                    {(comparisonRows.length > 0 || isBasicAdminPortalUser) && renderBasicUpgradeLockedCard(
                       <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white rounded-lg border shadow-sm">
-                          <div className="px-4 py-3 border-b font-semibold text-green-700">Removed Items</div>
-                          <div className="p-4 space-y-2">
-                            {removed.length === 0 ? (
-                              <div className="text-sm text-gray-500">None removed</div>
-                            ) : (
-                              removed.map((it: any, idx: number) => (
-                                <div key={`removed-${idx}`} className="flex items-center justify-between text-sm">
-                                  <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
-                                  <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg border shadow-sm">
-                          <div className="px-4 py-3 border-b font-semibold text-amber-700">Still Present</div>
-                          <div className="p-4 space-y-2">
-                            {stillPresent.length === 0 ? (
-                              <div className="text-sm text-gray-500">None</div>
-                            ) : (
-                              stillPresent.map((it: any, idx: number) => (
-                                <div key={`present-${idx}`} className="flex items-center justify-between text-sm">
-                                  <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
-                                  <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg border shadow-sm">
-                          <div className="px-4 py-3 border-b font-semibold text-red-700">New Items</div>
-                          <div className="p-4 space-y-2">
-                            {added.length === 0 ? (
-                              <div className="text-sm text-gray-500">None</div>
-                            ) : (
-                              added.map((it: any, idx: number) => (
-                                <div key={`added-${idx}`} className="flex items-center justify-between text-sm">
-                                  <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
-                                  <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
-                                </div>
-                              ))
-                            )}
-                          </div>
-                        </div>
+                        {comparisonRows.length > 0 && (
+                          <>
+                            <div className="bg-white rounded-lg border shadow-sm">
+                              <div className="px-4 py-3 border-b font-semibold text-green-700">Removed Items</div>
+                              <div className="p-4 space-y-2">
+                                {removed.length === 0 ? (
+                                  <div className="text-sm text-gray-500">None removed</div>
+                                ) : (
+                                  removed.map((it: any, idx: number) => (
+                                    <div key={`removed-${idx}`} className="flex items-center justify-between text-sm">
+                                      <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
+                                      <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                            <div className="bg-white rounded-lg border shadow-sm">
+                              <div className="px-4 py-3 border-b font-semibold text-amber-700">Still Present</div>
+                              <div className="p-4 space-y-2">
+                                {stillPresent.length === 0 ? (
+                                  <div className="text-sm text-gray-500">None</div>
+                                ) : (
+                                  stillPresent.map((it: any, idx: number) => (
+                                    <div key={`present-${idx}`} className="flex items-center justify-between text-sm">
+                                      <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
+                                      <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                            <div className="bg-white rounded-lg border shadow-sm">
+                              <div className="px-4 py-3 border-b font-semibold text-red-700">New Items</div>
+                              <div className="p-4 space-y-2">
+                                {added.length === 0 ? (
+                                  <div className="text-sm text-gray-500">None</div>
+                                ) : (
+                                  added.map((it: any, idx: number) => (
+                                    <div key={`added-${idx}`} className="flex items-center justify-between text-sm">
+                                      <span className="text-gray-700">{it.type} • {it.accountNumber || 'N/A'}</span>
+                                      <span className="text-gray-500">{it.creditor || 'Unknown'}</span>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </>
@@ -14103,6 +14288,7 @@ export default function CreditReport() {
           </Card>
 
           {/* Credit History & Account Overview */}
+          {renderBasicUpgradeLockedCard(
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Length of Credit History */}
             <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-pink-50">
@@ -14278,6 +14464,7 @@ export default function CreditReport() {
               </CardContent>
             </Card>
           </div>
+          )}
 
           
         </TabsContent>
@@ -17991,15 +18178,16 @@ export default function CreditReport() {
                 {(() => {
                   // Get public records for each bureau
                   const getBureauPublicRecords = (bureauName: string) => {
-                    const mapBureauIdToName = (bid: number) => {
-                      if (bid === 2) return 'TransUnion';
-                      if (bid === 3) return 'Equifax';
-                      return 'Experian';
-                    };
                     const list = Array.isArray(reportData.publicRecords) ? reportData.publicRecords : [];
                     return list.filter((record: any) => {
-                      const bid = Number(record?.BureauId ?? record?.bureauId ?? record?.BureauID ?? 0);
-                      const name = record?.bureau || mapBureauIdToName(bid);
+                      const rawBureau = record?.bureau
+                        ?? record?.Bureau
+                        ?? record?.bureauName
+                        ?? record?.BureauName
+                        ?? record?.BureauId
+                        ?? record?.bureauId
+                        ?? record?.BureauID;
+                      const name = mapReportBureauName(rawBureau);
                       return name === bureauName;
                     });
                   };
@@ -20462,30 +20650,34 @@ export default function CreditReport() {
                     In this step, you will review the inquiries listed on your report and decide whether they should be
                     verified with the credit bureaus.
                   </p>
-                  <div>
-                    <p className="font-medium text-foreground dark:text-white">The Capsol provides two tools to help you take action:</p>
-                    <ul className="mt-2 space-y-2 list-disc list-inside">
-                      <li>Phone guidance to contact the credit bureaus and request verification of the inquiry.</li>
-                      <li>
-                        <span>Inquiry Exterminator GPT, which can generate a structured dispute letter based on the inquiry details.</span>
-                        <div className="mt-2">
-                          <Button asChild size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
-                            <a href="https://chatgpt.com/g/g-69a9f4a2bae08191a91e627a2f1fc7ac-inquiry-exterminator-gpt" target="_blank" rel="noopener noreferrer">
-                              Launch Inquiry Exterminator GPT
-                            </a>
-                          </Button>
-                        </div>
-                      </li>
-                    </ul>
-                  </div>
-                  <p>
-                    Addressing unauthorized or questionable inquiries early can help reduce unnecessary inquiry activity
-                    on your report and simplify later steps in your credit analysis process.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    The Capsol provides educational tools only. All disputes and communications with credit bureaus are
-                    performed directly by the consumer.
-                  </p>
+                  {!isBasicAdminPortalUser && (
+                    <>
+                      <div>
+                        <p className="font-medium text-foreground dark:text-white">Score Machine provides two tools to help you take action:</p>
+                        <ul className="mt-2 space-y-2 list-disc list-inside">
+                          <li>Phone guidance to contact the credit bureaus and request verification of the inquiry.</li>
+                          <li>
+                            <span>Inquiry Exterminator GPT, which can generate a structured dispute letter based on the inquiry details.</span>
+                            <div className="mt-2">
+                              <Button asChild size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
+                                <a href="https://chatgpt.com/g/g-69a9f4a2bae08191a91e627a2f1fc7ac-inquiry-exterminator-gpt" target="_blank" rel="noopener noreferrer">
+                                  Launch Inquiry Exterminator GPT
+                                </a>
+                              </Button>
+                            </div>
+                          </li>
+                        </ul>
+                      </div>
+                      <p>
+                        Addressing unauthorized or questionable inquiries early can help reduce unnecessary inquiry activity
+                        on your report and simplify later steps in your credit analysis process.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Score Machine provides educational tools only. All disputes and communications with credit bureaus are
+                        performed directly by the consumer.
+                      </p>
+                    </>
+                  )}
                 </div>
               </CardDescription>
             </CardHeader>
@@ -20636,7 +20828,7 @@ export default function CreditReport() {
                     affect how lenders evaluate your credit profile.
                   </p>
                   <p>
-                    The Capsol organizes this process using principles similar to the M2 framework, which
+                    Score Machine organizes this process using principles similar to the M2 framework, which
                     analyzes how different credit report factors may influence risk assessment and credit scoring
                     behavior. By identifying and categorizing negative items, users can better understand which areas of
                     their credit file may require attention.
@@ -20654,7 +20846,7 @@ export default function CreditReport() {
                   </div>
                   <p>
                     Users are free to manage this process using their own credit repair platform, dispute method, or
-                    professional service if they already have one in place. The Capsol simply provides the analysis
+                    professional service if they already have one in place. Score Machine simply provides the analysis
                     and organization tools needed to identify and review negative items so users can take the next steps
                     that best fit their situation.
                   </p>
@@ -21082,28 +21274,51 @@ export default function CreditReport() {
                     <TableRow className="dark:border-slate-700">
                       <TableCell>
                         <div className="flex items-center justify-center">
-                          <img src="/m2ficoforge_logo.svg" alt="M2 FICO Forge" className="h-12 w-auto" />
+                          <img
+                            src={isBasicAdminPortalUser ? "/company-logo.svg" : "/m2ficoforge_logo.svg"}
+                            alt={isBasicAdminPortalUser ? "Our credit repair software" : "M2 FICO Forge"}
+                            className="h-12 w-auto"
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="text-foreground dark:text-white">
                         <div className="flex flex-col justify-center">
-                          <span className="text-lg font-semibold">M2 FICO Forge</span>
+                          <span className="text-lg font-semibold">
+                            {isBasicAdminPortalUser ? 'Our credit repair software' : 'M2 FICO Forge'}
+                          </span>
                           <span className="text-sm text-muted-foreground">
-                            Dispute automation and credit repair software suite
+                            {isBasicAdminPortalUser
+                              ? 'Open the built-in credit repair workspace for this report.'
+                              : 'Dispute automation and credit repair software suite'}
                           </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild size="sm">
-                          <a
-                            href={creditRepairUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        {isBasicAdminPortalUser ? (
+                          <Button
+                            size="sm"
                             className="font-semibold"
+                            onClick={() => {
+                              const nextParams = new URLSearchParams(searchParams);
+                              nextParams.set('tab', 'creditRepair');
+                              nextParams.delete('lawEngineAuto');
+                              setSearchParams(nextParams);
+                            }}
                           >
                             Go To
-                          </a>
-                        </Button>
+                          </Button>
+                        ) : (
+                          <Button asChild size="sm">
+                            <a
+                              href={creditRepairUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-semibold"
+                            >
+                              Go To
+                            </a>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   </TableBody>
@@ -21124,7 +21339,7 @@ export default function CreditReport() {
             </CardHeader>
             <CardContent>
               {(() => {
-                const targets = [30, 25, 20, 15, 10, 5, 0];
+                const targets = isBasicAdminPortalUser ? [30] : [30, 25, 20, 15, 10, 5, 0];
                 const formatCurrency = (n: number) => `$${Math.round(n).toLocaleString()}`;
                 const formatPercent = (n: number) => `${Math.round(n)}%`;
 
@@ -21793,177 +22008,187 @@ export default function CreditReport() {
                         {averageAgePlanner.ruleNotice}
                       </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Unique Tradelines</p>
-                          <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{averageAgePlanner.currentUniqueCount}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Average Age</p>
-                          <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{formatAgeMonths(averageAgePlanner.currentAverageAgeMonths)}</p>
-                          <p className="text-xs text-muted-foreground">{Math.round(averageAgePlanner.currentAverageAgeMonths)} months</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Age Pool</p>
-                          <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{Math.round(averageAgePlanner.totalAgePoolMonths).toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">{formatAgeMonths(averageAgePlanner.totalAgePoolMonths)}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Oldest Account</p>
-                          <p className="mt-2 text-sm font-semibold text-foreground dark:text-white">{averageAgePlanner.oldestTradeline?.creditorName || 'N/A'}</p>
-                          <p className="text-xs text-muted-foreground">{averageAgePlanner.oldestTradeline ? formatAgeMonths(averageAgePlanner.oldestTradeline.ageMonths) : 'N/A'}</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
-                          <p className="text-xs uppercase tracking-wide text-muted-foreground">Youngest Account</p>
-                          <p className="mt-2 text-sm font-semibold text-foreground dark:text-white">{averageAgePlanner.youngestTradeline?.creditorName || 'N/A'}</p>
-                          <p className="text-xs text-muted-foreground">{averageAgePlanner.youngestTradeline ? formatAgeMonths(averageAgePlanner.youngestTradeline.ageMonths) : 'N/A'}</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground dark:text-white">Target average age</label>
-                          <Select value={averageAgeTargetYears} onValueChange={setAverageAgeTargetYears}>
-                            <SelectTrigger className="bg-white dark:bg-slate-950/60">
-                              <SelectValue placeholder="Select target" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {AGE_GROWTH_TARGET_OPTIONS_YEARS.map((year) => (
-                                <SelectItem key={year} value={String(year)}>{year} years</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground dark:text-white">Max added tradelines</label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={averageAgeMaxTradelines}
-                            onChange={(event) => setAverageAgeMaxTradelines(event.target.value)}
-                            className="bg-white dark:bg-slate-950/60"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground dark:text-white">Min tradeline age</label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={averageAgeMinTradelineYears}
-                            onChange={(event) => setAverageAgeMinTradelineYears(event.target.value)}
-                            className="bg-white dark:bg-slate-950/60"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-foreground dark:text-white">Max tradeline age</label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={50}
-                            value={averageAgeMaxTradelineYears}
-                            onChange={(event) => setAverageAgeMaxTradelineYears(event.target.value)}
-                            className="bg-white dark:bg-slate-950/60"
-                          />
-                        </div>
-                      </div>
-
-                      {averageAgePlanner.warning ? (
-                        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
-                          {averageAgePlanner.warning}
-                        </div>
-                      ) : null}
-
-                      {averageAgePlanner.scenarios.length > 0 ? (
-                        <div className="mt-4 overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="dark:border-slate-700">
-                                <TableHead className="dark:text-white">Target Avg</TableHead>
-                                <TableHead className="dark:text-white">Tradeline Age</TableHead>
-                                <TableHead className="dark:text-white">Tradelines Needed</TableHead>
-                                <TableHead className="dark:text-white">Planning Note</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {averageAgePlanner.scenarios.map((scenario) => (
-                                <TableRow key={`${scenario.targetAverageMonths}-${scenario.tradelineAgeMonths}-${scenario.tradelinesNeeded}`} className="dark:border-slate-700">
-                                  <TableCell className="font-medium text-foreground dark:text-white">{formatAgeMonths(scenario.targetAverageMonths)}</TableCell>
-                                  <TableCell className="text-foreground dark:text-white">{formatAgeMonths(scenario.tradelineAgeMonths)}</TableCell>
-                                  <TableCell className="text-foreground dark:text-white">{scenario.tradelinesNeeded}</TableCell>
-                                  <TableCell className="text-muted-foreground">
-                                    {scenario.tradelinesNeeded === 1
-                                      ? 'One seasoned tradeline at this age clears the target.'
-                                      : `${scenario.tradelinesNeeded} tradelines at ${formatAgeMonths(scenario.tradelineAgeMonths)} are required to reach ${formatAgeMonths(scenario.targetAverageMonths)}.`}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      ) : null}
-
-                      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
-                          <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Accounts Pulling Average Down</h4>
-                          <div className="mt-3 space-y-3">
-                            {averageAgePlanner.draggingTradelines.length > 0 ? (
-                              averageAgePlanner.draggingTradelines.map((tradeline) => (
-                                <div key={`drag-${tradeline.key}`} className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="font-medium text-foreground dark:text-white">{tradeline.creditorName}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Opened {tradeline.openDate} • {tradeline.accountType} • {tradeline.ownershipType}
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline" className="whitespace-nowrap">{formatAgeMonths(tradeline.ageMonths)}</Badge>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-muted-foreground">No eligible tradelines found.</p>
-                            )}
+                      {renderBasicUpgradeLockedCard(
+                        <div className="space-y-4">
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Unique Tradelines</p>
+                              <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{averageAgePlanner.currentUniqueCount}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Average Age</p>
+                              <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{formatAgeMonths(averageAgePlanner.currentAverageAgeMonths)}</p>
+                              <p className="text-xs text-muted-foreground">{Math.round(averageAgePlanner.currentAverageAgeMonths)} months</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Total Age Pool</p>
+                              <p className="mt-2 text-2xl font-semibold text-foreground dark:text-white">{Math.round(averageAgePlanner.totalAgePoolMonths).toLocaleString()}</p>
+                              <p className="text-xs text-muted-foreground">{formatAgeMonths(averageAgePlanner.totalAgePoolMonths)}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Oldest Account</p>
+                              <p className="mt-2 text-sm font-semibold text-foreground dark:text-white">{averageAgePlanner.oldestTradeline?.creditorName || 'N/A'}</p>
+                              <p className="text-xs text-muted-foreground">{averageAgePlanner.oldestTradeline ? formatAgeMonths(averageAgePlanner.oldestTradeline.ageMonths) : 'N/A'}</p>
+                            </div>
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/60">
+                              <p className="text-xs uppercase tracking-wide text-muted-foreground">Youngest Account</p>
+                              <p className="mt-2 text-sm font-semibold text-foreground dark:text-white">{averageAgePlanner.youngestTradeline?.creditorName || 'N/A'}</p>
+                              <p className="text-xs text-muted-foreground">{averageAgePlanner.youngestTradeline ? formatAgeMonths(averageAgePlanner.youngestTradeline.ageMonths) : 'N/A'}</p>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
-                          <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Accounts Anchoring The File</h4>
-                          <div className="mt-3 space-y-3">
-                            {averageAgePlanner.anchoringTradelines.length > 0 ? (
-                              averageAgePlanner.anchoringTradelines.map((tradeline) => (
-                                <div key={`anchor-${tradeline.key}`} className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <p className="font-medium text-foreground dark:text-white">{tradeline.creditorName}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Opened {tradeline.openDate} • {tradeline.accountType} • {tradeline.ownershipType}
-                                    </p>
-                                  </div>
-                                  <Badge variant="outline" className="whitespace-nowrap">{formatAgeMonths(tradeline.ageMonths)}</Badge>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-muted-foreground">No eligible tradelines found.</p>
-                            )}
+                          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground dark:text-white">Target average age</label>
+                              <Select value={averageAgeTargetYears} onValueChange={setAverageAgeTargetYears}>
+                                <SelectTrigger className="bg-white dark:bg-slate-950/60">
+                                  <SelectValue placeholder="Select target" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {AGE_GROWTH_TARGET_OPTIONS_YEARS.map((year) => (
+                                    <SelectItem key={year} value={String(year)}>{year} years</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground dark:text-white">Max added tradelines</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={averageAgeMaxTradelines}
+                                onChange={(event) => setAverageAgeMaxTradelines(event.target.value)}
+                                className="bg-white dark:bg-slate-950/60"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground dark:text-white">Min tradeline age</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={averageAgeMinTradelineYears}
+                                onChange={(event) => setAverageAgeMinTradelineYears(event.target.value)}
+                                className="bg-white dark:bg-slate-950/60"
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-foreground dark:text-white">Max tradeline age</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={averageAgeMaxTradelineYears}
+                                onChange={(event) => setAverageAgeMaxTradelineYears(event.target.value)}
+                                className="bg-white dark:bg-slate-950/60"
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      {averageAgePlanner.notes.length > 0 ? (
-                        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
-                          <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Strategy Notes</h4>
-                          <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                            {averageAgePlanner.notes.map((note) => (
-                              <li key={note} className="flex gap-2">
-                                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
-                                <span>{note}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
+                          {averageAgePlanner.warning ? (
+                            <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
+                              {averageAgePlanner.warning}
+                            </div>
+                          ) : null}
+
+                          {averageAgePlanner.scenarios.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow className="dark:border-slate-700">
+                                    <TableHead className="dark:text-white">Target Avg</TableHead>
+                                    <TableHead className="dark:text-white">Tradeline Age</TableHead>
+                                    <TableHead className="dark:text-white">Tradelines Needed</TableHead>
+                                    <TableHead className="dark:text-white">Planning Note</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {averageAgePlanner.scenarios.map((scenario) => (
+                                    <TableRow key={`${scenario.targetAverageMonths}-${scenario.tradelineAgeMonths}-${scenario.tradelinesNeeded}`} className="dark:border-slate-700">
+                                      <TableCell className="font-medium text-foreground dark:text-white">{formatAgeMonths(scenario.targetAverageMonths)}</TableCell>
+                                      <TableCell className="text-foreground dark:text-white">{formatAgeMonths(scenario.tradelineAgeMonths)}</TableCell>
+                                      <TableCell className="text-foreground dark:text-white">{scenario.tradelinesNeeded}</TableCell>
+                                      <TableCell className="text-muted-foreground">
+                                        {scenario.tradelinesNeeded === 1
+                                          ? 'One seasoned tradeline at this age clears the target.'
+                                          : `${scenario.tradelinesNeeded} tradelines at ${formatAgeMonths(scenario.tradelineAgeMonths)} are required to reach ${formatAgeMonths(scenario.targetAverageMonths)}.`}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          ) : null}
+
+                          <div className="grid gap-4 xl:grid-cols-2">
+                            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
+                              <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Accounts Pulling Average Down</h4>
+                              <div className="mt-3 space-y-3">
+                                {averageAgePlanner.draggingTradelines.length > 0 ? (
+                                  averageAgePlanner.draggingTradelines.map((tradeline) => (
+                                    <div key={`drag-${tradeline.key}`} className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="font-medium text-foreground dark:text-white">{tradeline.creditorName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Opened {tradeline.openDate} • {tradeline.accountType} • {tradeline.ownershipType}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className="whitespace-nowrap">{formatAgeMonths(tradeline.ageMonths)}</Badge>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No eligible tradelines found.</p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
+                              <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Accounts Anchoring The File</h4>
+                              <div className="mt-3 space-y-3">
+                                {averageAgePlanner.anchoringTradelines.length > 0 ? (
+                                  averageAgePlanner.anchoringTradelines.map((tradeline) => (
+                                    <div key={`anchor-${tradeline.key}`} className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="font-medium text-foreground dark:text-white">{tradeline.creditorName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          Opened {tradeline.openDate} • {tradeline.accountType} • {tradeline.ownershipType}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className="whitespace-nowrap">{formatAgeMonths(tradeline.ageMonths)}</Badge>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">No eligible tradelines found.</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {averageAgePlanner.notes.length > 0 ? (
+                            <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60">
+                              <h4 className="text-sm font-semibold uppercase tracking-wide text-foreground dark:text-white">Strategy Notes</h4>
+                              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                                {averageAgePlanner.notes.map((note) => (
+                                  <li key={note} className="flex gap-2">
+                                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-slate-400 dark:bg-slate-500" />
+                                    <span>{note}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : null}
+                        </div>,
+                        "rounded-2xl",
+                        {
+                          title: "Upgrade Your Plan",
+                          description: "Unlock advanced average-age planning tools in the full portal.",
+                          buttonLabel: "Upgrade",
+                        },
+                      )}
                     </div>
                   </div>
                 );
@@ -21996,7 +22221,9 @@ export default function CreditReport() {
                   {showFundingCta ? (
                     <div className="space-y-4">
                       <p className="text-lg font-medium">
-                        Great news! This client is flagged as fundable. Proceed to the funding workspace to launch curated applications.
+                        {isBasicAdminPortalUser
+                          ? 'Great news! Your report is flagged as fundable. Proceed to the funding workspace to launch curated applications.'
+                          : 'Great news! This client is flagged as fundable. Proceed to the funding workspace to launch curated applications.'}
                       </p>
                       <Button
                         size="lg"
@@ -22009,7 +22236,9 @@ export default function CreditReport() {
                   ) : (
                     <div className="space-y-4">
                       <p className="text-lg font-medium">
-                        This client is not yet fundable. Rerun the funding audit to update status once key items are addressed.
+                        {isBasicAdminPortalUser
+                          ? 'Your report is not yet fundable. Rerun the funding audit to update status once key items are addressed.'
+                          : 'This client is not yet fundable. Rerun the funding audit to update status once key items are addressed.'}
                       </p>
                       <Button
                         size="lg"
@@ -22041,7 +22270,6 @@ export default function CreditReport() {
           })()}
 
         </TabsContent>
-
         {/* Comprehensive Credit Analysis Report */}
         <TabsContent value="analysis" className="space-y-8 mt-6">
           <div ref={analysisRef} className="analysis-pdf-root space-y-8">
@@ -22049,7 +22277,7 @@ export default function CreditReport() {
           <div className="bg-card rounded-2xl p-8 border-0 shadow-lg pdf-avoid-break">
             <div className="text-center">
               <h1 className="text-4xl font-bold text-foreground mb-2">
-                My Credit Analysis
+                {isBasicAdminPortalUser ? `My Credit Analysis Insight (${clientName})` : "My Credit Analysis"}
               </h1>
               <p className="text-xl text-muted-foreground mb-6">
                 Company Profile • Understanding Your Credit • How Credit Affects
@@ -22100,6 +22328,9 @@ export default function CreditReport() {
                 Introduction to Credit Bureaus and Credit Reports
               </div>
           </div>
+
+          {!isBasicAdminPortalUser && (
+            <>
 
               {/* What Are Credit Bureaus */}
               <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm pdf-avoid-break pdf-section pdf-break-before">
@@ -22154,7 +22385,7 @@ export default function CreditReport() {
                   What Is in My Credit Report?
                 </h3>
                 <p className="text-gray-700 mb-6">
-                  A credit report is a detailed document that outlines your
+                  sA credit report is a detailed document that outlines your
                   credit history, compiled by credit bureaus. It is used by
                   lenders, landlords, and even some employers to gauge your
                   reliability as a financial borrower.
@@ -22445,6 +22676,8 @@ export default function CreditReport() {
                   Overview of Your Credit Scores and Detailed Analysis
                 </div>
             </div>
+            </>
+          )}
 
               {/* Current Credit Scores */}
               <div className="bg-white rounded-xl p-6 border border-blue-200 shadow-sm pdf-avoid-break">
@@ -23116,6 +23349,9 @@ export default function CreditReport() {
                   </TableBody>
                 </Table>
               </div>
+
+          {!isBasicAdminPortalUser && (
+            <>
             {/* Negative Aspects - Bad Accounts Header */}
             <div className="bg-gradient-to-br from-red-50 via-rose-50 to-pink-50 rounded-2xl p-6 border-0 shadow-xl pdf-avoid-break pdf-section-break">
                 <div className="flex items-center gap-2 text-2xl font-bold text-red-800 mb-2">
@@ -23220,6 +23456,8 @@ export default function CreditReport() {
                   </TableBody>
                 </Table>
               </div>
+            </>
+          )}
             {/* Positive Aspects - Good Standing Accounts Header */}
             <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 rounded-2xl p-6 border-0 shadow-xl pdf-avoid-break">
                 <div className="flex items-center gap-2 text-2xl font-bold text-green-800 mb-2">
@@ -23325,6 +23563,9 @@ export default function CreditReport() {
                   </TableBody>
                 </Table>
               </div>
+
+          {!isBasicAdminPortalUser && (
+            <>
             {/* Common Mistakes Header */}
             <div className="bg-gradient-to-br from-orange-50 via-red-50 to-pink-50 rounded-2xl p-6 border-0 shadow-xl pdf-avoid-break">
                 <div className="flex items-center gap-2 text-2xl font-bold text-orange-800 mb-2">
@@ -23437,6 +23678,8 @@ export default function CreditReport() {
                   </div>
                 </div>
               </div>
+            </>
+          )}
   
           </div>
   
@@ -24437,7 +24680,7 @@ export default function CreditReport() {
                   {[1, 2, 3].map((bid) => {
                     const bureauRecords = (reportData.publicRecords as any[]).filter((r: any) => Number(r?.BureauId) === bid);
                     if (!bureauRecords || bureauRecords.length === 0) return null;
-                    const bureauLabel = bid === 1 ? "Experian" : bid === 2 ? "TransUnion" : "Equifax";
+                    const bureauLabel = bid === 1 ? "TransUnion" : bid === 2 ? "Experian" : "Equifax";
                     return (
                       <div key={bid} className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -24720,30 +24963,25 @@ export default function CreditReport() {
                               <RadioGroup
                                 value={selectedDisputeContentType}
                                 onValueChange={(value) => {
-                                  const nextType = value as DisputeContentType;
-                                  if (comingSoonDisputeContentTypes.has(nextType)) {
-                                    return;
-                                  }
-                                  setSelectedDisputeContentType(nextType);
+                                  setSelectedDisputeContentType(value as DisputeContentType);
                                 }}
                                 className="space-y-2"
                               >
-                                {disputeContentTypes.map((type) => {
+                                {visibleDisputeContentTypes.map((type) => {
                                   const id = `dispute-type-${type.toLowerCase()}`;
-                                  const isComingSoon = comingSoonDisputeContentTypes.has(type);
+                                  const isComingSoon = type === "ELITE" || type === "UNLIMITED";
                                   return (
                                     <div key={type} className="relative overflow-hidden rounded-lg border bg-background/90 p-3">
-                                      <div className={`flex items-start space-x-2 ${isComingSoon ? 'pointer-events-none select-none blur-[1.5px]' : ''}`}>
+                                      <div className={`flex items-start space-x-2 ${isComingSoon ? "pointer-events-none select-none blur-[2px]" : ""}`}>
                                         <RadioGroupItem value={type} id={id} disabled={isComingSoon} />
                                         <div>
-                                          <Label htmlFor={id} className={`font-semibold ${isComingSoon ? 'cursor-not-allowed' : 'cursor-pointer'}`}>{disputeContentTypeLabels[type]}</Label>
+                                          <Label htmlFor={id} className="cursor-pointer font-semibold">{disputeContentTypeLabels[type]}</Label>
                                           <p className="text-xs text-muted-foreground">{disputeContentTypeDescriptions[type]}</p>
                                         </div>
                                       </div>
-
                                       {isComingSoon && (
-                                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-background/55 backdrop-blur-sm">
-                                          <div className="rounded-full border border-border bg-background/95 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground shadow-sm">
+                                        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/20 backdrop-blur-[2px]">
+                                          <div className="rounded-md border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm">
                                             Coming Soon
                                           </div>
                                         </div>
@@ -24916,7 +25154,7 @@ export default function CreditReport() {
                               Download & Print Letters
                             </h3>
                             <p className="text-sm text-blue-700/70 dark:text-blue-300/70 mt-1">
-                              {letterOutputs.length} dispute letter{letterOutputs.length > 1 ? 's' : ''} ready for download or printing
+                              {letterOutputs.length} dispute letter{letterOutputs.length > 1 ? 's' : ''} ready for download or Send for printing
                             </p>
                           </div>
                           <div className="flex flex-col sm:flex-row gap-3">

@@ -197,11 +197,11 @@ function FundabilityGauge({ score, animateOnMount = true }: { score: number; ani
     <svg viewBox="0 0 300 175" className="w-full max-w-[280px] mx-auto drop-shadow-xl">
       <defs>
         <linearGradient id="gaugeGradElectric" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#002f1b" />
-          <stop offset="25%" stopColor="#004225" />
-          <stop offset="50%" stopColor="#77dd77" />
-          <stop offset="75%" stopColor="#5fcf74" />
-          <stop offset="100%" stopColor="#dfffe0" />
+          <stop offset="0%" stopColor="#ff0055" />
+          <stop offset="25%" stopColor="#ff00ff" />
+          <stop offset="50%" stopColor="#7000ff" />
+          <stop offset="75%" stopColor="#00d4ff" />
+          <stop offset="100%" stopColor="#00ffcc" />
         </linearGradient>
         <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="4" result="blur" />
@@ -233,7 +233,7 @@ function FundabilityGauge({ score, animateOnMount = true }: { score: number; ani
       <circle cx={cx} cy={cy} r="2.5" className="fill-white dark:fill-slate-950" />
       {/* Score text */}
       <text x={cx} y={cy - 25} textAnchor="middle" className="fill-slate-800 dark:fill-slate-100" fontSize="48" fontWeight="800" letterSpacing="-1">{clampedScore}</text>
-      <text x={cx} y={cy + 12} textAnchor="middle" className="fill-[#77dd77]" fontSize="11" fontWeight="800" letterSpacing="2">AVG FUNDABILITY</text>
+      <text x={cx} y={cy + 12} textAnchor="middle" className="fill-[#00d4ff]" fontSize="11" fontWeight="800" letterSpacing="2">AVG FUNDABILITY</text>
     </svg>
   );
 }
@@ -299,7 +299,7 @@ function ProgressSegmentBar({ segments, totalPct, animateOnMount = true }: { seg
     <div className="mt-6 p-4 bg-white dark:bg-slate-900 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgba(0,0,0,0.03)]">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest">Overall Client Progress</span>
-        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#004225] to-[#77dd77] drop-shadow-sm">{totalPct}%</span>
+        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] drop-shadow-sm">{totalPct}%</span>
       </div>
       <div className="flex h-3 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 dark:bg-slate-800 shadow-inner">
         {segments.map((seg, i) => (
@@ -380,25 +380,25 @@ export default function EliteDashboard({
 
   const totalAttn = (attn?.no_score ?? 0) + (attn?.improving ?? 0) + (attn?.declining_or_stable ?? 0) + (attn?.ready_for_matching ?? 0);
   const progressSegments = [
-    { label: "Analysis", pct: pct(attn?.no_score ?? 0, totalAttn || 1), gradient: "from-[#002f1b] to-[#004225]" },
-    { label: "In Progress", pct: pct(attn?.improving ?? 0, totalAttn || 1), gradient: "from-[#004225] to-[#77dd77]" },
-    { label: "Verifying", pct: pct(attn?.declining_or_stable ?? 0, totalAttn || 1), gradient: "from-[#77dd77] to-[#5fcf74]" },
-    { label: "Match Ready", pct: pct(attn?.ready_for_matching ?? 0, totalAttn || 1), gradient: "from-[#dfffe0] to-[#77dd77]" },
+    { label: "Analysis", pct: pct(attn?.no_score ?? 0, totalAttn || 1), gradient: "from-blue-400 to-cyan-400" },
+    { label: "In Progress", pct: pct(attn?.improving ?? 0, totalAttn || 1), gradient: "from-amber-400 to-orange-400" },
+    { label: "Verifying", pct: pct(attn?.declining_or_stable ?? 0, totalAttn || 1), gradient: "from-purple-400 to-fuchsia-400" },
+    { label: "Match Ready", pct: pct(attn?.ready_for_matching ?? 0, totalAttn || 1), gradient: "from-emerald-400 to-[#00ffcc]" },
   ];
 
-  const scoreColors: Record<string, string> = { Poor: "#002f1b", Fair: "#004225", Good: "#77dd77", "Very Good": "#5fcf74", Excellent: "#dfffe0" };
+  const scoreColors: Record<string, string> = { Poor: "#ff0055", Fair: "#ff9900", Good: "#00d4ff", "Very Good": "#7000ff", Excellent: "#00ffcc" };
   const donutSegments = (ed?.credit_score_distribution ?? []).map((d) => ({
     label: d.score_range, value: d.count, color: scoreColors[d.score_range] || "#cbd5e1",
   }));
   const totalScored = donutSegments.reduce((s, x) => s + x.value, 0);
 
   const statusBarData = [
-    { label: "Fundable", value: stats.fundable, gradient: "from-[#dfffe0] to-[#77dd77]" },
-    { label: "In Progress", value: inProgressCount, gradient: "from-[#004225] to-[#77dd77]" },
-    { label: "Match Ready", value: attn?.ready_for_matching ?? 0, gradient: "from-[#77dd77] to-[#5fcf74]" },
-    { label: "Not Fundable", value: stats.notFundable, gradient: "from-[#002f1b] to-[#004225]" },
-    { label: "New This Month", value: newThisMonthCount, gradient: "from-[#dfffe0] to-[#5fcf74]" },
-    { label: "Inactive", value: inactiveCount || stats.loginDisabled, gradient: "from-[#004225] to-[#002f1b]" },
+    { label: "Fundable", value: stats.fundable, gradient: "from-[#00d4ff] to-[#00ffcc]" },
+    { label: "In Progress", value: inProgressCount, gradient: "from-blue-400 to-indigo-500" },
+    { label: "Match Ready", value: attn?.ready_for_matching ?? 0, gradient: "from-emerald-400 to-green-500" },
+    { label: "Not Fundable", value: stats.notFundable, gradient: "from-rose-400 to-red-500" },
+    { label: "New This Month", value: newThisMonthCount, gradient: "from-emerald-400 to-[#00ffcc]" },
+    { label: "Inactive", value: inactiveCount || stats.loginDisabled, gradient: "from-slate-300 to-slate-400" },
   ];
 
   const filteredClients = useMemo(() => {
@@ -442,29 +442,29 @@ export default function EliteDashboard({
       label: "New Clients",
       value: stats.totalClients > 0 ? Math.floor(stats.totalClients * 0.15) : 0,
       icon: Target,
-      iconClassName: "text-[#004225]",
-      valueClassName: "text-[#004225]",
+      iconClassName: "text-[#00d4ff]",
+      valueClassName: "text-[#00d4ff]",
     },
     {
       label: "Got Funded",
       value: stats.fundable || 0,
       icon: Zap,
-      iconClassName: "text-[#77dd77]",
-      valueClassName: "text-[#77dd77]",
+      iconClassName: "text-emerald-500",
+      valueClassName: "text-emerald-500",
     },
     {
       label: "Reports Pulls",
       value: stats.reportPulls || 0,
       icon: Award,
-      iconClassName: "text-[#5fcf74]",
-      valueClassName: "text-[#5fcf74]",
+      iconClassName: "text-[#7000ff]",
+      valueClassName: "text-[#7000ff]",
     },
     {
       label: "Funding Invoice Paid",
       value: stats.fundingInvoicesPaid || 0,
       icon: DollarSign,
-      iconClassName: "text-[#77dd77]",
-      valueClassName: "text-[#77dd77]",
+      iconClassName: "text-amber-500",
+      valueClassName: "text-amber-500",
     },
   ];
 
@@ -508,14 +508,14 @@ export default function EliteDashboard({
         {/* ════════ HEADER ════════ */}
         <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white dark:bg-slate-900 dark:bg-slate-900/60 dark:bg-slate-900/60 backdrop-blur-xl p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
           <div>
-            <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#77dd77] to-[#004225] tracking-tight">
-              The Capsol Elite
+            <h1 className="text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 dark:from-white via-[#1B8B00] to-[#77dd77] tracking-tight">
+              CapSol Elite
             </h1>
             <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Professional Command Center</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-900 to-slate-800 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.2)]">
-              <Crown className="h-4 w-4 text-[#dfffe0]" />
+              <Crown className="h-4 w-4 text-[#00ffcc]" />
               <span className="text-xs font-bold text-white uppercase tracking-wider">Elite Access Active</span>
             </div>
           </div>
@@ -536,99 +536,99 @@ export default function EliteDashboard({
             </div>
           </motion.div>
           
-          <motion.div variants={itemVariants} onClick={() => navigate("/clients?status=notfundable")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,66,37,0.16)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#002f1b] to-[#004225]"></div>
+          <motion.div variants={itemVariants} onClick={() => navigate("/clients?status=notfundable")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(255,0,85,0.15)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#ff0055] to-[#ff00ff]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">Not Fundable</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><Target className="h-4 w-4 text-[#002f1b] dark:text-[#dfffe0]" /></div>
+              <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-900/50 dark:bg-rose-900/50 group-hover:bg-rose-100 transition-colors shadow-inner"><Target className="h-4 w-4 text-[#ff0055]" /></div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{stats.notFundable}</span>
-              <span className="text-xs font-bold text-[#002f1b] dark:text-[#dfffe0]">{pctDec(stats.notFundable, total)}%</span>
+              <span className="text-xs font-bold text-[#ff0055]">{pctDec(stats.notFundable, total)}%</span>
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} onClick={() => navigate("/clients")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(119,221,119,0.18)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#004225] to-[#77dd77]"></div>
+          <motion.div variants={itemVariants} onClick={() => navigate("/clients")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(255,153,0,0.15)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#ff9900] to-[#ffcc00]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">In Progress</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><Activity className="h-4 w-4 text-[#77dd77] dark:text-[#5fcf74]" /></div>
+              <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-900/50 dark:bg-amber-900/50 group-hover:bg-amber-100 transition-colors shadow-inner"><Activity className="h-4 w-4 text-[#ff9900]" /></div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{inProgressCount}</span>
-              <span className="text-xs font-bold text-[#77dd77] dark:text-[#5fcf74]">{pctDec(inProgressCount, total)}%</span>
+              <span className="text-xs font-bold text-[#ff9900]">{pctDec(inProgressCount, total)}%</span>
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} onClick={() => navigate("/clients?status=fundable")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(119,221,119,0.16)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#dfffe0] to-[#77dd77]"></div>
+          <motion.div variants={itemVariants} onClick={() => navigate("/clients?status=fundable")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,255,204,0.15)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00ffcc] to-[#00b386]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">Match Ready</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><Award className="h-4 w-4 text-[#77dd77] dark:text-[#5fcf74]" /></div>
+              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 dark:bg-emerald-900/50 group-hover:bg-emerald-100 transition-colors shadow-inner"><Award className="h-4 w-4 text-[#00ffcc]" /></div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{stats.fundable}</span>
-              <span className="text-xs font-bold text-[#77dd77] dark:text-[#5fcf74]">{pctDec(stats.fundable, total)}%</span>
+              <span className="text-xs font-bold text-[#00ffcc]">{pctDec(stats.fundable, total)}%</span>
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} onClick={() => navigate("/clients")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(95,207,116,0.16)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#77dd77] to-[#5fcf74]"></div>
+          <motion.div variants={itemVariants} onClick={() => navigate("/clients")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,255,204,0.15)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00ffcc] to-emerald-500"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">New This Month</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><Plus className="h-4 w-4 text-[#5fcf74] dark:text-[#77dd77]" /></div>
+              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 dark:bg-emerald-900/50 group-hover:bg-emerald-100 transition-colors shadow-inner"><Plus className="h-4 w-4 text-[#00ffcc]" /></div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{newThisMonthCount}</span>
-              <span className="text-xs font-bold text-[#5fcf74] dark:text-[#77dd77]">{pctDec(newThisMonthCount, total)}%</span>
+              <span className="text-xs font-bold text-[#00ffcc]">{pctDec(newThisMonthCount, total)}%</span>
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} onClick={() => navigate("/clients?loginStatus=disabled")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,66,37,0.16)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#002f1b] to-[#77dd77]"></div>
+          <motion.div variants={itemVariants} onClick={() => navigate("/clients?loginStatus=disabled")} className="group cursor-pointer bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(112,0,255,0.15)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#7000ff] to-[#4a00cc]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">Inactive</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><UserX className="h-4 w-4 text-[#004225] dark:text-[#dfffe0]" /></div>
+              <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-900/50 dark:bg-purple-900/50 group-hover:bg-purple-100 transition-colors shadow-inner"><UserX className="h-4 w-4 text-[#7000ff]" /></div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{inactiveCount || stats.loginDisabled}</span>
-              <span className="text-xs font-bold text-[#004225] dark:text-[#dfffe0]">{pctDec(inactiveCount || stats.loginDisabled, total)}%</span>
+              <span className="text-xs font-bold text-[#7000ff]">{pctDec(inactiveCount || stats.loginDisabled, total)}%</span>
             </div>
           </motion.div>
 
         </motion.div>
 
         <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          <motion.div variants={itemVariants} className="group bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,66,37,0.14)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#002f1b] to-[#77dd77]"></div>
+          <motion.div variants={itemVariants} className="group bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,212,255,0.12)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00d4ff] to-[#7000ff]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">Total Banks</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><Building2 className="h-4 w-4 text-[#004225] dark:text-[#dfffe0]" /></div>
+              <div className="p-2 rounded-xl bg-cyan-50 dark:bg-cyan-900/50 dark:bg-cyan-900/50 group-hover:bg-cyan-100 transition-colors shadow-inner"><Building2 className="h-4 w-4 text-[#00d4ff]" /></div>
             </div>
             <div className="flex items-end justify-between gap-3">
               <div>
                 <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{stats.totalBanks}</span>
                 <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Registered banks in your network</p>
               </div>
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#dfffe0] via-white to-[#77dd77] flex items-center justify-center shadow-inner">
-                <Building2 className="h-6 w-6 text-[#004225]" />
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-100 via-white to-purple-100 flex items-center justify-center shadow-inner">
+                <Building2 className="h-6 w-6 text-[#7000ff]" />
               </div>
             </div>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="group bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(119,221,119,0.14)] transition-all duration-300 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#dfffe0] to-[#77dd77]"></div>
+          <motion.div variants={itemVariants} className="group bg-white dark:bg-slate-900 dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_4px_20px_rgb(0,0,0,0.03)] hover:shadow-[0_8px_30px_rgba(0,255,204,0.12)] transition-all duration-300 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-[#00ffcc] to-[#00d4ff]"></div>
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-extrabold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest group-hover:text-slate-600 dark:text-slate-400 dark:text-slate-400 dark:text-slate-500 transition-colors">Total Products</span>
-              <div className="p-2 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 group-hover:bg-[#dfffe0]/60 transition-colors shadow-inner"><CreditCard className="h-4 w-4 text-[#77dd77] dark:text-[#5fcf74]" /></div>
+              <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-900/50 dark:bg-emerald-900/50 group-hover:bg-emerald-100 transition-colors shadow-inner"><CreditCard className="h-4 w-4 text-[#00b386]" /></div>
             </div>
             <div className="flex items-end justify-between gap-3">
               <div>
                 <span className="text-4xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">{stats.totalCards}</span>
                 <p className="mt-2 text-xs font-semibold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">Available funding products</p>
               </div>
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-[#dfffe0] via-white to-[#77dd77] flex items-center justify-center shadow-inner">
-                <CreditCard className="h-6 w-6 text-[#004225]" />
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-100 via-white to-cyan-100 flex items-center justify-center shadow-inner">
+                <CreditCard className="h-6 w-6 text-[#00d4ff]" />
               </div>
             </div>
           </motion.div>
@@ -640,10 +640,10 @@ export default function EliteDashboard({
           {/* Left: Client Fundability Overview + Credit Report */}
           <div className="lg:col-span-3 space-y-6">
             <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 md:p-8 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-              <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#77dd77] rounded-full mix-blend-multiply filter blur-[100px] opacity-10"></div>
+              <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#00d4ff] rounded-full mix-blend-multiply filter blur-[100px] opacity-10"></div>
               <div className="flex items-center justify-between mb-8 relative z-10">
                 <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">AI Fundability Overview</h2>
-                <div className="px-3 py-1 bg-gradient-to-r from-[#004225] to-[#77dd77] rounded-full shadow-[0_0_15px_rgba(119,221,119,0.3)]">
+                <div className="px-3 py-1 bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] rounded-full shadow-[0_0_15px_rgba(0,212,255,0.4)]">
                   <span className="text-[10px] font-black text-slate-900 dark:text-white dark:text-white tracking-wider">LIVE ANALYSIS</span>
                 </div>
               </div>
@@ -656,21 +656,21 @@ export default function EliteDashboard({
                   <div>
                     <p className="text-sm font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Portfolio Readiness</p>
                     <p className="text-3xl font-black text-slate-800 dark:text-slate-100 dark:text-slate-100">
-                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#004225] to-[#77dd77]">{fundabilityScore}%</span> Match Ready
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00d4ff] to-[#00ffcc]">{fundabilityScore}%</span> Match Ready
                     </p>
                   </div>
                   
                   <div className="space-y-4 bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-inner">
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><ShieldAlert className="h-4 w-4 text-[#002f1b] dark:text-[#dfffe0]" /></div>
+                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><ShieldAlert className="h-4 w-4 text-[#ff0055]" /></div>
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">{attn?.need_dispute_work ?? 0} clients need negative items removed</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><Clock className="h-4 w-4 text-[#77dd77] dark:text-[#5fcf74]" /></div>
+                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><Clock className="h-4 w-4 text-[#ff9900]" /></div>
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">{attn?.stale ?? 0} clients have stale profiles (30+ days)</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><CheckCircle className="h-4 w-4 text-[#004225] dark:text-[#dfffe0]" /></div>
+                      <div className="h-8 w-8 rounded-xl bg-white dark:bg-slate-900 dark:bg-slate-900 shadow-sm flex items-center justify-center shrink-0"><CheckCircle className="h-4 w-4 text-[#00ffcc]" /></div>
                       <span className="text-xs font-bold text-slate-700 dark:text-slate-300 dark:text-slate-300">{attn?.ready_for_matching ?? 0} clients are fully matched</span>
                     </div>
                   </div>
@@ -682,13 +682,13 @@ export default function EliteDashboard({
               </div>
             </motion.div>
 
-            <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(119,221,119,0.16)] transition-all">
+            <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgba(0,212,255,0.15)] transition-all">
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div>
                   <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">Get Your Credit Report</h3>
                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">Register, copy the link, or share the QR preview with clients.</p>
                 </div>
-                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#002f1b] to-[#77dd77] flex items-center justify-center shadow-[0_0_20px_rgba(119,221,119,0.18)] shrink-0">
+                <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-[#00d4ff] to-[#7000ff] flex items-center justify-center shadow-[0_0_20px_rgba(0,212,255,0.18)] shrink-0">
                   <FileText className="h-5 w-5 text-white" />
                 </div>
               </div>
@@ -704,11 +704,11 @@ export default function EliteDashboard({
                   <Button className="h-11 rounded-2xl bg-slate-900 hover:bg-slate-800 text-[10px] font-bold uppercase tracking-[0.2em]" onClick={onOpenCreditReportLink}>
                     Register Now
                   </Button>
-                  <button type="button" onClick={onOpenQrModal} className="relative mx-auto sm:mx-0 h-36 w-36 rounded-2xl border-4 border-slate-50 overflow-hidden bg-white dark:bg-slate-900 dark:bg-slate-900 p-1.5 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#77dd77]/60">
+                  <button type="button" onClick={onOpenQrModal} className="relative mx-auto sm:mx-0 h-36 w-36 rounded-2xl border-4 border-slate-50 overflow-hidden bg-white dark:bg-slate-900 dark:bg-slate-900 p-1.5 shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00d4ff]/60">
                     <img src={qrCodeUrl} alt="Credit report registration QR code" className="h-full w-full object-contain" loading="lazy" />
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="h-8 w-8 rounded-full bg-white dark:bg-slate-900 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 dark:border-slate-700 shadow flex items-center justify-center">
-                        <img src={qrLogoPath} alt="The Capsol logo" className="h-5 w-5 object-contain" />
+                        <img src={qrLogoPath} alt="Score Machine logo" className="h-5 w-5 object-contain" />
                       </div>
                     </div>
                   </button>
@@ -721,7 +721,7 @@ export default function EliteDashboard({
           <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
             <div className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between">
               <div>
-                <div className="h-10 w-10 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 flex items-center justify-center mb-3"><UserX className="h-5 w-5 text-[#004225] dark:text-[#dfffe0]" /></div>
+                <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-900/50 dark:bg-blue-900/50 flex items-center justify-center mb-3"><UserX className="h-5 w-5 text-[#00d4ff]" /></div>
                 <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest mb-1">Client Login</h4>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Share portal access</p>
               </div>
@@ -733,7 +733,7 @@ export default function EliteDashboard({
 
             <div className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col justify-between">
               <div>
-                <div className="h-10 w-10 rounded-xl bg-[#dfffe0]/45 dark:bg-[#004225]/50 flex items-center justify-center mb-3"><Target className="h-5 w-5 text-[#77dd77] dark:text-[#5fcf74]" /></div>
+                <div className="h-10 w-10 rounded-xl bg-purple-50 dark:bg-purple-900/50 dark:bg-purple-900/50 flex items-center justify-center mb-3"><Target className="h-5 w-5 text-[#7000ff]" /></div>
                 <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest mb-1">Onboarding Link</h4>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500">Send intake forms</p>
               </div>
@@ -779,7 +779,7 @@ export default function EliteDashboard({
                         <img src={referralQrCodeUrl} alt="Referral link QR code" className="h-full w-full object-contain" loading="lazy" />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                           <div className="h-5 w-5 rounded-full bg-white dark:bg-slate-900 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 dark:border-slate-700 shadow flex items-center justify-center">
-                            <img src={qrLogoPath} alt="The Capsol logo" className="h-3 w-3 object-contain" />
+                            <img src={qrLogoPath} alt="Score Machine logo" className="h-3 w-3 object-contain" />
                           </div>
                         </div>
                       </button>
@@ -802,7 +802,7 @@ export default function EliteDashboard({
             <div className="bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
               <div className="flex items-center gap-3 mb-5">
                 <div className="h-10 w-10 rounded-xl bg-slate-900 flex items-center justify-center shadow-[0_0_20px_rgba(15,23,42,0.15)]">
-                  <Activity className="h-5 w-5 text-[#77dd77]" />
+                  <Activity className="h-5 w-5 text-[#00ffcc]" />
                 </div>
                 <div>
                   <h4 className="text-xs font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">Quick Actions</h4>
@@ -810,11 +810,11 @@ export default function EliteDashboard({
                 </div>
               </div>
               <div className="space-y-3">
-                <Button onClick={onCreditReports} variant="outline" className="w-full justify-start h-10 rounded-xl border-slate-200 dark:border-slate-700 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:bg-[#004225] hover:text-white hover:border-[#004225] transition-colors">
+                <Button onClick={onCreditReports} variant="outline" className="w-full justify-start h-10 rounded-xl border-slate-200 dark:border-slate-700 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:bg-[#00d4ff] hover:text-white hover:border-[#00d4ff] transition-colors">
                   <FileText className="h-4 w-4 mr-2" />
                   Credit Reports
                 </Button>
-                <Button onClick={onSettings} variant="outline" className="w-full justify-start h-10 rounded-xl border-slate-200 dark:border-slate-700 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:bg-[#77dd77] hover:text-[#002f1b] hover:border-[#77dd77] transition-colors">
+                <Button onClick={onSettings} variant="outline" className="w-full justify-start h-10 rounded-xl border-slate-200 dark:border-slate-700 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 dark:text-slate-300 hover:bg-[#7000ff] hover:text-white hover:border-[#7000ff] transition-colors">
                   <Settings className="h-4 w-4 mr-2" />
                   Settings
                 </Button>
@@ -838,13 +838,13 @@ export default function EliteDashboard({
         {/* ════════ CALENDAR + RIGHT RAIL ANALYTICS ════════ */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
           <motion.div variants={itemVariants} className="lg:col-span-3 bg-white dark:bg-slate-900 dark:bg-slate-900 p-6 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
-            <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#004225] rounded-full mix-blend-multiply filter blur-[100px] opacity-10"></div>
+            <div className="absolute -top-20 -right-20 w-64 h-64 bg-[#7000ff] rounded-full mix-blend-multiply filter blur-[100px] opacity-10"></div>
             <div className="flex items-center justify-between mb-6 relative z-10">
               <div>
                 <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">Calendar</h3>
                 <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-1">Client report reminders and scheduled meetings</p>
               </div>
-              <div className="p-2.5 rounded-xl bg-gradient-to-r from-[#004225] to-[#77dd77] shadow-[0_0_15px_rgba(119,221,119,0.28)]">
+              <div className="p-2.5 rounded-xl bg-gradient-to-r from-[#7000ff] to-[#00d4ff] shadow-[0_0_15px_rgba(112,0,255,0.3)]">
                 <Calendar className="h-4 w-4 text-white" />
               </div>
             </div>
@@ -869,7 +869,7 @@ export default function EliteDashboard({
                   <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">Recent Activity</h3>
                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">Latest updates from your client pipeline</p>
                 </div>
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#004225] to-[#77dd77] flex items-center justify-center shadow-[0_0_20px_rgba(119,221,119,0.18)]">
+                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#7000ff] to-[#00d4ff] flex items-center justify-center shadow-[0_0_20px_rgba(112,0,255,0.18)]">
                   <Activity className="h-5 w-5 text-white" />
                 </div>
               </div>
@@ -884,7 +884,7 @@ export default function EliteDashboard({
                           activity.status === "success"
                             ? "bg-emerald-50 dark:bg-emerald-900/50 dark:bg-emerald-900/500"
                             : activity.status === "info"
-                              ? "bg-[#004225]"
+                              ? "bg-[#00d4ff]"
                               : "bg-amber-50 dark:bg-amber-900/50 dark:bg-amber-900/500"
                         }`}
                       />
@@ -905,7 +905,7 @@ export default function EliteDashboard({
                   <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">This Month's Performance</h3>
                   <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 dark:text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-2 uppercase tracking-wide">High-level production metrics for this month</p>
                 </div>
-                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#dfffe0] to-[#77dd77] flex items-center justify-center shadow-[0_0_20px_rgba(119,221,119,0.18)]">
+                <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#00ffcc] to-[#00d4ff] flex items-center justify-center shadow-[0_0_20px_rgba(0,255,204,0.18)]">
                   <Award className="h-5 w-5 text-slate-900 dark:text-white dark:text-white" />
                 </div>
               </div>
@@ -934,7 +934,7 @@ export default function EliteDashboard({
           <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 dark:bg-slate-900 rounded-3xl border border-white dark:border-slate-800 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
             <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 dark:border-slate-800 dark:border-slate-800">
               <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 dark:text-slate-100 uppercase tracking-widest">Client Pipeline</h3>
-              <button onClick={() => navigate("/clients")} className="text-[10px] font-bold text-[#77dd77] hover:text-[#004225] uppercase tracking-wider flex items-center gap-1">
+              <button onClick={() => navigate("/clients")} className="text-[10px] font-bold text-[#7000ff] hover:text-[#5000cc] uppercase tracking-wider flex items-center gap-1">
                 View All <ChevronRight className="h-3 w-3" />
               </button>
             </div>
@@ -973,7 +973,7 @@ export default function EliteDashboard({
                       <TableCell className="py-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
-                            <AvatarFallback className="bg-gradient-to-br from-[#002f1b] to-[#77dd77] text-white font-black">{client.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                            <AvatarFallback className="bg-gradient-to-br from-[#00d4ff] to-[#7000ff] text-white font-black">{client.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
                           </Avatar>
                           <div>
                             <div className="text-sm font-bold text-slate-800 dark:text-slate-100 dark:text-slate-100">{client.name}</div>
@@ -984,24 +984,24 @@ export default function EliteDashboard({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className={`h-8 w-8 rounded-xl flex items-center justify-center text-xs font-black text-white shadow-sm ${
-                            client.creditScore >= 700 ? "bg-gradient-to-br from-[#dfffe0] to-[#77dd77] text-[#002f1b]" : client.creditScore >= 600 ? "bg-gradient-to-br from-[#004225] to-[#77dd77]" : "bg-gradient-to-br from-[#002f1b] to-[#004225]"
+                            client.creditScore >= 700 ? "bg-gradient-to-br from-[#00ffcc] to-emerald-500" : client.creditScore >= 600 ? "bg-gradient-to-br from-[#ff9900] to-amber-500" : "bg-gradient-to-br from-[#ff0055] to-rose-600"
                           }`}>{client.creditScore > 0 ? Math.round(client.creditScore / 10) : "?"}</div>
                           <Badge variant="outline" className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 ${
-                            client.fundableStatus === "Fundable" ? "border-[#dfffe0]/50 text-[#004225] bg-[#dfffe0]/35 dark:bg-[#004225]/35 dark:text-[#dfffe0]" :
-                            "border-[#004225]/50 text-[#002f1b] bg-[#dfffe0]/20 dark:bg-[#002f1b]/50 dark:text-[#dfffe0]"
+                            client.fundableStatus === "Fundable" ? "border-[#00ffcc]/50 text-emerald-700 bg-emerald-50 dark:bg-emerald-900/50 dark:bg-emerald-900/50" :
+                            "border-[#ff0055]/50 text-rose-600 bg-rose-50 dark:bg-rose-900/50 dark:bg-rose-900/50"
                           }`}>{client.fundableStatus === "Fundable" ? "Match Ready" : "Not Fundable"}</Badge>
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border-0 shadow-sm ${
-                          client.progress === "improving" ? "bg-gradient-to-r from-[#004225] to-[#77dd77] text-white" :
-                          client.status === "Completed" ? "bg-gradient-to-r from-[#dfffe0] to-[#77dd77] text-[#002f1b] dark:text-[#002f1b]" :
-                          "bg-gradient-to-r from-[#002f1b] to-[#004225] text-white"
+                          client.progress === "improving" ? "bg-gradient-to-r from-amber-400 to-orange-400 text-white" :
+                          client.status === "Completed" ? "bg-gradient-to-r from-[#00ffcc] to-emerald-500 text-slate-900 dark:text-white dark:text-white" :
+                          "bg-gradient-to-r from-[#00d4ff] to-blue-500 text-white"
                         }`}>{client.progress === "improving" ? "In Progress" : client.status}</Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex items-center justify-end gap-1">
-                          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold uppercase tracking-wider text-[#004225] hover:bg-[#004225] hover:text-white"
+                          <Button size="sm" variant="ghost" className="h-8 px-3 text-xs font-bold uppercase tracking-wider text-[#7000ff] hover:bg-[#7000ff]"
                             onClick={(event) => {
                               event.stopPropagation();
                               navigate(`/credit-report?clientId=${client.id}&clientName=${encodeURIComponent(client.name)}`);

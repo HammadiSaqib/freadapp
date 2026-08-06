@@ -42,6 +42,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -52,7 +53,8 @@ import AddClientDialog from "@/components/AddClientDialog";
 import { useEffect, useRef, useState } from "react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
-import api, { clientsApi, creditReportScraperApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import api, { aiPlansApi, clientsApi, creditReportScraperApi } from "@/lib/api";
 import {
   Brain,
   Sparkles,
@@ -82,6 +84,7 @@ import {
   Info,
   Rocket,
   Eye,
+  CreditCard,
 } from "lucide-react";
 
 // Mock AI recommendations data
@@ -255,6 +258,9 @@ type CoachSelectedClientReport = {
 type CoachPromptQuota = {
   used: number;
   limit: number | null;
+  baseLimit?: number;
+  freeRemaining?: number | null;
+  purchasedRemaining?: number;
   remaining: number | null;
   unlimited: boolean;
   resetAt: string | null;
@@ -262,7 +268,7 @@ type CoachPromptQuota = {
   unlinked?: boolean;
 };
 
-const AI_COACH_SUPPORT_PHONE = "(704) 966-9919";
+const AI_COACH_SUPPORT_PHONE = "(475) 259-8768";
 const AI_COACH_ELITE_ONLY_MESSAGE = "This feature For Elite User Only Upgrade To Eilte Or If You Already Have Unlimete Unlimte Pakege So Contact To Support For Elite Activtion";
 
 const createWelcomeCoachMessage = (): CoachChatMessage => ({
@@ -328,13 +334,55 @@ const formatPromptQuotaDaysRemaining = (resetInDays: number | null) => {
   return `${resetInDays} days`;
 };
 
+type AiCreditPlan = {
+  id: number;
+  name?: string;
+  plan_name?: string;
+  description?: string;
+  plan_description?: string | null;
+  price?: number;
+  price_cents?: number;
+  credits?: number;
+  prompt_count?: number;
+  prompts?: number;
+};
+
+const getAiCreditPlanName = (plan: AiCreditPlan | null | undefined) => (
+  plan?.name || plan?.plan_name || "AI Plans & Credits"
+);
+
+const getAiCreditPlanDescription = (plan: AiCreditPlan) => (
+  plan.description || plan.plan_description || "More prompts for Carmela Credit Coach."
+);
+
+const getAiCreditPlanPrompts = (plan: AiCreditPlan) => Number(plan.prompt_count ?? plan.prompts ?? 0);
+
+const getAiCreditPlanPrice = (plan: AiCreditPlan) => {
+  if (typeof plan.price === "number") return plan.price;
+  return Number(plan.price_cents || 0) / 100;
+};
+
+const formatAiCreditPlanPrice = (plan: AiCreditPlan) => new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+}).format(getAiCreditPlanPrice(plan));
+
+const cleanAiPlanCheckoutParams = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("ai_plan_session_id");
+  url.searchParams.delete("ai_plan_canceled");
+  const nextSearch = url.searchParams.toString();
+  window.history.replaceState({}, "", `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`);
+};
 export default function AICoach() {
+  const { toast } = useToast();
   const { userProfile } = useAuthContext();
   const { hasScoreMachineEliteAccess, isEliteStatusLoading, isEliteActive } = useScoreMachineEliteStatus();
   const [selectedRecommendation, setSelectedRecommendation] = useState<any>(null);
   const [chatInput, setChatInput] = useState("");
   const [activeTab, setActiveTab] = useState("recommendations");
   const isSuperAdminUser = userProfile?.role === "super_admin";
+  const isAdminUser = userProfile?.role === "admin";
   const canResolveEliteCoach = ["admin", "employee", "user", "funding_manager"].includes(String(userProfile?.role || ""));
   const showEliteCoach = isSuperAdminUser || isEliteActive;
   const isCoachAccessLoading = !isSuperAdminUser && canResolveEliteCoach && isEliteStatusLoading;
@@ -344,6 +392,11 @@ export default function AICoach() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [promptQuota, setPromptQuota] = useState<CoachPromptQuota | null>(null);
+  const [aiPlans, setAiPlans] = useState<AiCreditPlan[]>([]);
+  const [aiPlansLoading, setAiPlansLoading] = useState(false);
+  const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
+  const [purchaseLoadingPlanId, setPurchaseLoadingPlanId] = useState<number | null>(null);
+  const [finalizingAiPlan, setFinalizingAiPlan] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Admin: client selection and report analysis state
@@ -431,6 +484,103 @@ export default function AICoach() {
     };
   }, [showEliteCoach]);
 
+  useEffect(() => {
+    if (!showEliteCoach || !isAdminUser) {
+      setAiPlans([]);
+      setAiPlansLoading(false);
+      return;
+    }
+
+    let isActive = true;
+
+    (async () => {
+      setAiPlansLoading(true);
+      try {
+        const resp = await aiPlansApi.getPlans();
+        if (isActive) {
+          setAiPlans(resp?.data?.plans || []);
+        }
+      } catch (planError) {
+        console.warn('Failed to load AI plans', planError);
+        if (isActive) {
+          setAiPlans([]);
+        }
+      } finally {
+        if (isActive) {
+          setAiPlansLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [showEliteCoach, isAdminUser]);
+
+  useEffect(() => {
+    if (!showEliteCoach || !isAdminUser) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const canceled = params.get('ai_plan_canceled');
+    const sessionId = params.get('ai_plan_session_id');
+
+    if (canceled) {
+      setPurchaseDialogOpen(true);
+      cleanAiPlanCheckoutParams();
+      return;
+    }
+
+    if (!sessionId) {
+      return;
+    }
+
+    let isActive = true;
+
+    (async () => {
+      setFinalizingAiPlan(true);
+      setError(null);
+      try {
+        const finalizeResp = await aiPlansApi.finalizeCheckout(sessionId);
+        if (!isActive) {
+          return;
+        }
+
+        const promptsGranted = Number(finalizeResp?.data?.promptsGranted || 0);
+        const planName = getAiCreditPlanName(finalizeResp?.data?.plan);
+        toast({
+          title: 'AI prompts added',
+          description: `${planName} added ${promptsGranted} prompts to your AI Coach balance.`,
+        });
+
+        const quotaResp = await api.get('/api/ai/finmint-chat/quota');
+        if (isActive) {
+          setPromptQuota(quotaResp?.data?.quota ?? null);
+        }
+      } catch (checkoutError: any) {
+        console.error('AI plan checkout finalize error', checkoutError?.response?.data || checkoutError?.message || checkoutError);
+        if (isActive) {
+          const message = checkoutError?.response?.data?.error || 'Payment was received, but prompts could not be added automatically. Please contact support.';
+          setError(message);
+          toast({
+            title: 'Unable to add AI prompts',
+            description: message,
+            variant: 'destructive',
+          });
+        }
+      } finally {
+        cleanAiPlanCheckoutParams();
+        if (isActive) {
+          setFinalizingAiPlan(false);
+        }
+      }
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [showEliteCoach, isAdminUser, toast]);
   // Load clients for admin selector
   useEffect(() => {
     (async () => {
@@ -605,6 +755,37 @@ export default function AICoach() {
   const promptLimitReached = !!promptQuota && !promptQuota.unlimited && (promptQuota.remaining ?? 0) <= 0;
   const promptQuotaResetDate = formatPromptQuotaResetDate(promptQuota?.resetAt ?? null);
   const promptQuotaDaysRemaining = formatPromptQuotaDaysRemaining(promptQuota?.resetInDays ?? null);
+  const canPurchaseAiPlans = showEliteCoach && isAdminUser;
+  const purchasedPromptsRemaining = Math.max(0, Number(promptQuota?.purchasedRemaining || 0));
+  const freePromptsRemaining = promptQuota?.freeRemaining === null
+    ? null
+    : Math.max(0, Number(promptQuota?.freeRemaining ?? Math.max(0, (promptQuota?.baseLimit ?? 10) - (promptQuota?.used ?? 0))));
+
+  const handlePurchaseAiPlan = async (plan: AiCreditPlan) => {
+    setPurchaseLoadingPlanId(plan.id);
+    setError(null);
+
+    try {
+      const resp = await aiPlansApi.createCheckout(plan.id);
+      const checkoutUrl = resp?.data?.url;
+
+      if (!checkoutUrl) {
+        throw new Error('Checkout URL was not returned.');
+      }
+
+      window.location.href = checkoutUrl;
+    } catch (purchaseError: any) {
+      console.error('AI plan purchase error', purchaseError?.response?.data || purchaseError?.message || purchaseError);
+      const message = purchaseError?.response?.data?.error || purchaseError?.message || 'Unable to start checkout. Please try again.';
+      setError(message);
+      toast({
+        title: 'Unable to start checkout',
+        description: message,
+        variant: 'destructive',
+      });
+      setPurchaseLoadingPlanId(null);
+    }
+  };
 
   const handleSendMessage = async () => {
     const input = chatInput.trim();
@@ -724,6 +905,11 @@ export default function AICoach() {
                   )}
 
                   <div className="sticky bottom-0 z-20 mt-3 space-y-3 border-t border-slate-200 bg-white/95 p-3 pt-3 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+                    {finalizingAiPlan && (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700 shadow-sm">
+                        Finalizing your AI prompt purchase...
+                      </div>
+                    )}
                     {promptQuota && (
                       <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${promptQuota.unlimited ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : promptLimitReached ? 'border-red-200 bg-red-50 text-red-700' : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -733,17 +919,41 @@ export default function AICoach() {
                           <Badge variant="outline" className={promptQuota.unlimited ? 'border-emerald-200 bg-white text-emerald-700' : promptLimitReached ? 'border-red-200 bg-white text-red-700' : 'border-slate-200 bg-white text-slate-700'}>
                             {promptQuota.unlimited
                               ? 'Unlimited'
-                              : `10 / ${promptQuota.remaining ?? 0} Remaining`}
+                              : `${promptQuota.remaining ?? 0} Remaining`}
                           </Badge>
+                          {canPurchaseAiPlans && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setPurchaseDialogOpen(true)}
+                              className="h-8 rounded-full border-blue-200 bg-white text-blue-700 hover:bg-blue-500"
+                            >
+                              <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                              Purchase AI Credits
+                            </Button>
+                          )}
                         </div>
                         <div className="mt-2 text-xs leading-5">
                           {promptQuota.unlimited ? (
                             <span>You have unlimited Open AI prompts.</span>
                           ) : (
                             <span>
-                              You have {promptQuota.remaining ?? 0} prompts left out of {promptQuota.limit ?? 10} for this billing period.
-                              {promptQuotaResetDate ? ` Resets on ${promptQuotaResetDate}` : ''}
-                              {promptQuotaDaysRemaining ? ` (${promptQuotaDaysRemaining} remaining).` : '.'}
+                              {promptLimitReached ? (
+                                <>
+                                  You have reached your prompt limit. Please purchase more prompts to continue
+                                  {promptQuotaResetDate ? ` or wait until ${promptQuotaResetDate}` : ''}
+                                  {promptQuotaDaysRemaining ? ` (${promptQuotaDaysRemaining} remaining).` : '.'}
+                                </>
+                              ) : (
+                                <>
+                                  You have {promptQuota.remaining ?? 0} prompts available for this billing period.
+                                  {freePromptsRemaining !== null ? ` Free prompts: ${freePromptsRemaining}.` : ''}
+                                  {purchasedPromptsRemaining > 0 ? ` Purchased prompts: ${purchasedPromptsRemaining}.` : ''}
+                                  {promptQuotaResetDate ? ` Free prompts reset on ${promptQuotaResetDate}` : ''}
+                                  {promptQuotaDaysRemaining ? ` (${promptQuotaDaysRemaining} remaining).` : '.'}
+                                </>
+                              )}
                             </span>
                           )}
                         </div>
@@ -1093,6 +1303,78 @@ export default function AICoach() {
               </CardContent>
             </Card>
              */}
+      <Dialog open={purchaseDialogOpen} onOpenChange={setPurchaseDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Purchase AI Plans & Credits</DialogTitle>
+            <DialogDescription>
+              Choose a prompt package created by Super Admin. Purchased prompts are added to your current AI Coach balance.
+            </DialogDescription>
+          </DialogHeader>
+
+          {finalizingAiPlan && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+              Finalizing your payment and adding prompts...
+            </div>
+          )}
+
+          {aiPlansLoading ? (
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+              Loading AI plans...
+            </div>
+          ) : aiPlans.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+              No AI Plans & Credits are available yet.
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {aiPlans.map((plan) => {
+                const prompts = getAiCreditPlanPrompts(plan);
+                const isPurchasing = purchaseLoadingPlanId === plan.id;
+
+                return (
+                  <div key={plan.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="font-semibold text-slate-900">{getAiCreditPlanName(plan)}</div>
+                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                          {Number(plan.credits || 0)} credits
+                        </Badge>
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-600">{getAiCreditPlanDescription(plan)}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-slate-900">{formatAiCreditPlanPrice(plan)}</div>
+                        <div className="text-xs text-slate-500">One-time purchase</div>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => handlePurchaseAiPlan(plan)}
+                        disabled={isPurchasing || finalizingAiPlan}
+                        className="rounded-full bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        {isPurchasing ? (
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <CreditCard className="mr-2 h-4 w-4" />
+                        )}
+                        Purchase
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPurchaseDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AddClientDialog
         isOpen={showAddClient}
         onClose={() => setShowAddClient(false)}

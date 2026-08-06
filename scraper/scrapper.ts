@@ -7,6 +7,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import * as cheerio from 'cheerio';
 import UserAgent from 'user-agents';
 import { isArray } from 'util';
+import { normalizeUnifiedDob } from '../shared/partialDob.js';
 
 // Extend Window interface to include credit report properties
 declare global {
@@ -580,10 +581,16 @@ export class Scraper implements ScraperInterface {
         'EXP': { id: 2, name: 'Experian', symbol: 'EXP' },
         'EQF': { id: 3, name: 'Equifax', symbol: 'EQF' }
       }
+      const attr = (obj: any, key: string) => obj?.[key] ?? obj?.[`@${key}`] ?? '';
+      const desc = (obj: any) => attr(obj, 'description');
+      const bureauIdFromSource = (source: any) => bureau[attr(source?.Bureau, 'symbol')]?.id || 0;
       let merged_credit_report: any = undefined;
 
       if (original_report) {
-        original_report = original_report.filter((obj: any) => { return obj.Type == 'MergeCreditReports' })
+        original_report = original_report.filter((obj: any) => {
+          const typeValue = obj?.Type?.$ || obj?.Type?.['@description'] || obj?.Type?.description || obj?.Type;
+          return typeValue === 'MergeCreditReports' || Boolean(obj?.TrueLinkCreditReportType?.Borrower);
+        })
         merged_credit_report = (original_report.length) ? original_report[0].TrueLinkCreditReportType : undefined;
 
         if (merged_credit_report) {
@@ -599,11 +606,11 @@ export class Scraper implements ScraperInterface {
           modifiedReport.Name = BorrowerName.map((borrower: any) => {
 
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "FirstName": borrower.Name.first || '',
-              "Middle": borrower.Name.middle || '',
-              "LastName": borrower.Name.last || '',
-              "NameType": borrower.NameType.description || ''
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "FirstName": attr(borrower.Name, 'first') || '',
+              "Middle": attr(borrower.Name, 'middle') || '',
+              "LastName": attr(borrower.Name, 'last') || '',
+              "NameType": desc(borrower.NameType) || ''
             }
           })
 
@@ -612,11 +619,11 @@ export class Scraper implements ScraperInterface {
 
           modifiedReport.Address = BorrowerAddress.map((borrower: any) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "StreetAddress": borrower.CreditAddress.unparsedStreet || `${borrower.CreditAddress.houseNumber} ${borrower.CreditAddress.streetName} ${borrower.CreditAddress.unit}`,
-              "City": borrower.CreditAddress.city,
-              "State": borrower.CreditAddress.stateCode,
-              "Zip": borrower.CreditAddress.postalCode,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "StreetAddress": attr(borrower.CreditAddress, 'unparsedStreet') || `${attr(borrower.CreditAddress, 'houseNumber')} ${attr(borrower.CreditAddress, 'streetName')} ${attr(borrower.CreditAddress, 'unit')}`,
+              "City": attr(borrower.CreditAddress, 'city'),
+              "State": attr(borrower.CreditAddress, 'stateCode'),
+              "Zip": attr(borrower.CreditAddress, 'postalCode'),
               "AddressType": "Current"
             }
           })
@@ -626,11 +633,11 @@ export class Scraper implements ScraperInterface {
 
           modifiedReport.Address = PreviousAddress.map((borrower: any) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "StreetAddress": borrower.CreditAddress.unparsedStreet || `${borrower.CreditAddress.houseNumber} ${borrower.CreditAddress.streetName} ${borrower.CreditAddress.unit}`,
-              "City": borrower.CreditAddress.city,
-              "State": borrower.CreditAddress.stateCode,
-              "Zip": borrower.CreditAddress.postalCode,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "StreetAddress": attr(borrower.CreditAddress, 'unparsedStreet') || `${attr(borrower.CreditAddress, 'houseNumber')} ${attr(borrower.CreditAddress, 'streetName')} ${attr(borrower.CreditAddress, 'unit')}`,
+              "City": attr(borrower.CreditAddress, 'city'),
+              "State": attr(borrower.CreditAddress, 'stateCode'),
+              "Zip": attr(borrower.CreditAddress, 'postalCode'),
               "AddressType": "Previous"
             }
           })
@@ -641,8 +648,8 @@ export class Scraper implements ScraperInterface {
           modifiedReport.DOB = Birth.map((borrower: any) => {
             // Ensure each object has both BureauId and DOB fields
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "DOB": borrower.date || "Unknown"
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "DOB": normalizeUnifiedDob(attr(borrower, 'date'))
             }
           })
 
@@ -651,9 +658,9 @@ export class Scraper implements ScraperInterface {
           modifiedReport.Score = CreditScore.map((borrower: any) => {
 
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "Score": borrower.riskScore,
-              "ScoreType": borrower.scoreName,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "Score": attr(borrower, 'riskScore'),
+              "ScoreType": attr(borrower, 'scoreName'),
               "DateScore": borrower.Source.InquiryDate
             }
           })
@@ -664,10 +671,10 @@ export class Scraper implements ScraperInterface {
           modifiedReport.Employer = Employer.map((borrower: any) => {
 
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "EmployerName": borrower.name,
-              "DateUpdated": borrower.dateUpdated,
-              "DateReported": borrower.dateReported
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "EmployerName": attr(borrower, 'name'),
+              "DateUpdated": attr(borrower, 'dateUpdated'),
+              "DateReported": attr(borrower, 'dateReported')
             }
           })
 
@@ -676,11 +683,11 @@ export class Scraper implements ScraperInterface {
           modifiedReport.Inquiries = merged_credit_report.InquiryPartition.map((borrower: any) => {
 
             return {
-              "BureauId": bureau[borrower.Inquiry.Source.Bureau.symbol].id,
-              "DateInquiry": borrower.Inquiry.inquiryDate,
-              "CreditorName": borrower.Inquiry.subscriberName,
-              "InquiryType": borrower.Inquiry.inquiryType,
-              "Industry": borrower.Inquiry.IndustryCode.description
+              "BureauId": bureauIdFromSource(borrower.Inquiry?.Source),
+              "DateInquiry": attr(borrower.Inquiry, 'inquiryDate'),
+              "CreditorName": attr(borrower.Inquiry, 'subscriberName'),
+              "InquiryType": attr(borrower.Inquiry, 'inquiryType'),
+              "Industry": desc(borrower.Inquiry?.IndustryCode)
             }
           })
 
@@ -694,10 +701,10 @@ export class Scraper implements ScraperInterface {
               : (partition?.PublicRecord ? [partition.PublicRecord] : [])
 
             return publicRecords
-              .filter((publicRecord: any) => publicRecord?.Source?.Bureau?.symbol && bureau[publicRecord.Source.Bureau.symbol])
+              .filter((publicRecord: any) => bureauIdFromSource(publicRecord?.Source))
               .map((publicRecord: any) => {
                 return {
-                  "BureauId": bureau[publicRecord.Source.Bureau.symbol].id,
+                  "BureauId": bureauIdFromSource(publicRecord.Source),
                   "Date": publicRecord?.dateFiled || publicRecord?.dateReported || '',
                   "DateFiled": publicRecord?.dateFiled || '',
                   "DateReported": publicRecord?.dateReported || '',
@@ -733,30 +740,30 @@ export class Scraper implements ScraperInterface {
             let accounts = borrower.Tradeline.map((tradeline: any) => {
               if (!Array.isArray(tradeline?.Remark)) tradeline.Remark = [tradeline.Remark || undefined]
               modifiedReport.Accounts.push({
-                "BureauId": bureau[tradeline.Source.Bureau.symbol].id,
-                "AccountTypeDescription": borrower.accountTypeDescription,
-                "HighBalance": tradeline?.highBalance,
-                "DateReported": tradeline?.dateReported,
-                "DateOpened": tradeline?.dateOpened,
-                "AccountNumber": tradeline?.accountNumber,
-                "DateAccountStatus": tradeline?.dateAccountStatus,
-                "CurrentBalance": tradeline?.currentBalance,
-                "CreditorName": tradeline?.creditorName,
-                "AccountCondition": tradeline?.AccountCondition?.description,
-                "AccountDesignator": tradeline?.AccountDesignator?.description,
-                "DisputeFlag": tradeline?.DisputeFlag?.description,
-                "Industry": tradeline?.IndustryCode?.description,
-                "AccountStatus": tradeline?.OpenClosed?.description,
-                "PaymentStatus": tradeline?.PayStatus?.description,
-                "AmountPastDue": tradeline?.GrantedTrade?.amountPastDue,
-                "AccountType": tradeline?.GrantedTrade?.AccountType.description,
-                "CreditType": tradeline?.GrantedTrade?.CreditType.description,
-                "PaymentFrequency": tradeline?.GrantedTrade?.PaymentFrequency?.description,
-                "TermType": tradeline?.GrantedTrade?.TermType?.description,
-                "WorstPayStatus": tradeline?.GrantedTrade?.WorstPayStatus?.description,
-                "PayStatusHistoryStartDate": tradeline?.GrantedTrade?.PayStatusHistory?.startDate,
-                "PayStatusHistory": tradeline?.GrantedTrade?.PayStatusHistory?.status,
-                "Remark": tradeline.Remark[0]?.RemarkCode.description,
+                "BureauId": bureauIdFromSource(tradeline.Source),
+                "AccountTypeDescription": attr(borrower, 'accountTypeDescription'),
+                "HighBalance": attr(tradeline, 'highBalance'),
+                "DateReported": attr(tradeline, 'dateReported'),
+                "DateOpened": attr(tradeline, 'dateOpened'),
+                "AccountNumber": attr(tradeline, 'accountNumber'),
+                "DateAccountStatus": attr(tradeline, 'dateAccountStatus'),
+                "CurrentBalance": attr(tradeline, 'currentBalance'),
+                "CreditorName": attr(tradeline, 'creditorName'),
+                "AccountCondition": desc(tradeline?.AccountCondition),
+                "AccountDesignator": desc(tradeline?.AccountDesignator),
+                "DisputeFlag": desc(tradeline?.DisputeFlag),
+                "Industry": desc(tradeline?.IndustryCode),
+                "AccountStatus": desc(tradeline?.OpenClosed),
+                "PaymentStatus": desc(tradeline?.PayStatus),
+                "AmountPastDue": attr(tradeline?.GrantedTrade, 'amountPastDue'),
+                "AccountType": desc(tradeline?.GrantedTrade?.AccountType),
+                "CreditType": desc(tradeline?.GrantedTrade?.CreditType),
+                "PaymentFrequency": desc(tradeline?.GrantedTrade?.PaymentFrequency),
+                "TermType": desc(tradeline?.GrantedTrade?.TermType),
+                "WorstPayStatus": desc(tradeline?.GrantedTrade?.WorstPayStatus),
+                "PayStatusHistoryStartDate": attr(tradeline?.GrantedTrade?.PayStatusHistory, 'startDate'),
+                "PayStatusHistory": attr(tradeline?.GrantedTrade?.PayStatusHistory, 'status'),
+                "Remark": desc(tradeline.Remark[0]?.RemarkCode),
                 "CreditLimit": tradeline?.GrantedTrade?.CreditLimit
               })
 
@@ -771,18 +778,20 @@ export class Scraper implements ScraperInterface {
           modifiedReport.Creditors = Subscriber.map((borrower: any) => {
 
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "CreditorName": borrower.name,
-              "CreditorAddress": borrower.CreditAddress.unparsedStreet || '',
-              "CreditorCity": borrower.CreditAddress.city?.trim(),
-              "CreditorState": borrower.CreditAddress.stateCode,
-              "CreditorZip": borrower.CreditAddress.postalCode,
-              "CreditorPhone": borrower.telephone,
-              "Industry": borrower.IndustryCode.description
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "CreditorName": attr(borrower, 'name'),
+              "CreditorAddress": attr(borrower.CreditAddress, 'unparsedStreet') || '',
+              "CreditorCity": attr(borrower.CreditAddress, 'city')?.trim(),
+              "CreditorState": attr(borrower.CreditAddress, 'stateCode'),
+              "CreditorZip": attr(borrower.CreditAddress, 'postalCode'),
+              "CreditorPhone": attr(borrower, 'telephone'),
+              "Industry": desc(borrower.IndustryCode)
             }
           })
         }
-        modifiedReport.Accounts = modifiedReport.Accounts.sort((a: any, b: any) => a.BureauId - b.BureauId);
+        modifiedReport.Accounts = Array.isArray(modifiedReport.Accounts)
+          ? modifiedReport.Accounts.sort((a: any, b: any) => a.BureauId - b.BureauId)
+          : [];
 
       }
       return modifiedReport;

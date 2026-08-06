@@ -1,3 +1,5 @@
+import { normalizeUnifiedDob, normalizeYearOnlyDob } from '../../../shared/partialDob.js';
+
 const BUREAUS = ['EFX', 'EXP', 'TU'];
 
 export function toBureauId(bureau) {
@@ -411,12 +413,14 @@ function mapDOB(payload) {
   const out = [];
   for (const bureau of BUREAUS) {
     const bureauId = toBureauId(bureau);
-    const dob = firstNonNull(
-      readBureauValue(payload?.dob, bureau),
+    const fullDob = readBureauValue(payload?.dob, bureau);
+    const birthYear = firstNonNull(
       readBureauValue(payload?.Borrower?.BirthYear, bureau),
       typeof payload?.Borrower?.BirthYear !== 'object' ? payload?.Borrower?.BirthYear : null
     );
-    const formatted = epochToISO(dob);
+    const formatted = fullDob !== null && fullDob !== undefined && fullDob !== ''
+      ? normalizeUnifiedDob(fullDob)
+      : normalizeYearOnlyDob(birthYear);
     if (!formatted) continue;
     out.push({ BureauId: bureauId, DOB: formatted });
   }

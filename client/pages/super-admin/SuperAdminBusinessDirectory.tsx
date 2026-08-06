@@ -5,7 +5,7 @@ export default function SuperAdminBusinessDirectory() {
   return (
     <SuperAdminLayout
       title="Business Directory"
-      description="Create and manage the directory entries shown in The Capsol Academy"
+      description="Create and manage the directory entries shown in Score Machine Academy"
     >
       <BusinessDirectoryManagement />
     </SuperAdminLayout>

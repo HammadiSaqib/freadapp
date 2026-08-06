@@ -14,7 +14,9 @@ import { useAuthContext } from "@/contexts/AuthContext";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import EditClientForm from "@/components/EditClientForm";
 import ClientProfileStandard from "@/pages/ClientProfileStandard";
+import BasicClientProfile from "@/components/BasicClientProfile";
 import BasicAdminReportPullPrompt from "@/components/BasicAdminReportPullPrompt";
+import PowerOfAttorneyTab from "@/components/PowerOfAttorneyTab";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
 import { PrintRequestDialog, type PrintRequestSenderFormValues } from "@/components/PrintRequestDialog";
 import { US_STATE_OPTIONS, isUsStateOption } from "@shared/usStates";
@@ -43,12 +45,15 @@ import {
   Edit,
   FileText,
   Plus,
+  RefreshCw,
   TrendingUp,
   TrendingDown,
   Minus,
   Target,
   DollarSign,
   Activity,
+  ArrowRight,
+  Bell,
   CreditCard,
   User,
   History,
@@ -60,6 +65,7 @@ import {
   ScrollText,
   Shield,
   ShieldCheck,
+  LayoutGrid,
   Upload,
   Trash2,
   Download,
@@ -266,6 +272,12 @@ export default function ClientProfile() {
     );
   }
 
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+
+  if (isBasicAdminPortalUser && !isEliteActive) {
+    return <BasicClientProfile />;
+  }
+
   const showEnhancedClientProfile = isSuperAdminUser || isEliteActive || hasAdminBasicPortalAccess(userProfile);
 
   return showEnhancedClientProfile ? <EnhancedClientProfile /> : <ClientProfileStandard />;
@@ -381,16 +393,18 @@ function EnhancedClientProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { userProfile } = useAuthContext();
+  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
   const [client, setClient] = useState<ClientData | null>(null);
   const [loading, setLoading] = useState(true);
   const [reports, setReports] = useState<any[]>([]);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [scoreHistoryLoading, setScoreHistoryLoading] = useState(false);
-  const allowedClientProfileTabs = ["info", "history", "scores", "letters", "equifax", "json"] as const;
+  const allowedClientProfileTabs = ["overview", "info", "history", "scores", "power-of-attorney", "letters", "equifax", "other-creditors-freeze", "json"] as const;
   const getClientProfileTab = () => {
     const tab = String(searchParams.get("tab") || "").trim();
-    return allowedClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : "info";
+    if (isBasicAdminPortalUser && tab === "overview") return "info";
+    return allowedClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : (isBasicAdminPortalUser ? "info" : "overview");
   };
   const activeTab = getClientProfileTab();
   const [scrapingLoading, setScrapingLoading] = useState(false);
@@ -415,6 +429,7 @@ function EnhancedClientProfile() {
   const [showPassword, setShowPassword] = useState(false);
   const [letterHistory, setLetterHistory] = useState<any[]>([]);
   const [letterHistoryLoading, setLetterHistoryLoading] = useState(false);
+  const fetchedLetterHistoryClientRef = useRef<string | null>(null);
   const [historyZipDownloadingId, setHistoryZipDownloadingId] = useState<number | null>(null);
   const [historyPrintingId, setHistoryPrintingId] = useState<number | null>(null);
   const [historyPrintDialogRow, setHistoryPrintDialogRow] = useState<any | null>(null);
@@ -427,7 +442,12 @@ function EnhancedClientProfile() {
   const [equifaxSavedScreenshot, setEquifaxSavedScreenshot] = useState<any>(null);
   const [securityFreezePinSaveState, setSecurityFreezePinSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
+  const profileBackHref = isBasicAdminPortalUser ? "/dashboard" : "/clients";
+  const profileBackLabel = isBasicAdminPortalUser ? "Back to Dashboard" : "Back to Clients";
+  const profileNotFoundTitle = isBasicAdminPortalUser ? "Profile Not Found" : "Client not found";
+  const profileNotFoundDescription = isBasicAdminPortalUser
+    ? "The requested profile could not be found."
+    : "The requested client could not be found.";
   const shouldForceReportPullPrompt = normalizeBasicAdminBooleanParam(searchParams.get("reportPullPrompt"));
   const shouldShowBasicAdminReportPullPrompt = isBasicAdminPortalUser
     && Boolean(client)
@@ -440,7 +460,7 @@ function EnhancedClientProfile() {
   }, [clientId, isBasicAdminPortalUser]);
 
   const handleClientProfileTabChange = (nextTab: string) => {
-    if (!allowedClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number])) {
+    if (!allowedClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number]) || (isBasicAdminPortalUser && nextTab === "overview")) {
       return;
     }
 
@@ -575,7 +595,9 @@ function EnhancedClientProfile() {
     if (!client.platform || !client.platform_email || !client.platform_password) {
       toast({
         title: "Missing Credentials",
-        description: "Client credentials are not configured. Please update client profile with platform credentials.",
+        description: isBasicAdminPortalUser
+          ? "Your monitoring credentials are not configured. Please update your profile with platform credentials."
+          : "Client credentials are not configured. Please update client profile with platform credentials.",
         variant: "destructive",
       });
       return;
@@ -589,7 +611,9 @@ function EnhancedClientProfile() {
       if (requiresSsn && (!ssn || String(ssn).length !== 4)) {
         toast({
           title: 'SSN Last 4 Required',
-          description: 'Please set SSN Last 4 on the client profile for IdentityIQ/MyScoreIQ.',
+          description: isBasicAdminPortalUser
+            ? 'Please set SSN Last 4 on your profile for IdentityIQ/MyScoreIQ.'
+            : 'Please set SSN Last 4 on the client profile for IdentityIQ/MyScoreIQ.',
           variant: 'destructive',
         });
         setScrapingLoading(false);
@@ -642,7 +666,9 @@ function EnhancedClientProfile() {
     if (isManuallyAddedClient) {
       toast({
         title: "No Reports Available",
-        description: "This client was added manually and does not have a credit report JSON.",
+        description: isBasicAdminPortalUser
+          ? "This profile was added manually and does not have a credit report JSON."
+          : "This client was added manually and does not have a credit report JSON.",
       });
       return;
     }
@@ -713,8 +739,8 @@ function EnhancedClientProfile() {
     sender: PrintRequestSenderFormValues,
   ) => {
     if (!clientId) {
-      toast({ title: 'Client not found', variant: 'destructive' });
-      throw new Error('Client not found');
+      toast({ title: profileNotFoundTitle, variant: 'destructive' });
+      throw new Error(profileNotFoundTitle);
     }
 
     if (!row?.zip_id) {
@@ -991,6 +1017,26 @@ function EnhancedClientProfile() {
             console.log('🔍 DEBUG: History scores fallback failed:', e);
           }
         }
+        // The history endpoint is ordered newest-first. Use the earliest report as
+        // the baseline for the CRM's "Score Improvement" calculation.
+        const historyRows = historyResponse?.data?.data;
+        if (Array.isArray(historyRows) && historyRows.length > 1) {
+          const startingReport = [...historyRows].reverse().find((report: any) =>
+            Number(report.experian_score) > 0 ||
+            Number(report.equifax_score) > 0 ||
+            Number(report.transunion_score) > 0 ||
+            Number(report.credit_score) > 0,
+          );
+
+          if (startingReport) {
+            extractedPreviousScores = {
+              experian: Number(startingReport.experian_score) || 0,
+              equifax: Number(startingReport.equifax_score) || 0,
+              transunion: Number(startingReport.transunion_score) || 0,
+            };
+          }
+        }
+
         const transformedClient: ClientData = {
           id: clientData.id.toString(),
           first_name: clientData.first_name,
@@ -1393,7 +1439,8 @@ function EnhancedClientProfile() {
 
   // Fetch letter history
   useEffect(() => {
-    if (activeTab === "letters" && clientId) {
+    if ((activeTab === "letters" || activeTab === "overview") && clientId && fetchedLetterHistoryClientRef.current !== clientId) {
+      fetchedLetterHistoryClientRef.current = clientId;
       const fetchLetterHistory = async () => {
         setLetterHistoryLoading(true);
         try {
@@ -1403,7 +1450,12 @@ function EnhancedClientProfile() {
           });
           if (res.ok) {
             const data = await res.json();
-            setLetterHistory(Array.isArray(data) ? data : data.data || []);
+                        const rows = Array.isArray(data) ? data : data.data || [];
+            setLetterHistory([...rows].sort((a: any, b: any) => {
+              const aTime = new Date(a.created_at || a.generated_at || a.updated_at || 0).getTime();
+              const bTime = new Date(b.created_at || b.generated_at || b.updated_at || 0).getTime();
+              return bTime - aTime;
+            }));
           }
         } catch (err) {
           console.error("Error fetching letter history:", err);
@@ -1649,11 +1701,11 @@ function EnhancedClientProfile() {
     return (
       <DashboardLayout>
         <div className="text-center py-12">
-          <h2 className="text-2xl font-bold text-gray-900">Client not found</h2>
-          <p className="text-gray-600 mt-2">The requested client could not be found.</p>
-          <Button onClick={() => navigate("/clients")} className="mt-4">
+          <h2 className="text-2xl font-bold text-gray-900">{profileNotFoundTitle}</h2>
+          <p className="text-gray-600 mt-2">{profileNotFoundDescription}</p>
+          <Button onClick={() => navigate(profileBackHref)} className="mt-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Clients
+            {profileBackLabel}
           </Button>
         </div>
       </DashboardLayout>
@@ -1668,7 +1720,79 @@ function EnhancedClientProfile() {
     100
   );
 
-  return (
+  const currentScores = Object.values(client.creditScores).filter((score) => Number(score) > 0);
+  const previousScores = Object.values(client.previousScores).filter((score) => Number(score) > 0);
+  const bestCurrentScore = currentScores.length ? Math.max(...currentScores) : Number(client.credit_score || 0);
+  const bestPreviousScore = previousScores.length ? Math.max(...previousScores) : Number(client.previous_credit_score || 0);
+  const scoreImprovement = bestCurrentScore && bestPreviousScore ? bestCurrentScore - bestPreviousScore : 0;
+  const requiredDocuments = [
+    { label: "Government ID", value: (client as any).dl_or_id_card },
+    { label: "Social Security Card", value: (client as any).ssc },
+    { label: "Proof of Address", value: (client as any).poa },
+  ];
+  const completedDocumentCount = requiredDocuments.filter((document) => Boolean(document.value)).length;
+  const missingDocumentCount = requiredDocuments.length - completedDocumentCount;
+  const documentsReadyPercent = Math.round((completedDocumentCount / requiredDocuments.length) * 100);
+  const hasCreditReport = Boolean(client.latestJsonData || (client.creditReportHistory && client.creditReportHistory.length > 0));
+  const reportProgress = hasCreditReport ? 100 : 25;
+  const fundingProgressValue = Number(client.fundingProgress || 0);
+  const overallProgress = Math.min(100, Math.max(8, Math.round((documentsReadyPercent * 0.35) + (reportProgress * 0.25) + (fundingProgressValue * 0.4))));
+  const getGeneratedLetterRound = (letter: any) => {
+    const round = Number(
+      letter?.dispute_round ??
+      letter?.round ??
+      letter?.disputeRound ??
+      letter?.round_number ??
+      0
+    );
+    return Number.isFinite(round) && round > 0 ? round : 1;
+  };
+  const highestGeneratedRound = Math.max(
+    1,
+    ...letterHistory.map((letter) => getGeneratedLetterRound(letter))
+  );
+  const latestGeneratedLetterRound = letterHistory[0]
+    ? getGeneratedLetterRound(letterHistory[0])
+    : highestGeneratedRound;
+  const latestReport = client.creditReportHistory?.[0];
+  const recentActivity = [
+    latestReport ? {
+      icon: CheckCircle,
+      iconClassName: "bg-emerald-500 text-white",
+      title: "Credit report fetched successfully",
+      description: latestReport.platform ? `${latestReport.platform} report ready for review` : "Latest credit report ready for review",
+      date: latestReport.date,
+    } : null,
+    letterHistory[0] ? {
+      icon: FileText,
+      iconClassName: "bg-blue-500 text-white",
+      title: "Dispute letters generated",
+      description: `Round ${latestGeneratedLetterRound} letters ready for review`,
+      date: letterHistory[0].created_at,
+    } : null,
+    otherDocs[0] ? {
+      icon: Upload,
+      iconClassName: "bg-violet-500 text-white",
+      title: "Documents uploaded",
+      description: otherDocs.length === 1 ? "1 supporting document available" : `${otherDocs.length} supporting documents available`,
+      date: otherDocs[0].created_at,
+    } : null,
+    {
+      icon: User,
+      iconClassName: "bg-amber-500 text-white",
+      title: "Profile created",
+      description: `Welcome to ${formData.company_name || client.name}`,
+      date: client.joinDate,
+    },
+  ].filter(Boolean).slice(0, 4) as Array<{
+    icon: typeof User;
+    iconClassName: string;
+    title: string;
+    description: string;
+    date?: string | number | Date | null;
+  }>;
+  const cityStateZip = [formData.city, formData.state, formData.zip_code].filter(Boolean).join(", ");
+return (
     <DashboardLayout>
       <div className="relative min-h-screen">
         <div className={shouldShowBasicAdminReportPullPrompt ? "pointer-events-none select-none blur-sm opacity-80" : ""}>
@@ -1679,10 +1803,10 @@ function EnhancedClientProfile() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate("/clients")}
+              onClick={() => navigate(profileBackHref)}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Clients
+              {profileBackLabel}
             </Button>
             <div className="flex items-center space-x-3">
               <Avatar className="h-12 w-12">
@@ -1698,7 +1822,7 @@ function EnhancedClientProfile() {
                   {client.name}
                 </h1>
                 <p className="text-muted-foreground">
-                  Client since {formatUsShortDate(client.joinDate)}
+                  {isBasicAdminPortalUser ? 'Member since' : 'Client since'} {formatUsShortDate(client.joinDate)}
                 </p>
               </div>
             </div>
@@ -1709,7 +1833,7 @@ function EnhancedClientProfile() {
           </Badge>
           <Button variant="outline" size="sm" onClick={handleEditClient}>
             <Edit className="h-4 w-4 mr-2" />
-            Edit Client
+            {isBasicAdminPortalUser ? 'Edit My Profile' : 'Edit Client'}
           </Button>
           {!client.latestJsonData && (
             <Button 
@@ -1817,18 +1941,28 @@ function EnhancedClientProfile() {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-2 min-w-[700px] sm:min-w-0">
+            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 gap-2 min-w-[1120px] sm:min-w-0">
+              {!isBasicAdminPortalUser && (
+                <TabsTrigger value="overview" className="flex items-center space-x-2">
+                  <LayoutGrid className="h-4 w-4" />
+                  <span>Overview</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="info" className="flex items-center space-x-2">
                 <User className="h-4 w-4" />
-                <span>Profile & Documents</span>
+                <span>{isBasicAdminPortalUser ? 'My Profile & Documents' : 'Profile & Documents'}</span>
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center space-x-2">
                 <History className="h-4 w-4" />
-                <span>Credit Reports</span>
+                <span>{isBasicAdminPortalUser ? 'My Reports' : 'Credit Reports'}</span>
               </TabsTrigger>
               <TabsTrigger value="scores" className="flex items-center space-x-2">
                 <TrendingUp className="h-4 w-4" />
-                <span>Score History</span>
+                <span>{isBasicAdminPortalUser ? 'My Score History' : 'Score History'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="power-of-attorney" className="flex items-center space-x-2">
+                <FileText className="h-4 w-4" />
+                <span>POA (Power of Attorney)</span>
               </TabsTrigger>
               <TabsTrigger value="letters" className="flex items-center space-x-2">
                 <ScrollText className="h-4 w-4" />
@@ -1838,6 +1972,10 @@ function EnhancedClientProfile() {
                 <Shield className="h-4 w-4" />
                 <span>Equifax Settlement</span>
               </TabsTrigger>
+              <TabsTrigger value="other-creditors-freeze" className="flex items-center space-x-2">
+                <ShieldCheck className="h-4 w-4" />
+                <span>other creditors freeze</span>
+              </TabsTrigger>
               <TabsTrigger value="json" className="flex items-center space-x-2">
                 <Code className="h-4 w-4" />
                 <span>Raw Data</span>
@@ -1845,6 +1983,221 @@ function EnhancedClientProfile() {
             </TabsList>
           </div>
 
+          {!isBasicAdminPortalUser && (
+            <TabsContent value="overview" className="mt-0 space-y-5">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Client Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex items-center gap-5 pt-0">
+                    <Avatar className="h-20 w-20 shadow-sm">
+                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-2xl font-bold text-white">
+                        {client.name.split(" ").map((namePart) => namePart[0]).join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-2xl font-bold text-slate-900">{client.name}</h3>
+                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">{client.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-slate-600">
+                        <CalendarDays className="h-4 w-4 text-slate-500" />
+                        <span>Member since {formatUsFullDate(client.joinDate) || formatUsShortDate(client.joinDate)}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0 text-sm text-slate-700">
+                    <div className="flex items-center gap-3">
+                      <Mail className="h-4 w-4 text-slate-500" />
+                      <span className="min-w-0 truncate">{client.email || "No email on file"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-4 w-4 text-slate-500" />
+                      <span>{client.phone || "No phone on file"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CalendarDays className="h-4 w-4 text-slate-500" />
+                      <span>Date of Birth: {formatUsShortDate(formData.date_of_birth || client.date_of_birth) || "Not provided"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <User className="h-4 w-4 text-slate-500" />
+                      <span>Joined: {formatUsShortDate(client.joinDate)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Location</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 pt-0 text-sm text-slate-700">
+                    <div className="flex items-center gap-3">
+                      <MapPin className="h-4 w-4 text-slate-500" />
+                      <span>{formData.street_number_and_name || client.address || "No street address"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Building className="h-4 w-4 text-slate-500" />
+                      <span>{cityStateZip || "City, state, and ZIP not provided"}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Globe className="h-4 w-4 text-slate-500" />
+                      <span>{formData.country || "United States"}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                      <TrendingUp className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">Score Improvement</p>
+                    <p className={`mt-2 text-3xl font-bold ${scoreImprovement >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                      {scoreImprovement >= 0 ? "+" : ""}{scoreImprovement}
+                    </p>
+                    <p className="text-sm text-slate-500">points since start</p>
+                    <div className="mt-5 inline-flex rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+                      From {bestPreviousScore || "N/A"} to {bestCurrentScore || "N/A"}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                      <RefreshCw className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">Current Round</p>
+                    <p className="mt-2 text-3xl font-bold text-blue-600">Round {highestGeneratedRound}</p>
+                    <p className="text-sm text-slate-500">of Generation</p>
+                    <div className="mt-5 inline-flex rounded-lg bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">In Progress</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                      <CheckCircle className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">Documents Status</p>
+                    <p className="mt-2 text-3xl font-bold text-emerald-600">{missingDocumentCount === 0 ? "No missing" : `${missingDocumentCount} missing`}</p>
+                    <p className="text-sm text-slate-500">documents</p>
+                    <div className="mt-5 inline-flex rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+                      {missingDocumentCount === 0 ? "All caught up" : `${completedDocumentCount}/${requiredDocuments.length} complete`}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                      <Shield className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">Funding Readiness</p>
+                    <p className={`mt-2 text-3xl font-bold ${client.fundingEligibility === "fundable" ? "text-emerald-600" : "text-amber-600"}`}>
+                      {client.fundingEligibility === "fundable" ? "Ready" : "Not Ready"}
+                    </p>
+                    <p className="text-sm text-slate-500">for Funding Yet</p>
+                    <div className="mt-5 inline-flex rounded-lg bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+                      {client.fundingEligibility === "fundable" ? "Ready to apply" : "Keep building your profile"}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="flex h-full flex-col items-center justify-center p-5 text-center">
+                    <p className="mb-3 text-sm font-semibold text-slate-900">Overall Progress</p>
+                    <div
+                      className="relative flex h-28 w-28 items-center justify-center rounded-full"
+                      style={{ background: `conic-gradient(#3b82f6 ${overallProgress * 3.6}deg, #e5e7eb 0deg)` }}
+                    >
+                      <div className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-white shadow-inner">
+                        <span className="text-2xl font-bold text-slate-900">{overallProgress}%</span>
+                        <span className="text-[10px] text-slate-500">Complete</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 w-32 rounded-full bg-slate-100">
+                      <div className="h-2 rounded-full bg-blue-500" style={{ width: `${overallProgress}%` }} />
+                    </div>
+                    <p className="mt-3 text-sm text-slate-600">You are making great progress.</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+                <Card className="border-slate-200 shadow-sm xl:col-span-1">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+                      <Check className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">What is Looking Good</p>
+                    <p className="mt-3 text-2xl font-bold text-emerald-600">Everything is on track</p>
+                    <p className="mt-2 text-sm text-slate-500">Keep up the great work.</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm xl:col-span-1">
+                  <CardContent className="p-5">
+                    <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                      <ArrowRight className="h-7 w-7" />
+                    </div>
+                    <p className="text-sm text-slate-600">Next Step</p>
+                    <p className="mt-3 text-2xl font-bold text-violet-600">Continue building profile</p>
+                    <p className="mt-2 text-sm text-slate-500">and complete this round</p>
+                    <Button
+                      className="mt-5 bg-violet-100 text-violet-700 hover:bg-violet-200"
+                      onClick={() => {
+                        if (!clientId) return;
+                        navigate(`/credit-report?clientId=${encodeURIComponent(clientId)}&clientName=${encodeURIComponent(client?.name || '')}&tab=creditWarMap`);
+                      }}
+                    >
+                      View Action Plan
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 shadow-sm xl:col-span-3">
+                  <CardHeader className="flex flex-row items-center justify-between pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Bell className="h-4 w-4 text-blue-600" />
+                      Recent Activity
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => handleClientProfileTabChange("history")}>View All Activity</Button>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      {recentActivity.map((activityItem, index) => {
+                        const ActivityIcon = activityItem.icon;
+                        return (
+                          <div key={`${activityItem.title}-${index}`} className="flex items-start gap-4">
+                            <div className={`mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${activityItem.iconClassName}`}>
+                              <ActivityIcon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-slate-900">{activityItem.title}</p>
+                              <p className="text-sm text-slate-500">{activityItem.description}</p>
+                            </div>
+                            <div className="shrink-0 text-right text-xs text-slate-500">
+                              {formatUsShortDateTime(activityItem.date) || formatUsShortDate(activityItem.date)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+          )}
           {/* Client Info Tab - Profile & Documents */}
           <TabsContent value="info" className="mt-0 space-y-6">
                 {/* Client Welcome Card */}
@@ -1857,7 +2210,7 @@ function EnhancedClientProfile() {
                     </Avatar>
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-xl font-bold text-slate-800 truncate">{client.name || 'Client'}</h2>
+                    <h2 className="text-xl font-bold text-slate-800 truncate">{client.name || (isBasicAdminPortalUser ? 'My Profile' : 'Client')}</h2>
                     <p className="text-sm text-slate-500 flex items-center gap-1.5 mt-0.5">
                       <CalendarDays className="h-3.5 w-3.5" /> Member since {client.joinDate ? new Date(client.joinDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'N/A'}
                     </p>
@@ -1963,6 +2316,46 @@ function EnhancedClientProfile() {
                   </div>
                 </div>
 
+                {/* Identification Information */}
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 flex items-center gap-2.5">
+                    <Briefcase className="h-4 w-4 text-white" />
+                    <h3 className="text-sm font-semibold text-white tracking-wide">Identification Information</h3>
+                  </div>
+                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-2">
+                    {/* Display Non For Now
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                        <Briefcase className="h-3 w-3" /> Employment
+                      </label>
+                      <input type="text" value={formData.employment_status || ''} onChange={(e) => updateField('employment_status', e.target.value)} placeholder="e.g. Full-time, Freelancer..." className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-colors placeholder:text-slate-300" />
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                        <DollarSign className="h-3 w-3" /> Annual Income
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
+                        <input type="number" value={formData.annual_income || ''} onChange={(e) => updateField('annual_income', e.target.value)} className="w-full border border-slate-200 rounded-xl pl-7 pr-3.5 py-2.5 text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-colors" />
+                      </div>
+                    </div>
+                     */}
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                        <ShieldCheck className="h-3 w-3" /> Social Security Number
+                      </label>
+                      <input type="text" value={formData.ssn_last_four || ''} onChange={(e) => updateField('ssn_last_four', e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Last 4 Digits" maxLength={4} className="w-full border border-orange-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-orange-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-colors placeholder:text-slate-400 tracking-widest" />
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
+                        <ShieldCheck className="h-3 w-3" /> Equifax Settlement SSN
+                      </label>
+                      <input type="text" value={formData.ssn_last_six || ''} onChange={(e) => updateField('ssn_last_six', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Last 6 Digits" maxLength={6} className="w-full border border-orange-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-orange-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-colors placeholder:text-slate-400 tracking-widest" />
+                      <p className="mt-1.5 text-xs text-orange-500">Required for the Equifax Data Breach Settlement tab.</p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Residential Information */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3 flex items-center gap-2.5">
@@ -2004,46 +2397,6 @@ function EnhancedClientProfile() {
                         <Globe className="h-3 w-3" /> Country
                       </label>
                       <input type="text" value={formData.country || ''} onChange={(e) => updateField('country', e.target.value)} placeholder="United States" className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-colors placeholder:text-slate-300" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Work Information dfsf */}
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-5 py-3 flex items-center gap-2.5">
-                    <Briefcase className="h-4 w-4 text-white" />
-                    <h3 className="text-sm font-semibold text-white tracking-wide">Work Information</h3>
-                  </div>
-                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-2">
-                    {/* Display Non For Now
-                    <div>
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
-                        <Briefcase className="h-3 w-3" /> Employment
-                      </label>
-                      <input type="text" value={formData.employment_status || ''} onChange={(e) => updateField('employment_status', e.target.value)} placeholder="e.g. Full-time, Freelancer..." className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-colors placeholder:text-slate-300" />
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
-                        <DollarSign className="h-3 w-3" /> Annual Income
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-medium">$</span>
-                        <input type="number" value={formData.annual_income || ''} onChange={(e) => updateField('annual_income', e.target.value)} className="w-full border border-slate-200 rounded-xl pl-7 pr-3.5 py-2.5 text-slate-800 bg-slate-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition-colors" />
-                      </div>
-                    </div>
-                     */}
-                    <div>
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
-                        <ShieldCheck className="h-3 w-3" /> Social Security Number
-                      </label>
-                      <input type="text" value={formData.ssn_last_four || ''} onChange={(e) => updateField('ssn_last_four', e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="Last 4 Digits" maxLength={4} className="w-full border border-orange-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-orange-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-colors placeholder:text-slate-400 tracking-widest" />
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">
-                        <ShieldCheck className="h-3 w-3" /> Equifax Settlement SSN
-                      </label>
-                      <input type="text" value={formData.ssn_last_six || ''} onChange={(e) => updateField('ssn_last_six', e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Last 6 Digits" maxLength={6} className="w-full border border-orange-200 rounded-xl px-3.5 py-2.5 text-slate-800 bg-orange-50/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-colors placeholder:text-slate-400 tracking-widest" />
-                      <p className="mt-1.5 text-xs text-orange-500">Required for the Equifax Data Breach Settlement tab.</p>
                     </div>
                   </div>
                 </div>
@@ -2239,7 +2592,7 @@ function EnhancedClientProfile() {
           <TabsContent value="history" className="space-y-6">
             <Card className="gradient-light border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg">Credit Report History</CardTitle>
+                <CardTitle className="text-lg">{isBasicAdminPortalUser ? 'My Report History' : 'Credit Report History'}</CardTitle>
                 <Button
                   onClick={() => {
                     console.log('Fetch New Report button clicked!');
@@ -2283,7 +2636,7 @@ function EnhancedClientProfile() {
                         </div>
                         <div className="space-y-1">
                           <div className="text-sm text-muted-foreground">
-                            • Client: {report.clientName}
+                            • {isBasicAdminPortalUser ? 'Profile' : 'Client'}: {report.clientName}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             • Report: {report.reportName}
@@ -2299,7 +2652,7 @@ function EnhancedClientProfile() {
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No credit report history found for this client.</p>
+                      <p>{isBasicAdminPortalUser ? 'No credit report history found for your profile.' : 'No credit report history found for this client.'}</p>
                       <p className="text-sm">Reports will appear here once they are generated.</p>
                     </div>
                   )}
@@ -2312,7 +2665,7 @@ function EnhancedClientProfile() {
           <TabsContent value="scores" className="space-y-6">
             <Card className="gradient-light border-0">
               <CardHeader>
-                <CardTitle className="text-lg">Credit Score History</CardTitle>
+                <CardTitle className="text-lg">{isBasicAdminPortalUser ? 'My Score History' : 'Credit Score History'}</CardTitle>
               </CardHeader>
               <CardContent>
                 {scoreHistoryLoading ? (
@@ -2423,7 +2776,7 @@ function EnhancedClientProfile() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No score history found for this client.</p>
+                    <p>{isBasicAdminPortalUser ? 'No score history found for your profile.' : 'No score history found for this client.'}</p>
                     <p className="text-sm">Score history will appear here once credit reports are generated.</p>
                   </div>
                 )}
@@ -2435,7 +2788,7 @@ function EnhancedClientProfile() {
           <TabsContent value="json" className="space-y-6">
             <Card className="gradient-light border-0">
               <CardHeader>
-                <CardTitle className="text-lg">Latest Credit Report Data (JSON)</CardTitle>
+                <CardTitle className="text-lg">{isBasicAdminPortalUser ? 'Latest Report Data (JSON)' : 'Latest Credit Report Data (JSON)'}</CardTitle>
               </CardHeader>
               <CardContent>
                 {client.latestJsonData ? (
@@ -2483,6 +2836,36 @@ function EnhancedClientProfile() {
                       {jsonSearchTerm && (
                         <Button variant="outline" size="sm" onClick={() => setJsonSearchTerm("")}>Clear</Button>
                       )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            if (navigator?.clipboard?.writeText) {
+                              await navigator.clipboard.writeText(jsonString);
+                            } else {
+                              const textarea = document.createElement('textarea');
+                              textarea.value = jsonString;
+                              textarea.setAttribute('readonly', '');
+                              textarea.style.position = 'absolute';
+                              textarea.style.left = '-9999px';
+                              document.body.appendChild(textarea);
+                              textarea.select();
+                              document.execCommand('copy');
+                              document.body.removeChild(textarea);
+                            }
+                            toast({ title: 'Copied', description: 'Full JSON copied to clipboard.' });
+                          } catch {
+                            toast({
+                              title: 'Copy failed',
+                              description: 'Unable to copy JSON to clipboard.',
+                              variant: 'destructive',
+                            });
+                          }
+                        }}
+                      >
+                        Copy All
+                      </Button>
                       <span className="text-xs text-muted-foreground">
                         {matchCount > 0 ? `${currentMatchIndex + 1}/${matchCount}` : '0/0'} matches
                       </span>
@@ -2494,7 +2877,7 @@ function EnhancedClientProfile() {
                 ) : (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No JSON data available for this client.</p>
+                    <p>{isBasicAdminPortalUser ? 'No JSON data available for your profile.' : 'No JSON data available for this client.'}</p>
                     <p className="text-sm">Credit report data will appear here once available.</p>
                   </div>
                 )}
@@ -2503,6 +2886,10 @@ function EnhancedClientProfile() {
           </TabsContent>
 
           {/* Generated Letter History Tab */}
+          <TabsContent value="power-of-attorney" className="mt-0">
+            <PowerOfAttorneyTab clientId={clientId || client.id} />
+          </TabsContent>
+
           <TabsContent value="letters" className="mt-0">
                 <h3 className="text-3xl font-bold text-slate-800 mb-8">
                   Generated Dispute Letter History
@@ -2663,7 +3050,7 @@ function EnhancedClientProfile() {
                 ) : (
                   <div className="text-center py-20 bg-slate-50 rounded-3xl">
                     <p className="text-2xl font-semibold text-slate-600">
-                      No dispute letters generated yet for this client.
+                      {isBasicAdminPortalUser ? 'No dispute letters generated yet for your profile.' : 'No dispute letters generated yet for this client.'}
                     </p>
                   </div>
                 )}
@@ -2688,38 +3075,10 @@ function EnhancedClientProfile() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => window.open('https://www.innovis.com/securityFreeze/register', '_blank', 'noopener,noreferrer')}
+                    onClick={() => window.open('https://my.equifax.com/membercenter/#/login', '_blank', 'noopener,noreferrer')}
                     className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
                   >
-                      Security Freeze
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://www.innovis.com/securityFreeze/index', '_blank', 'noopener,noreferrer')}
-                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                      Innovis
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://form.consumer.risk.lexisnexis.com/s/web-form?type=security_freeze&requestfor=self', '_blank', 'noopener,noreferrer')}
-                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                      LexisNexis
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://forms.sagestreamllc.com/#/opt-self', '_blank', 'noopener,noreferrer')}
-                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                      Sage Stream
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.open('https://consumers.clarityservices.com/idv?type=PLACE_SECURITY_FREEZE', '_blank', 'noopener,noreferrer')}
-                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
-                  >
-                      Clarity Service
+                      Equifax Freeze
                   </button>
                   <Button
                     onClick={startEquifaxLiveBrowser}
@@ -2785,6 +3144,46 @@ function EnhancedClientProfile() {
                 {equifaxLiveError && (
                   <div className="text-sm text-red-600 text-center">{equifaxLiveError}</div>
                 )}
+          </TabsContent>
+
+          <TabsContent value="other-creditors-freeze" className="mt-0 space-y-6">
+            <Card className="border border-slate-200 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">Other Creditors Freeze</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://www.innovis.com/securityFreeze/index', '_blank', 'noopener,noreferrer')}
+                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    Innovis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://form.consumer.risk.lexisnexis.com/s/web-form?type=security_freeze&requestfor=self', '_blank', 'noopener,noreferrer')}
+                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    LexisNexis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://forms.sagestreamllc.com/#/opt-self', '_blank', 'noopener,noreferrer')}
+                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    Sage Stream
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.open('https://consumers.clarityservices.com/idv?type=PLACE_SECURITY_FREEZE', '_blank', 'noopener,noreferrer')}
+                    className="h-11 px-5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    Clarity Service
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
         </Tabs>

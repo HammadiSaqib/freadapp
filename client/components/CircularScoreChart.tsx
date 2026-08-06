@@ -204,7 +204,7 @@ const CircularScoreChart: React.FC<CircularScoreChartProps> = ({
           <div className={centerBoxClasses} style={{ width: centerSize, height: centerSize }}>
             {scoreType === 'FICO' ? (
               <div className={logoWrapperClasses}>
-                <div className="relative">
+                <div className="relative mt-10">
                           <img 
                     src="/FICO_Score_RGB_Blue.png" 
                     alt="FICO Score" 
@@ -212,7 +212,6 @@ const CircularScoreChart: React.FC<CircularScoreChartProps> = ({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-transparent to-white opacity-20 rounded-lg"></div>
                 </div>
-                <div className={scoreLabelClasses}>SCORE</div>
               </div>
             ) : (
               <div className={logoWrapperClasses}>
@@ -229,7 +228,7 @@ const CircularScoreChart: React.FC<CircularScoreChartProps> = ({
                     <div className={scoreClasses}>
               {score}
             </div>
-                    <div className={badgeClasses}>Avarage Score</div>
+                    <div className={badgeClasses}>Average Score</div>
           </div>
         </div>
 

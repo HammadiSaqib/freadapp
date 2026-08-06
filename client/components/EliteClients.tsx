@@ -144,7 +144,7 @@ export default function EliteClients(props: EliteClientsProps) {
           <motion.div variants={itemVariants} className="bg-white rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden">
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 pb-4 border-b border-slate-100 gap-4">
               <div>
-                <h2 className="text-xl font-black text bg-clip-text bg-gradient-to-r from-slate-900 via-[#7000ff] to-[#00d4ff] tracking-tight">CRM Pipeline</h2>
+                <h2 className="text-xl font-black text bg-clip-text bg-gradient-to-r from-slate-900 via-[#1B8B00] to-[#77dd77] tracking-tight">CRM Pipeline</h2>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Manage Elite Client Network</p>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
@@ -157,7 +157,7 @@ export default function EliteClients(props: EliteClientsProps) {
                     className="pl-10 h-10 border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400 text-xs font-semibold"
                   />
                 </div>
-                <Button size="sm" onClick={() => setShowAddClient(true)} className="h-10 w-full sm:w-auto px-4 bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] hover:opacity-90 text-slate-900 rounded-xl shadow-[0_0_15px_rgba(0,212,255,0.4)] border-0 text-xs font-black uppercase tracking-wider">
+                <Button size="sm" onClick={() => setShowAddClient(true)} className="h-10 w-full sm:w-auto px-4 bg-gradient-to-r from-[#004225] to-[#77dd77] hover:opacity-95 text-white rounded-xl shadow-[0_0_15px_rgba(27,139,0,0.28)] border-0 text-xs font-black uppercase tracking-wider">
                   <Plus className="h-4 w-4 mr-2" /> Add Client
                 </Button>
               </div>

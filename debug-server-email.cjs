@@ -13,7 +13,7 @@ const config = {
   EMAIL_SECURE: process.env.EMAIL_SECURE === 'true',
   EMAIL_USER: process.env.EMAIL_USER || '',
   EMAIL_PASSWORD: process.env.EMAIL_PASSWORD || '',
-  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'The Capsol',
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'Score Machine',
   EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER || '',
 };
 

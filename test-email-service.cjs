@@ -25,9 +25,9 @@ async function testEmailService() {
     // Test 2: Send a test email
     console.log('2. Sending test email...');
     const testEmail = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'The Capsol'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER}>`,
+      from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER, // Send to self for testing
-      subject: 'Test Email - The Capsol Email Service',
+      subject: 'Test Email - Score Machine Email Service',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #2563eb;">Email Service Test</h2>
@@ -65,13 +65,13 @@ async function testEmailService() {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
     const verificationEmail = {
-      from: `"${process.env.EMAIL_FROM_NAME || 'The Capsol'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER}>`,
+      from: `"${process.env.EMAIL_FROM_NAME || 'Score Machine'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
-      subject: 'Email Verification Code - The Capsol',
+      subject: 'Email Verification Code - Score Machine',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #2563eb; margin: 0;">The Capsol</h1>
+            <h1 style="color: #2563eb; margin: 0;">Score Machine</h1>
             <p style="color: #6b7280; margin: 5px 0;">Affiliate Registration</p>
           </div>
           
@@ -94,13 +94,13 @@ async function testEmailService() {
           
           <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
             <p style="color: #9ca3af; font-size: 12px;">
-              © 2024 The Capsol. All rights reserved.
+              © 2024 Score Machine. All rights reserved.
             </p>
           </div>
         </div>
       `,
       text: `
-        The Capsol - Email Verification
+        Score Machine - Email Verification
         
         Thank you for registering as an affiliate!
         

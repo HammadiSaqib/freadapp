@@ -334,8 +334,8 @@ export default function EliteFeatureRequests() {
           {/* Header Section */}
           <motion.div variants={itemVariants} className="flex flex-col md:flex-row items-start md:items-center justify-between p-6 pb-4 bg-white rounded-3xl border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] gap-4">
             <div>
-              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-[#7000ff] to-[#00d4ff] tracking-tight flex items-center gap-2">
-                <Sparkles className="h-6 w-6 text-[#7000ff]" /> Feature Requests
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-[#1B8B00] to-[#77dd77] tracking-tight flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-[#1B8B00]" /> Feature Requests
               </h2>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Vote on community ideas or suggest your own</p>
             </div>
@@ -347,20 +347,20 @@ export default function EliteFeatureRequests() {
                   placeholder="Search ideas..." 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
-                  className="pl-10 h-10 border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 transition-all placeholder:text-slate-400 text-xs font-semibold"
+                  className="pl-10 h-10 border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#77dd77]/30 focus:border-[#1B8B00]/40 transition-all placeholder:text-slate-400 text-xs font-semibold"
                 />
               </div>
               <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as "newest" | "popular")} className="w-full sm:w-auto">
                 <TabsList className="h-10 bg-slate-50 border border-slate-100 rounded-xl shadow-inner p-1">
-                  <TabsTrigger value="newest" className="text-[10px] font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#00d4ff] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 transition-all"><Clock className="w-3 h-3 mr-1" /> Newest</TabsTrigger>
-                  <TabsTrigger value="popular" className="text-[10px] font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#ff00ff] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 transition-all"><TrendingUp className="w-3 h-3 mr-1" /> Popular</TabsTrigger>
+                  <TabsTrigger value="newest" className="text-[10px] font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#004225] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 transition-all"><Clock className="w-3 h-3 mr-1" /> Newest</TabsTrigger>
+                  <TabsTrigger value="popular" className="text-[10px] font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#1B8B00] data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 transition-all"><TrendingUp className="w-3 h-3 mr-1" /> Popular</TabsTrigger>
                 </TabsList>
               </Tabs>
               <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-100 shadow-inner">
                 <Button variant={viewMode === "row" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("row")} className={`h-8 w-8 p-0 rounded-lg ${viewMode === "row" ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}><List className="w-4 h-4" /></Button>
                 <Button variant={viewMode === "column" ? "secondary" : "ghost"} size="sm" onClick={() => setViewMode("column")} className={`h-8 w-8 p-0 rounded-lg ${viewMode === "column" ? 'bg-white shadow-sm text-slate-800' : 'text-slate-400'}`}><LayoutGrid className="w-4 h-4" /></Button>
               </div>
-              <Button size="sm" onClick={() => setIsCreateOpen(true)} className="h-10 w-full sm:w-auto px-4 bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] hover:opacity-90 text-slate-900 rounded-xl shadow-[0_0_15px_rgba(0,212,255,0.4)] border-0 text-xs font-black uppercase tracking-wider shrink-0">
+              <Button size="sm" onClick={() => setIsCreateOpen(true)} className="h-10 w-full sm:w-auto px-4 bg-gradient-to-r from-[#004225] to-[#77dd77] hover:opacity-95 text-white rounded-xl shadow-[0_0_15px_rgba(27,139,0,0.28)] border-0 text-xs font-black uppercase tracking-wider shrink-0">
                 <Plus className="h-4 w-4 mr-2" /> New Idea
               </Button>
             </div>
@@ -369,7 +369,7 @@ export default function EliteFeatureRequests() {
           {/* Requests Grid */}
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="h-12 w-12 rounded-full border-4 border-[#00d4ff] border-t-transparent animate-spin mb-4"></div>
+              <div className="h-12 w-12 rounded-full border-4 border-[#1B8B00] border-t-transparent animate-spin mb-4"></div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-widest animate-pulse">Loading Innovation Hub...</p>
             </div>
           ) : filteredRequests.length === 0 ? (
@@ -395,15 +395,15 @@ export default function EliteFeatureRequests() {
               <AnimatePresence>
                 {filteredRequests.map((request) => (
                   <motion.div key={request.id} variants={itemVariants} layout>
-                    <Card className={`h-full flex flex-col group hover:shadow-[0_8px_30px_rgba(112,0,255,0.12)] transition-all duration-300 border-white bg-white/80 backdrop-blur-xl overflow-hidden rounded-3xl relative ${request.status === 'closed' ? 'opacity-80' : ''}`}>
-                      {request.status === "closed" && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#00ffcc] to-emerald-500"></div>}
+                    <Card className={`h-full flex flex-col group hover:shadow-[0_8px_30px_rgba(27,139,0,0.12)] transition-all duration-300 border-white bg-white/80 backdrop-blur-xl overflow-hidden rounded-3xl relative ${request.status === 'closed' ? 'opacity-80' : ''}`}>
+                      {request.status === "closed" && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#1B8B00] to-emerald-500"></div>}
                       
                       {/* Card Header */}
                       <CardHeader className="p-6 pb-4 flex flex-row items-start justify-between space-y-0 border-b border-slate-50">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
                             <AvatarImage src={request.user.avatar} />
-                            <AvatarFallback className="bg-gradient-to-br from-[#00d4ff] to-[#7000ff] text-white font-black">
+                            <AvatarFallback className="bg-gradient-to-br from-[#004225] to-[#77dd77] text-white font-black">
                               {getInitials(request.user.first_name, request.user.last_name)}
                             </AvatarFallback>
                           </Avatar>
@@ -421,7 +421,7 @@ export default function EliteFeatureRequests() {
                       {/* Card Content */}
                       <CardContent className="p-6 pt-4 flex-grow space-y-4">
                         <div className="space-y-2">
-                          <h3 className="font-black text-lg text-slate-800 leading-tight group-hover:text-[#7000ff] transition-colors line-clamp-2">
+                          <h3 className="font-black text-lg text-slate-800 leading-tight group-hover:text-[#1B8B00] transition-colors line-clamp-2">
                             {request.title}
                           </h3>
                           <p className="text-xs font-medium text-slate-500 line-clamp-4 leading-relaxed">
@@ -449,8 +449,8 @@ export default function EliteFeatureRequests() {
                             onClick={() => toggleVote(request.id)}
                             className={`gap-2 h-9 px-4 rounded-xl transition-all text-xs font-bold uppercase tracking-wider ${
                               request.user_has_voted 
-                                ? "bg-gradient-to-r from-[#00ffcc] to-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(0,255,204,0.4)] border-0" 
-                                : "bg-white border border-slate-200 text-slate-600 hover:text-[#00ffcc] hover:border-[#00ffcc]/50 shadow-sm"
+                                ? "bg-gradient-to-r from-[#1B8B00] to-emerald-500 text-white shadow-[0_0_15px_rgba(27,139,0,0.28)] border-0" 
+                                : "bg-white border border-slate-200 text-slate-600 hover:text-[#1B8B00] hover:border-[#1B8B00]/40 shadow-sm"
                             }`}
                           >
                             <ThumbsUp className={`w-3.5 h-3.5 ${request.user_has_voted ? "fill-slate-900" : ""}`} />
@@ -467,7 +467,7 @@ export default function EliteFeatureRequests() {
                               variant="ghost" 
                               size="sm" 
                               onClick={() => openComments(request.id)}
-                              className="h-9 px-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-[#00d4ff] hover:border-[#00d4ff]/50 shadow-sm text-xs font-bold uppercase tracking-wider"
+                              className="h-9 px-3 rounded-xl bg-white border border-slate-200 text-slate-600 hover:text-[#004225] hover:border-[#1B8B00]/40 shadow-sm text-xs font-bold uppercase tracking-wider"
                             >
                               <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
                               <span>{request.comments_count}</span>
@@ -487,11 +487,11 @@ export default function EliteFeatureRequests() {
       {/* Create Request Dialog (Elite Styled) */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-[600px] rounded-3xl border-0 dark:border dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] p-0 overflow-hidden bg-white dark:bg-slate-950 dark:text-slate-100 elite-nested-wrapper">
-          <div className="h-1 w-full bg-gradient-to-r from-[#00d4ff] via-[#7000ff] to-[#ff00ff]"></div>
+          <div className="h-1 w-full bg-gradient-to-r from-[#004225] via-[#1B8B00] to-[#77dd77]"></div>
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
               <div className="p-2 bg-blue-50 rounded-xl shadow-inner">
-                <Sparkles className="w-5 h-5 text-[#00d4ff]" />
+                <Sparkles className="w-5 h-5 text-[#1B8B00]" />
               </div>
               Submit New Idea
             </DialogTitle>
@@ -505,7 +505,7 @@ export default function EliteFeatureRequests() {
                   placeholder="What should we build next?"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="h-12 border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 text-sm font-semibold"
+                  className="h-12 border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#77dd77]/30 focus:border-[#1B8B00]/40 text-sm font-semibold"
                 />
               </div>
               
@@ -516,14 +516,14 @@ export default function EliteFeatureRequests() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={5}
-                  className="resize-none border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#00d4ff]/30 focus:border-[#00d4ff]/50 text-sm font-medium"
+                  className="resize-none border-slate-100 rounded-xl bg-slate-50 text-slate-800 shadow-inner focus:ring-2 focus:ring-[#77dd77]/30 focus:border-[#1B8B00]/40 text-sm font-medium"
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Attachment (Optional)</label>
                 <div className={`border-2 border-dashed rounded-2xl p-6 transition-all ${
-                  imagePreviewUrl ? 'border-[#00d4ff]/50 bg-blue-50/50' : 'border-slate-200 bg-slate-50 hover:border-[#00d4ff]/50 hover:bg-blue-50/30 cursor-pointer'
+                  imagePreviewUrl ? 'border-[#1B8B00]/40 bg-green-50/60' : 'border-slate-200 bg-slate-50 hover:border-[#1B8B00]/40 hover:bg-green-50/40 cursor-pointer'
                 }`}>
                   {imagePreviewUrl ? (
                     <div className="relative group flex justify-center">
@@ -544,7 +544,7 @@ export default function EliteFeatureRequests() {
                   ) : (
                     <div className="flex flex-col items-center justify-center text-center gap-2" onClick={() => document.getElementById('image-upload-elite')?.click()}>
                       <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                        <ImageIcon className="w-5 h-5 text-[#00d4ff]" />
+                        <ImageIcon className="w-5 h-5 text-[#1B8B00]" />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-slate-700">Click to upload image</p>
@@ -567,7 +567,7 @@ export default function EliteFeatureRequests() {
               <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs font-bold uppercase tracking-wider text-slate-500 hover:bg-slate-100 rounded-xl h-10 px-4">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreating} className="bg-gradient-to-r from-[#00d4ff] to-[#00ffcc] text-slate-900 rounded-xl shadow-[0_0_15px_rgba(0,212,255,0.4)] hover:shadow-[0_0_25px_rgba(0,212,255,0.6)] border-0 text-xs font-black uppercase tracking-wider h-10 px-6">
+              <Button type="submit" disabled={isCreating} className="bg-gradient-to-r from-[#004225] to-[#77dd77] text-white rounded-xl shadow-[0_0_15px_rgba(27,139,0,0.28)] hover:shadow-[0_0_25px_rgba(119,221,119,0.28)] border-0 text-xs font-black uppercase tracking-wider h-10 px-6">
                 {isCreating ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>
                 ) : (
@@ -582,10 +582,10 @@ export default function EliteFeatureRequests() {
       {/* Comments Dialog (Elite Styled) */}
       <Dialog open={isCommentsOpen} onOpenChange={setIsCommentsOpen}>
         <DialogContent className="sm:max-w-[600px] h-[80vh] flex flex-col p-0 gap-0 overflow-hidden rounded-3xl border-0 dark:border dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.12)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] bg-white dark:bg-slate-950 dark:text-slate-100 elite-nested-wrapper">
-          <div className="h-1 w-full bg-gradient-to-r from-[#ff9900] to-[#ff00ff]"></div>
+          <div className="h-1 w-full bg-gradient-to-r from-[#004225] to-[#77dd77]"></div>
           <DialogHeader className="p-6 border-b border-slate-50 bg-slate-50/50">
             <DialogTitle className="flex items-center gap-2 text-lg font-black text-slate-800">
-              <MessageSquare className="w-5 h-5 text-[#ff00ff]" />
+              <MessageSquare className="w-5 h-5 text-[#004225]" />
               Discussion
             </DialogTitle>
             {activeRequest && (
@@ -598,7 +598,7 @@ export default function EliteFeatureRequests() {
           <ScrollArea className="flex-1 p-6 bg-[#fafcff] dark:bg-slate-950/60">
             {isLoadingComments ? (
               <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
-                <div className="h-8 w-8 rounded-full border-4 border-[#ff00ff] border-t-transparent animate-spin"></div>
+                <div className="h-8 w-8 rounded-full border-4 border-[#1B8B00] border-t-transparent animate-spin"></div>
                 <p className="text-xs font-bold uppercase tracking-widest animate-pulse">Loading thread...</p>
               </div>
             ) : comments.length === 0 ? (
@@ -615,7 +615,7 @@ export default function EliteFeatureRequests() {
                   <div key={comment.id} className="flex gap-4 group">
                     <Avatar className="w-8 h-8 mt-1 ring-2 ring-white shadow-sm shrink-0">
                       <AvatarImage src={comment.user.avatar} />
-                      <AvatarFallback className="bg-gradient-to-br from-[#00d4ff] to-[#7000ff] text-white text-[10px] font-black">
+                      <AvatarFallback className="bg-gradient-to-br from-[#004225] to-[#77dd77] text-white text-[10px] font-black">
                         {getInitials(comment.user.first_name, comment.user.last_name)}
                       </AvatarFallback>
                     </Avatar>
@@ -639,7 +639,7 @@ export default function EliteFeatureRequests() {
           </ScrollArea>
 
           <div className="p-4 border-t border-slate-100 bg-white mt-auto">
-            <div className="flex gap-2 items-end bg-slate-50 p-2 rounded-2xl border border-slate-100 shadow-inner focus-within:ring-2 focus-within:ring-[#ff00ff]/30 focus-within:border-[#ff00ff]/50 transition-all">
+            <div className="flex gap-2 items-end bg-slate-50 p-2 rounded-2xl border border-slate-100 shadow-inner focus-within:ring-2 focus-within:ring-[#77dd77]/30 focus-within:border-[#1B8B00]/40 transition-all">
               <Textarea
                 placeholder="Write a comment..."
                 value={newComment}
@@ -656,7 +656,7 @@ export default function EliteFeatureRequests() {
                 size="icon" 
                 onClick={postComment} 
                 disabled={isPostingComment || !newComment.trim()}
-                className="mb-0.5 shrink-0 h-9 w-9 rounded-xl bg-gradient-to-r from-[#ff00ff] to-[#7000ff] text-white shadow-md border-0 hover:opacity-90 disabled:opacity-50"
+                className="mb-0.5 shrink-0 h-9 w-9 rounded-xl bg-gradient-to-r from-[#004225] to-[#77dd77] text-white shadow-md border-0 hover:opacity-90 disabled:opacity-50"
               >
                 {isPostingComment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
               </Button>

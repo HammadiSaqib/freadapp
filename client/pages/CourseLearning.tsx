@@ -87,6 +87,57 @@ const CourseLearning: React.FC = () => {
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
 
+  const formatDuration = (hours?: number, minutes?: number, fallback?: string) => {
+    const rawFallback = String(fallback || '').trim();
+    if (rawFallback) {
+      return rawFallback;
+    }
+
+    const wholeHours = Number(hours || 0);
+    const wholeMinutes = Number(minutes || 0);
+
+    if (wholeHours > 0 || wholeMinutes > 0) {
+      return [wholeHours > 0 ? `${wholeHours}h` : '', wholeMinutes > 0 ? `${wholeMinutes}m` : '']
+        .filter(Boolean)
+        .join(' ');
+    }
+
+    return '0 mins';
+  };
+
+  const formatVideoDuration = (seconds?: number, fallback?: string) => {
+    const rawFallback = String(fallback || '').trim();
+    if (rawFallback) {
+      return rawFallback;
+    }
+
+    const totalSeconds = Number(seconds || 0);
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+      return 'N/A';
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
+
+  const formatFileSize = (value?: number) => {
+    const size = Number(value || 0);
+    if (!Number.isFinite(size) || size <= 0) {
+      return 'Unknown size';
+    }
+
+    if (size >= 1024 * 1024) {
+      return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    if (size >= 1024) {
+      return `${Math.max(1, Math.round(size / 1024))} KB`;
+    }
+
+    return `${size} B`;
+  };
+
   useEffect(() => {
     if (courseId) {
       fetchCourseData(parseInt(courseId));
@@ -150,14 +201,14 @@ const CourseLearning: React.FC = () => {
         title: course.title,
         description: course.description,
         instructor: course.instructor_name || course.instructor,
-        duration: course.duration,
-        difficulty: course.difficulty,
+        duration: formatDuration(course.duration_hours, course.duration_minutes, course.duration),
+        difficulty: course.level || course.difficulty || 'beginner',
         progress: 0, // This would come from user progress API
         videos: videos.map((video: any) => ({
           id: video.id,
           title: video.title,
           url: video.video_url,
-          duration: video.duration,
+          duration: formatVideoDuration(video.duration_seconds, video.duration),
           order: video.order_index,
           completed: false // This would come from user progress API
         })),
@@ -166,7 +217,7 @@ const CourseLearning: React.FC = () => {
           title: material.title,
           url: material.file_url,
           type: material.file_type,
-          size: material.file_size,
+          size: formatFileSize(material.file_size),
           downloadAllowed: material.is_downloadable
         })),
         quiz: quizzes.length > 0 ? {
@@ -181,13 +232,15 @@ const CourseLearning: React.FC = () => {
       if (!courseData.videos || courseData.videos.length === 0) {
         const fallbackUrl = (navState && typeof navState.videoUrl === 'string' && navState.videoUrl.trim().length > 0)
           ? navState.videoUrl
-          : (typeof course?.video_url === 'string' && course.video_url.trim().length > 0 ? course.video_url : '');
+          : (typeof course?.preview_video_url === 'string' && course.preview_video_url.trim().length > 0
+              ? course.preview_video_url
+              : (typeof course?.video_url === 'string' && course.video_url.trim().length > 0 ? course.video_url : ''));
         if (fallbackUrl) {
           courseData.videos = [{
             id: -1,
             title: course.title || 'Course Video',
             url: fallbackUrl,
-            duration: course.duration || 'N/A',
+            duration: formatDuration(course.duration_hours, course.duration_minutes, course.duration),
             order: 1,
             completed: false
           }];

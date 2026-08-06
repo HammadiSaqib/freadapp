@@ -1,11 +1,5 @@
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
@@ -13,25 +7,43 @@ import { useState, useEffect } from "react";
 import { authApi, setAuthToken } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Shield,
+  ArrowRight,
+  CalendarDays,
+  CheckCircle2,
+  CreditCard,
   Eye,
   EyeOff,
+  FileText,
   Lock,
   Mail,
-  AlertTriangle,
-  CreditCard,
-  CheckCircle,
-  Award,
-  Settings,
+  Shield,
+  Sparkles,
   TrendingUp,
-  Users,
-  PieChart,
-  FileText,
-  BarChart3,
-  Target,
-  Calendar,
-  Bell,
 } from "lucide-react";
+
+const dashboardBenefits = [
+  {
+    icon: TrendingUp,
+    title: "Track progress",
+    description: "Stay on top of readiness, movement, and the next actions inside your portal.",
+  },
+  {
+    icon: FileText,
+    title: "Review updates",
+    description: "See the latest items, notes, and supporting information connected to your account.",
+  },
+  {
+    icon: CreditCard,
+    title: "Manage your journey",
+    description: "Use your member portal as the central place for your funding-related workflow.",
+  },
+];
+
+const miniStats = [
+  "Secure member access",
+  "Personal dashboard visibility",
+  "Simple step-by-step portal flow",
+];
 
 export default function ClientLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -45,12 +57,11 @@ export default function ClientLogin() {
   });
 
   useEffect(() => {
-    // Check if user is already authenticated
     const token = localStorage.getItem("auth_token");
     if (token) {
       navigate("/member/dashboard");
     }
-  }, []);
+  }, [navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -65,10 +76,7 @@ export default function ClientLogin() {
     setIsLoading(true);
 
     try {
-      const response = await authApi.clientLogin(
-        loginData.email,
-        loginData.password
-      );
+      const response = await authApi.clientLogin(loginData.email, loginData.password);
 
       if (response.error) {
         toast({
@@ -98,247 +106,182 @@ export default function ClientLogin() {
     }
   };
 
-  const clientFeatures = [
-    {
-      icon: CreditCard,
-      title: "Credit Monitoring",
-      description: "Real-time credit score tracking and report analysis",
-    },
-    {
-      icon: FileText,
-      title: "Progress Reports",
-      description: "Detailed progress tracking and improvement insights",
-    },
-    {
-      icon: BarChart3,
-      title: "Score Analytics",
-      description: "Comprehensive credit score history and trends",
-    },
-    {
-      icon: Target,
-      title: "Goal Tracking",
-      description: "Set and monitor your credit improvement goals",
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 dark:from-slate-900 dark:via-slate-800/95 dark:to-slate-900 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Background image overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-green-50/60 via-white/40 to-emerald-50/60 dark:from-slate-800/90 dark:via-slate-700/80 dark:to-slate-800/90"></div>
+    <div className="min-h-screen overflow-hidden bg-white text-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(20,184,166,0.14),transparent_26%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.12),transparent_28%),linear-gradient(180deg,#f8fffd_0%,#ffffff_45%,#f1faf6_100%)]" />
 
-        {/* Floating credit-themed images */}
-        <div className="absolute top-20 right-20 w-64 h-40 rounded-2xl overflow-hidden shadow-2xl opacity-10 rotate-12 hover:opacity-20 transition-opacity duration-500">
-          <img
-            src="https://images.pexels.com/photos/259200/pexels-photo-259200.jpeg"
-            alt="Credit score improvement"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="absolute bottom-32 left-16 w-48 h-32 rounded-2xl overflow-hidden shadow-2xl opacity-10 -rotate-12 hover:opacity-20 transition-opacity duration-500">
-          <img
-            src="https://images.pexels.com/photos/164527/pexels-photo-164527.jpeg"
-            alt="Financial planning"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Animated gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-green-400/20 to-emerald-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-emerald-500/20 to-teal-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
-      <div className="relative z-10 flex min-h-screen">
-        {/* Left side - Branding and features */}
-        <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 flex-col justify-center p-12 xl:p-16">
-          <div className="max-w-2xl">
-            <div className="mb-12">
-              <Link to="/" className="inline-flex items-center space-x-3 mb-8">
-                <div className="w-12 h-12 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Shield className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <span className="text-3xl font-bold">Client Portal</span>
-                  <div className="text-green-600/80 text-sm">
-                    Funding Dashboard
-                  </div>
-                </div>
-              </Link>
-
-              <div className="space-y-10">
-                <div>
-                  <h1 className="text-4xl xl:text-5xl font-bold mb-6 leading-tight">
-                    Your Credit
-                    <span className="block bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                      Improvement Journey
-                    </span>
-                  </h1>
-                  <p className="text-lg xl:text-xl text-slate-600 dark:text-slate-300 leading-relaxed max-w-lg">
-                    Track your progress, monitor your credit score, and achieve your financial goals with our comprehensive client dashboard.
-                  </p>
-
-                  {/* Client metrics highlight */}
-                  <div className="mt-6 flex items-center space-x-6 text-slate-600 dark:text-slate-400">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium">
-                        Real-time Monitoring
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse delay-500"></div>
-                      <span className="text-sm font-medium">
-                        Progress Tracking
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Client Features */}
-                <div className="grid grid-cols-1 gap-6">
-                  {clientFeatures.map((feature, index) => (
-                    <div key={index} className="flex items-start space-x-4">
-                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-xl flex items-center justify-center">
-                        <feature.icon className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold mb-1">{feature.title}</h3>
-                        <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                          {feature.description}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+      <div className="relative z-10 grid min-h-screen lg:grid-cols-[1fr_.92fr]">
+        <section className="flex items-center px-6 py-12 sm:px-10 lg:px-14 xl:px-20">
+          <div className="mx-auto w-full max-w-3xl">
+            <Link to="/" className="inline-flex items-center gap-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+                <img src="/capsol-logo.png" alt="CapSol" className="h-10 w-auto object-contain sm:h-12" />
               </div>
-            </div>
-          </div>
-        </div>
+              <div>
+                <p className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">CapSol Member</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">
+                  Client Portal
+                </p>
+              </div>
+            </Link>
 
-        {/* Right side - Login form */}
-        <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-8">
-          <div className="w-full max-w-md space-y-8">
-            {/* Mobile header */}
-            <div className="lg:hidden text-center mb-8">
-              <Link to="/" className="inline-flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-600 to-emerald-600 rounded-lg flex items-center justify-center">
-                  <Shield className="h-6 w-6 text-white" />
-                </div>
-                <span className="text-2xl font-bold">Client Portal</span>
-              </Link>
-              <p className="text-slate-600 dark:text-slate-400">
-                Access your Funding Dashboard
+            <div className="mt-12 max-w-2xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-800">
+                <Sparkles className="h-4 w-4" />
+                A cleaner member access experience
+              </div>
+              <h1 className="mt-6 text-5xl font-black leading-[1.02] tracking-[-0.045em] text-slate-950 sm:text-6xl xl:text-7xl">
+                Welcome back to
+                <span className="block bg-gradient-to-r from-teal-700 via-emerald-600 to-lime-600 bg-clip-text text-transparent">
+                  your CapSol portal.
+                </span>
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
+                Sign in to view your member dashboard, follow your funding journey, and stay aligned with the next steps your account needs.
               </p>
             </div>
 
-            <Card className="border-0 shadow-2xl bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl">
-              <CardHeader className="space-y-1 pb-8">
-                <CardTitle className="text-2xl font-bold text-center">
-                  Welcome Back
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {miniStats.map((item) => (
+                <div key={item} className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+                  <CheckCircle2 className="h-5 w-5 text-teal-700" />
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-800">{item}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 grid gap-4">
+              {dashboardBenefits.map((item) => (
+                <article key={item.title} className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="inline-flex rounded-2xl bg-teal-50 p-3 text-teal-700">
+                      <item.icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-950">{item.title}</h2>
+                      <p className="mt-2 text-sm leading-7 text-slate-600">{item.description}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="flex items-center justify-center px-6 py-12 sm:px-10 lg:px-12">
+          <Card className="w-full max-w-xl rounded-[2rem] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
+            <CardHeader className="space-y-5 px-8 pt-8 sm:px-10 sm:pt-10">
+              <div className="inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-950 text-white shadow-lg">
+                <Shield className="h-8 w-8" />
+              </div>
+              <div>
+                <CardTitle className="text-3xl font-black tracking-tight sm:text-4xl">
+                  Member Login
                 </CardTitle>
-                <CardDescription className="text-center text-base">
-                  Sign in to your client dashboard to track your credit improvement progress
+                <CardDescription className="mt-3 text-base leading-7 text-slate-600">
+                  Access your CapSol client portal to review updates, monitor activity, and continue your funding workflow.
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <form onSubmit={handleLogin} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium">
-                      Email Address
-                    </Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        id="email"
-                        name="email"
-                        type="email"
-                        placeholder="Enter your email"
-                        value={loginData.email}
-                        onChange={handleInputChange}
-                        className="pl-10 h-12 border-slate-200 dark:border-slate-700 focus:border-green-500 focus:ring-green-500/20"
-                        required
-                      />
-                    </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="px-8 pb-8 sm:px-10 sm:pb-10">
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-bold text-slate-800">
+                    Email Address
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="you@thecapsol.com"
+                      value={loginData.email}
+                      onChange={handleInputChange}
+                      className="h-14 rounded-2xl border-slate-200 pl-12 text-base focus-visible:ring-teal-500"
+                      required
+                    />
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium">
-                      Password
-                    </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        id="password"
-                        name="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter your password"
-                        value={loginData.password}
-                        onChange={handleInputChange}
-                        className="pl-10 pr-10 h-12 border-slate-200 dark:border-slate-700 focus:border-green-500 focus:ring-green-500/20"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4" />
-                        ) : (
-                          <Eye className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-bold text-slate-800">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={loginData.password}
+                      onChange={handleInputChange}
+                      className="h-14 rounded-2xl border-slate-200 pl-12 pr-12 text-base focus-visible:ring-teal-500"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </button>
                   </div>
+                </div>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-medium shadow-lg hover:shadow-xl transition-all duration-200"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        <span>Signing In...</span>
-                      </div>
-                    ) : (
-                      "Sign In to Dashboard"
-                    )}
-                  </Button>
-                </form>
-
-                <div className="text-center space-y-4">
-                  <Link
-                    to="/forgot-password"
-                    className="text-sm text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium"
-                  >
-                    Forgot your password?
+                <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-teal-700" />
+                    <span>Secure member access</span>
+                  </div>
+                  <Link to="/forgot-password" className="font-semibold text-teal-700 transition hover:text-teal-900">
+                    Forgot password?
                   </Link>
+                </div>
 
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      Need help?{" "}
-                      <Link
-                        to="/support"
-                        className="text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 font-medium"
-                      >
-                        Contact Support
-                      </Link>
+                <Button
+                  type="submit"
+                  className="h-14 w-full rounded-2xl bg-slate-950 text-base font-bold text-white hover:bg-teal-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                      Signing In...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Sign In to Dashboard
+                      <ArrowRight className="h-5 w-5" />
+                    </span>
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-start gap-3">
+                  <Shield className="mt-0.5 h-5 w-5 text-teal-700" />
+                  <div>
+                    <p className="font-semibold text-slate-900">Protected member portal</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      Your portal is secured for private account access and workflow visibility. If you need help signing in, our support team can assist.
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Security notice */}
-            <div className="flex items-center justify-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
-              <Shield className="h-3 w-3" />
-              <span>Your data is protected with enterprise-grade security</span>
-            </div>
-          </div>
-        </div>
+              <div className="mt-6 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                <span>Need help with your account?</span>
+                <Link to="/support" className="font-semibold text-teal-700 transition hover:text-teal-900">
+                  Contact Support
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
       </div>
     </div>
   );

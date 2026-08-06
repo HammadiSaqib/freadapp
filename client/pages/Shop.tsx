@@ -269,7 +269,7 @@ export default function Shop({ embed = false }: ShopProps) {
   return (
     <div className={rootClassName}>
       <Helmet>
-        <title>{embed ? 'Shop Embed - The Capsol' : 'Shop - The Capsol'}</title>
+        <title>{embed ? 'Shop Embed - Score Machine' : 'Shop - Score Machine'}</title>
         <meta name="description" content="Browse premium shop products, purchase instantly, and re-download using email verification." />
         {embed ? (
           <>

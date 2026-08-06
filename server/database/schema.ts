@@ -222,6 +222,10 @@ async function createTables() {
       funding_override_enabled BOOLEAN DEFAULT 0,
       funding_override_signature_text TEXT,
       funding_override_signed_at DATETIME,
+      send_dispute_letter_email BOOLEAN DEFAULT 1,
+      send_inactivity_email BOOLEAN DEFAULT 1,
+      send_report_pull_reminder_email BOOLEAN DEFAULT 1,
+      notify_client_after_report_pull BOOLEAN DEFAULT 1,
       account_type TEXT DEFAULT 'admin' CHECK (account_type IN ('admin','affiliate_only')),
       referred_by_user_id INTEGER,
       referral_source TEXT CHECK (referral_source IN ('product_link','affiliate_link')),
@@ -285,6 +289,22 @@ async function createTables() {
   } catch (err) {
   }
   try {
+    await runQuery(`ALTER TABLE users ADD COLUMN send_dispute_letter_email BOOLEAN DEFAULT 1`);
+  } catch (err) {
+  }
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN send_inactivity_email BOOLEAN DEFAULT 1`);
+  } catch (err) {
+  }
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN send_report_pull_reminder_email BOOLEAN DEFAULT 1`);
+  } catch (err) {
+  }
+  try {
+    await runQuery(`ALTER TABLE users ADD COLUMN notify_client_after_report_pull BOOLEAN DEFAULT 1`);
+  } catch (err) {
+  }
+  try {
     await runQuery(`ALTER TABLE tsm_elite_signatures ADD COLUMN signature_image_url TEXT`);
   } catch (err) {
   }
@@ -331,6 +351,9 @@ async function createTables() {
       custom_field_report_date TEXT,
       field_mappings TEXT,
       is_active BOOLEAN DEFAULT 1,
+      verified_at DATETIME,
+      last_validation_code INTEGER,
+      last_validation_error TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       created_by INTEGER,
@@ -349,12 +372,30 @@ async function createTables() {
       status TEXT NOT NULL CHECK (status IN ('success','failed')),
       message TEXT,
       client_id INTEGER,
+      response_code INTEGER,
+      error_message TEXT,
+      data_fields TEXT,
+      retry_status TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (integration_id) REFERENCES admin_integrations (id),
       FOREIGN KEY (admin_id) REFERENCES users (id),
       FOREIGN KEY (client_id) REFERENCES clients (id)
     )
   `);
+
+  for (const statement of [
+    `ALTER TABLE admin_integrations ADD COLUMN verified_at DATETIME`,
+    `ALTER TABLE admin_integrations ADD COLUMN last_validation_code INTEGER`,
+    `ALTER TABLE admin_integrations ADD COLUMN last_validation_error TEXT`,
+    `ALTER TABLE integration_activity_logs ADD COLUMN response_code INTEGER`,
+    `ALTER TABLE integration_activity_logs ADD COLUMN error_message TEXT`,
+    `ALTER TABLE integration_activity_logs ADD COLUMN data_fields TEXT`,
+    `ALTER TABLE integration_activity_logs ADD COLUMN retry_status TEXT`
+  ]) {
+    try {
+      await runQuery(statement);
+    } catch {}
+  }
 
   await runQuery(`
     CREATE TABLE IF NOT EXISTS integration_webhook_events (
@@ -961,7 +1002,7 @@ async function seedDatabase() {
       demoPasswordHash,
       "John",
       "Doe",
-      "The Capsol",
+      "The Score Machine",
       "admin",
       1,
     ],

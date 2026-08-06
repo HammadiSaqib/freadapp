@@ -3,6 +3,7 @@ import fs from 'fs';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import UserAgent from 'user-agents';
+import { normalizeUnifiedDob, normalizeYearOnlyDob } from '../shared/partialDob.js';
 
 // Sleep utility compatible across Puppeteer versions
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -777,8 +778,12 @@ export class Scraper {
   async Parse(credit_report) {
     try {
       // Check for MyScoreIQ structure (rawCreditData + sections)
-      if (credit_report.rawCreditData || credit_report.sections) {
-        return this.parseMyScoreIQ(credit_report);
+      if (credit_report.rawCreditData || credit_report.sections || Array.isArray(credit_report.data)) {
+        return this.parseMyScoreIQ(
+          credit_report.rawCreditData || credit_report.sections
+            ? credit_report
+            : { rawCreditData: credit_report }
+        );
       }
 
       let modifiedReport = {};
@@ -790,10 +795,16 @@ export class Scraper {
         'EXP': { id: 2, name: 'Experian', symbol: 'EXP' },
         'EQF': { id: 3, name: 'Equifax', symbol: 'EQF' }
       }
+      const attr = (obj, key) => obj?.[key] ?? obj?.[`@${key}`] ?? '';
+      const desc = (obj) => attr(obj, 'description');
+      const bureauIdFromSource = (source) => bureau[attr(source?.Bureau, 'symbol')]?.id || 0;
       let merged_credit_report = undefined;
 
       if (original_report) {
-        original_report = original_report.filter((obj) => { return obj.Type == 'MergeCreditReports' })
+        original_report = original_report.filter((obj) => {
+          const typeValue = obj?.Type?.$ || obj?.Type?.['@description'] || obj?.Type?.description || obj?.Type;
+          return typeValue === 'MergeCreditReports' || Boolean(obj?.TrueLinkCreditReportType?.Borrower);
+        })
         merged_credit_report = (original_report.length) ? original_report[0].TrueLinkCreditReportType : undefined;
 
         if (merged_credit_report) {
@@ -808,11 +819,11 @@ export class Scraper {
 
           modifiedReport.Name = BorrowerName.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "FirstName": borrower.Name.first || '',
-              "Middle": borrower.Name.middle || '',
-              "LastName": borrower.Name.last || '',
-              "NameType": borrower.NameType.description || ''
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "FirstName": attr(borrower.Name, 'first') || '',
+              "Middle": attr(borrower.Name, 'middle') || '',
+              "LastName": attr(borrower.Name, 'last') || '',
+              "NameType": desc(borrower.NameType) || ''
             }
           })
 
@@ -821,11 +832,11 @@ export class Scraper {
 
           modifiedReport.Address = BorrowerAddress.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "StreetAddress": borrower.CreditAddress.unparsedStreet || `${borrower.CreditAddress.houseNumber} ${borrower.CreditAddress.streetName} ${borrower.CreditAddress.unit}`,
-              "City": borrower.CreditAddress.city,
-              "State": borrower.CreditAddress.stateCode,
-              "Zip": borrower.CreditAddress.postalCode,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "StreetAddress": attr(borrower.CreditAddress, 'unparsedStreet') || `${attr(borrower.CreditAddress, 'houseNumber')} ${attr(borrower.CreditAddress, 'streetName')} ${attr(borrower.CreditAddress, 'unit')}`,
+              "City": attr(borrower.CreditAddress, 'city'),
+              "State": attr(borrower.CreditAddress, 'stateCode'),
+              "Zip": attr(borrower.CreditAddress, 'postalCode'),
               "AddressType": "Current"
             }
           })
@@ -835,11 +846,11 @@ export class Scraper {
 
           modifiedReport.Address = PreviousAddress.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "StreetAddress": borrower.CreditAddress.unparsedStreet || `${borrower.CreditAddress.houseNumber} ${borrower.CreditAddress.streetName} ${borrower.CreditAddress.unit}`,
-              "City": borrower.CreditAddress.city,
-              "State": borrower.CreditAddress.stateCode,
-              "Zip": borrower.CreditAddress.postalCode,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "StreetAddress": attr(borrower.CreditAddress, 'unparsedStreet') || `${attr(borrower.CreditAddress, 'houseNumber')} ${attr(borrower.CreditAddress, 'streetName')} ${attr(borrower.CreditAddress, 'unit')}`,
+              "City": attr(borrower.CreditAddress, 'city'),
+              "State": attr(borrower.CreditAddress, 'stateCode'),
+              "Zip": attr(borrower.CreditAddress, 'postalCode'),
               "AddressType": "Previous"
             }
           })
@@ -849,8 +860,8 @@ export class Scraper {
 
           modifiedReport.DOB = Birth.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "DOB": borrower.date
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "DOB": normalizeUnifiedDob(attr(borrower, 'date'))
             }
           })
 
@@ -858,9 +869,9 @@ export class Scraper {
           //Section Borrower Score
           modifiedReport.Score = CreditScore.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "Score": borrower.riskScore,
-              "ScoreType": borrower.scoreName,
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "Score": attr(borrower, 'riskScore'),
+              "ScoreType": attr(borrower, 'scoreName'),
               "DateScore": borrower.Source.InquiryDate
             }
           })
@@ -870,10 +881,10 @@ export class Scraper {
           //Section Borrower Employer
           modifiedReport.Employer = Employer.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "EmployerName": borrower.name,
-              "DateUpdated": borrower.dateUpdated,
-              "DateReported": borrower.dateReported
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "EmployerName": attr(borrower, 'name'),
+              "DateUpdated": attr(borrower, 'dateUpdated'),
+              "DateReported": attr(borrower, 'dateReported')
             }
           })
 
@@ -881,11 +892,11 @@ export class Scraper {
           //Section Borrower Inquiries
           modifiedReport.Inquiries = merged_credit_report.InquiryPartition.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Inquiry.Source.Bureau.symbol].id,
-              "DateInquiry": borrower.Inquiry.inquiryDate,
-              "CreditorName": borrower.Inquiry.subscriberName,
-              "InquiryType": borrower.Inquiry.inquiryType,
-              "Industry": borrower.Inquiry.IndustryCode.description
+              "BureauId": bureauIdFromSource(borrower.Inquiry?.Source),
+              "DateInquiry": attr(borrower.Inquiry, 'inquiryDate'),
+              "CreditorName": attr(borrower.Inquiry, 'subscriberName'),
+              "InquiryType": attr(borrower.Inquiry, 'inquiryType'),
+              "Industry": desc(borrower.Inquiry?.IndustryCode)
             }
           })
 
@@ -899,10 +910,10 @@ export class Scraper {
               : (partition?.PublicRecord ? [partition.PublicRecord] : []);
 
             return publicRecords
-              .filter((publicRecord) => publicRecord?.Source?.Bureau?.symbol && bureau[publicRecord.Source.Bureau.symbol])
+              .filter((publicRecord) => bureauIdFromSource(publicRecord?.Source))
               .map((publicRecord) => {
                 return {
-                  "BureauId": bureau[publicRecord.Source.Bureau.symbol].id,
+                  "BureauId": bureauIdFromSource(publicRecord.Source),
                   "Date": publicRecord?.dateFiled || publicRecord?.dateReported || '',
                   "DateFiled": publicRecord?.dateFiled || '',
                   "DateReported": publicRecord?.dateReported || '',
@@ -936,30 +947,30 @@ export class Scraper {
             let accounts = borrower.Tradeline.map((tradeline) => {
               if (!Array.isArray(tradeline?.Remark)) tradeline.Remark = [tradeline.Remark || undefined]
               modifiedReport.Accounts.push({
-                "BureauId": bureau[tradeline.Source.Bureau.symbol].id,
-                "AccountTypeDescription": borrower.accountTypeDescription,
-                "HighBalance": tradeline?.highBalance,
-                "DateReported": tradeline?.dateReported,
-                "DateOpened": tradeline?.dateOpened,
-                "AccountNumber": tradeline?.accountNumber,
-                "DateAccountStatus": tradeline?.dateAccountStatus,
-                "CurrentBalance": tradeline?.currentBalance,
-                "CreditorName": tradeline?.creditorName,
-                "AccountCondition": tradeline?.AccountCondition?.description,
-                "AccountDesignator": tradeline?.AccountDesignator?.description,
-                "DisputeFlag": tradeline?.DisputeFlag?.description,
-                "Industry": tradeline?.IndustryCode?.description,
-                "AccountStatus": tradeline?.OpenClosed?.description,
-                "PaymentStatus": tradeline?.PayStatus?.description,
-                "AmountPastDue": tradeline?.GrantedTrade?.amountPastDue,
-                "AccountType": tradeline?.GrantedTrade?.AccountType.description,
-                "CreditType": tradeline?.GrantedTrade?.CreditType.description,
-                "PaymentFrequency": tradeline?.GrantedTrade?.PaymentFrequency?.description,
-                "TermType": tradeline?.GrantedTrade?.TermType?.description,
-                "WorstPayStatus": tradeline?.GrantedTrade?.WorstPayStatus?.description,
-                "PayStatusHistoryStartDate": tradeline?.GrantedTrade?.PayStatusHistory?.startDate,
-                "PayStatusHistory": tradeline?.GrantedTrade?.PayStatusHistory?.status,
-                "Remark": tradeline.Remark[0]?.RemarkCode.description,
+                "BureauId": bureauIdFromSource(tradeline.Source),
+                "AccountTypeDescription": attr(borrower, 'accountTypeDescription'),
+                "HighBalance": attr(tradeline, 'highBalance'),
+                "DateReported": attr(tradeline, 'dateReported'),
+                "DateOpened": attr(tradeline, 'dateOpened'),
+                "AccountNumber": attr(tradeline, 'accountNumber'),
+                "DateAccountStatus": attr(tradeline, 'dateAccountStatus'),
+                "CurrentBalance": attr(tradeline, 'currentBalance'),
+                "CreditorName": attr(tradeline, 'creditorName'),
+                "AccountCondition": desc(tradeline?.AccountCondition),
+                "AccountDesignator": desc(tradeline?.AccountDesignator),
+                "DisputeFlag": desc(tradeline?.DisputeFlag),
+                "Industry": desc(tradeline?.IndustryCode),
+                "AccountStatus": desc(tradeline?.OpenClosed),
+                "PaymentStatus": desc(tradeline?.PayStatus),
+                "AmountPastDue": attr(tradeline?.GrantedTrade, 'amountPastDue'),
+                "AccountType": desc(tradeline?.GrantedTrade?.AccountType),
+                "CreditType": desc(tradeline?.GrantedTrade?.CreditType),
+                "PaymentFrequency": desc(tradeline?.GrantedTrade?.PaymentFrequency),
+                "TermType": desc(tradeline?.GrantedTrade?.TermType),
+                "WorstPayStatus": desc(tradeline?.GrantedTrade?.WorstPayStatus),
+                "PayStatusHistoryStartDate": attr(tradeline?.GrantedTrade?.PayStatusHistory, 'startDate'),
+                "PayStatusHistory": attr(tradeline?.GrantedTrade?.PayStatusHistory, 'status'),
+                "Remark": desc(tradeline.Remark[0]?.RemarkCode),
                 "CreditLimit": tradeline?.GrantedTrade?.CreditLimit
               })
             })
@@ -970,18 +981,20 @@ export class Scraper {
 
           modifiedReport.Creditors = Subscriber.map((borrower) => {
             return {
-              "BureauId": bureau[borrower.Source.Bureau.symbol].id,
-              "CreditorName": borrower.name,
-              "CreditorAddress": borrower.CreditAddress.unparsedStreet || '',
-              "CreditorCity": borrower.CreditAddress.city?.trim(),
-              "CreditorState": borrower.CreditAddress.stateCode,
-              "CreditorZip": borrower.CreditAddress.postalCode,
-              "CreditorPhone": borrower.telephone,
-              "Industry": borrower.IndustryCode.description
+              "BureauId": bureauIdFromSource(borrower.Source),
+              "CreditorName": attr(borrower, 'name'),
+              "CreditorAddress": attr(borrower.CreditAddress, 'unparsedStreet') || '',
+              "CreditorCity": attr(borrower.CreditAddress, 'city')?.trim(),
+              "CreditorState": attr(borrower.CreditAddress, 'stateCode'),
+              "CreditorZip": attr(borrower.CreditAddress, 'postalCode'),
+              "CreditorPhone": attr(borrower, 'telephone'),
+              "Industry": desc(borrower.IndustryCode)
             }
           })
         }
-        modifiedReport.Accounts = modifiedReport.Accounts.sort((a, b) => a.BureauId - b.BureauId);
+        modifiedReport.Accounts = Array.isArray(modifiedReport.Accounts)
+          ? modifiedReport.Accounts.sort((a, b) => a.BureauId - b.BureauId)
+          : [];
       }
       return modifiedReport;
     } catch (error) {
@@ -1179,6 +1192,42 @@ export class Scraper {
     const { rawCreditData, sections } = data;
     const modifiedReport = {};
     const reportDate = new Date().toISOString().split('T')[0];
+    const rawReports = Array.isArray(rawCreditData?.data) ? rawCreditData.data : [];
+    const bureauNameToId = { TransUnion: 1, Experian: 2, Equifax: 3 };
+    const bureauIdForRawReport = (report, fallbackIndex = 0) => {
+      return bureauNameToId[report?.bureau] || [1, 2, 3][fallbackIndex] || 0;
+    };
+    const clean = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+    const formatRawAddress = (address) => clean([
+      address?.house_number,
+      address?.pre_directional,
+      address?.street_name,
+      address?.suffix,
+      address?.post_directional,
+      address?.unit
+    ].filter(Boolean).join(' '));
+    const parseRawScore = (report) => {
+      const directScore = parseInt(report?.score || report?.credit_score || report?.fico_score, 10);
+      if (Number.isFinite(directScore) && directScore > 0) return directScore;
+
+      const scoreDetail = Array.isArray(report?.score_details) ? report.score_details[0] : report?.score_details;
+      const scoreDetailValue = parseInt(scoreDetail?.score, 10);
+      if (Number.isFinite(scoreDetailValue) && scoreDetailValue > 0) return scoreDetailValue;
+
+      const rawContent = report?.credit_score_content?.content
+        || report?.credit_score_content
+        || scoreDetail?.credit_score_content?.content
+        || scoreDetail?.credit_score_content;
+      if (rawContent) {
+        try {
+          const content = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent;
+          const score = parseInt(content?.score, 10);
+          if (Number.isFinite(score) && score > 0) return score;
+        } catch (e) {}
+      }
+
+      return 0;
+    };
 
     // Concatenate all section values to handle fragmented text
     const fullText = Object.values(sections || {}).join('\n');
@@ -1209,32 +1258,48 @@ export class Scraper {
     if (!personalInfo) personalInfo = fullText; // Fallback
     
     // Name
-    const names = this.extractThreeBureauData(personalInfo, 'Name:', 'Also Known As:');
-    modifiedReport.Name = bureaus.map((bid, idx) => {
-      const full = names[idx] || '';
-      const parts = full.split(' ').filter(p => p);
-      return {
-        BureauId: bid,
-        FirstName: parts[0] || '',
-        Middle: parts.length > 2 ? parts[1] : '',
-        LastName: parts.length > 1 ? parts[parts.length - 1] : '',
-        NameType: 'Primary'
-      };
-    });
+    if (rawReports.some((report) => Array.isArray(report?.names) && report.names.length > 0)) {
+      modifiedReport.Name = rawReports.flatMap((report, idx) => {
+        const bureauId = bureauIdForRawReport(report, idx);
+        return (report.names || []).map((name) => ({
+          BureauId: bureauId,
+          FirstName: clean(name?.first_name),
+          Middle: clean(name?.middle_name),
+          LastName: clean(name?.last_name),
+          NameType: 'Primary'
+        }));
+      });
+    } else {
+      const names = this.extractThreeBureauData(personalInfo, 'Name:', 'Also Known As:');
+      modifiedReport.Name = bureaus.map((bid, idx) => {
+        const full = names[idx] || '';
+        const parts = full.split(' ').filter(p => p);
+        return {
+          BureauId: bid,
+          FirstName: parts[0] || '',
+          Middle: parts.length > 2 ? parts[1] : '',
+          LastName: parts.length > 1 ? parts[parts.length - 1] : '',
+          NameType: 'Primary'
+        };
+      });
+    }
 
     // DOB
-    const dobs = this.extractThreeBureauData(personalInfo, 'Date of Birth:', 'Current Address(es):');
-    modifiedReport.DOB = bureaus.map((bid, idx) => {
-      let dob = dobs[idx] || '';
-      // If only Year (4 digits), construct 01/01/YYYY
-      if (/^\d{4}$/.test(dob.trim())) {
-        dob = `01/01/${dob.trim()}`;
-      }
-      return {
-        BureauId: bid,
-        DOB: dob
-      };
-    });
+    if (rawReports.some((report) => report?.year_of_birth)) {
+      modifiedReport.DOB = rawReports.map((report, idx) => ({
+        BureauId: bureauIdForRawReport(report, idx),
+        DOB: normalizeYearOnlyDob(report?.year_of_birth)
+      }));
+    } else {
+      const dobs = this.extractThreeBureauData(personalInfo, 'Date of Birth:', 'Current Address(es):');
+      modifiedReport.DOB = bureaus.map((bid, idx) => {
+        const dob = normalizeUnifiedDob(dobs[idx] || '');
+        return {
+          BureauId: bid,
+          DOB: dob
+        };
+      });
+    }
 
     // Address - Current
     const currAddrs = this.extractThreeBureauData(personalInfo, 'Current Address(es):', 'Previous Address(es):');
@@ -1286,30 +1351,46 @@ export class Scraper {
     };
 
     modifiedReport.Address = [];
-    bureaus.forEach((bid, idx) => {
-      if (currAddrs[idx]) {
-        const parsed = parseAddress(currAddrs[idx]);
-        modifiedReport.Address.push({
-          BureauId: bid,
-          StreetAddress: parsed.StreetAddress,
-          City: parsed.City,
-          State: parsed.State,
-          Zip: parsed.Zip,
-          AddressType: 'Current'
+    if (rawReports.some((report) => Array.isArray(report?.addresses) && report.addresses.length > 0)) {
+      rawReports.forEach((report, idx) => {
+        const bureauId = bureauIdForRawReport(report, idx);
+        (report.addresses || []).forEach((address, addressIndex) => {
+          modifiedReport.Address.push({
+            BureauId: bureauId,
+            StreetAddress: formatRawAddress(address),
+            City: clean(address?.city),
+            State: clean(address?.state),
+            Zip: clean(address?.zipcode),
+            AddressType: addressIndex === 0 ? 'Current' : 'Previous'
+          });
         });
-      }
-      if (prevAddrs[idx]) {
-        const parsed = parseAddress(prevAddrs[idx]);
-        modifiedReport.Address.push({
-          BureauId: bid,
-          StreetAddress: parsed.StreetAddress,
-          City: parsed.City,
-          State: parsed.State,
-          Zip: parsed.Zip,
-          AddressType: 'Previous'
-        });
-      }
-    });
+      });
+    } else {
+      bureaus.forEach((bid, idx) => {
+        if (currAddrs[idx]) {
+          const parsed = parseAddress(currAddrs[idx]);
+          modifiedReport.Address.push({
+            BureauId: bid,
+            StreetAddress: parsed.StreetAddress,
+            City: parsed.City,
+            State: parsed.State,
+            Zip: parsed.Zip,
+            AddressType: 'Current'
+          });
+        }
+        if (prevAddrs[idx]) {
+          const parsed = parseAddress(prevAddrs[idx]);
+          modifiedReport.Address.push({
+            BureauId: bid,
+            StreetAddress: parsed.StreetAddress,
+            City: parsed.City,
+            State: parsed.State,
+            Zip: parsed.Zip,
+            AddressType: 'Previous'
+          });
+        }
+      });
+    }
 
     // Employer
     const employers = this.extractThreeBureauData(personalInfo, 'Employers:', 'Back to Top');
@@ -1323,17 +1404,27 @@ export class Scraper {
     });
 
     // 3. Scores
-    const scoreBlock = getBlock('Credit Score', 'Summary');
-    const scores = this.extractThreeBureauData(scoreBlock, 'FICO® Score 8:', 'Lender Rank:');
-    modifiedReport.Score = bureaus.map((bid, idx) => {
-      return {
-        BureauId: bid,
+    if (rawReports.length > 0) {
+      modifiedReport.Score = rawReports.map((report, idx) => ({
+        BureauId: bureauIdForRawReport(report, idx),
         ScoreType: 'FICO 8',
-        Score: parseInt(scores[idx]) || 0,
-        DateScore: reportDate,
+        Score: parseRawScore(report),
+        DateScore: report?.report_date ? String(report.report_date).split('T')[0] : reportDate,
         ScoreFactors: []
-      };
-    });
+      }));
+    } else {
+      const scoreBlock = getBlock('Credit Score', 'Summary');
+      const scores = this.extractThreeBureauData(scoreBlock, 'FICO® Score 8:', 'Lender Rank:');
+      modifiedReport.Score = bureaus.map((bid, idx) => {
+        return {
+          BureauId: bid,
+          ScoreType: 'FICO 8',
+          Score: parseInt(scores[idx]) || 0,
+          DateScore: reportDate,
+          ScoreFactors: []
+        };
+      });
+    }
 
     // 4. Accounts from rawCreditData
     modifiedReport.Accounts = [];

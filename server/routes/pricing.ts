@@ -5,6 +5,56 @@ import CommissionService from '../services/commissionService.js';
 import { optionalAuth } from '../middleware/authMiddleware.js';
 
 const router = Router();
+const SCORE_MACHINE_BASIC_PAGE = 'score-machine-basic';
+
+const requestIsTsmBasic = (req: Request) => {
+  const candidates = [
+    req.headers.host,
+    req.headers.origin,
+    req.headers.referer,
+  ];
+
+  return candidates.some((value) => {
+    const raw = String(value || '').toLowerCase();
+    if (!raw) return false;
+
+    try {
+      const parsed = new URL(raw.includes('://') ? raw : `https://${raw}`);
+      return parsed.hostname === 'tsmbasic.com' || parsed.hostname.endsWith('.tsmbasic.com');
+    } catch {
+      return raw.includes('tsmbasic.com');
+    }
+  });
+};
+
+const parsePlanPermissions = (value: unknown): any => {
+  if (!value) return [];
+  if (typeof value === 'object') return value;
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const getPlanPermissionPages = (value: unknown): string[] => {
+  const parsed = parsePlanPermissions(value);
+  if (Array.isArray(parsed)) {
+    return parsed.filter((entry): entry is string => typeof entry === 'string');
+  }
+  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.pages)) {
+    return parsed.pages.filter((entry: unknown): entry is string => typeof entry === 'string');
+  }
+  return [];
+};
+
+const isTsmBasicPlan = (plan: any) => {
+  const pages = getPlanPermissionPages(plan?.page_permissions);
+  return pages.includes(SCORE_MACHINE_BASIC_PAGE);
+};
 
 // Get all active subscription plans (public endpoint)
 router.get('/plans', optionalAuth, async (req: Request, res: Response) => {
@@ -125,8 +175,12 @@ router.get('/plans', optionalAuth, async (req: Request, res: Response) => {
       });
 
     const filtered = plans.filter((plan: any) => {
+      if (requestIsTsmBasic(req) && !isTsmBasicPlan(plan)) {
+        return false;
+      }
+
       try {
-        const perm = plan.page_permissions ? JSON.parse(plan.page_permissions) : [];
+        const perm = parsePlanPermissions(plan.page_permissions);
         const planId = Number(plan.id);
         const hasThisPlan = Number.isFinite(planId) && activePlanIds.includes(planId);
 
@@ -196,7 +250,14 @@ router.get('/plans/:id', optionalAuth, async (req: Request, res: Response) => {
       });
     }
 
-    const perm = (() => { try { return plan.page_permissions ? JSON.parse(plan.page_permissions) : []; } catch { return []; } })();
+    if (requestIsTsmBasic(req) && !isTsmBasicPlan(plan)) {
+      return res.status(404).json({
+        success: false,
+        error: 'Plan not found'
+      });
+    }
+
+    const perm = parsePlanPermissions(plan.page_permissions);
     const requesterRole = String(((req as any).user as any)?.role || '').toLowerCase();
     let contextAffiliateId: number | null = null;
     let hasPlanHistory = false;

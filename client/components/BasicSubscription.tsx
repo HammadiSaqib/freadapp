@@ -16,6 +16,15 @@ interface BasicSubscriptionProps {
   getStatusBadge: (status: string) => React.ReactNode;
 }
 
+const normalizePlanName = (plan: any) => String(plan?.name || '').trim().toLowerCase();
+
+const isBasicPlan = (plan: any) => normalizePlanName(plan).includes('basic');
+
+const isUpgradePlan = (plan: any) => {
+  const name = normalizePlanName(plan);
+  return name.includes('elite') || name.includes('pro') || name.includes('professional');
+};
+
 export default function BasicSubscription({
   subscription,
   availablePlans,
@@ -29,46 +38,143 @@ export default function BasicSubscription({
   navigate,
   getStatusBadge
 }: BasicSubscriptionProps) {
+  const filteredPlans = availablePlans.filter((plan) => plan.billing_cycle === billingFilter);
+  const basicPlans = filteredPlans.filter(isBasicPlan);
+  const upgradePlans = filteredPlans.filter((plan) => isUpgradePlan(plan) && !isBasicPlan(plan));
+
+  const renderPlanCard = (plan: any, sectionType: 'basic' | 'upgrade') => {
+    const isCurrentPlan = subscription?.plan_id === plan.id && subscription?.status !== 'canceled';
+    const isDisabled = !recurringConsent || upgrading || isCurrentPlan;
+    const isUpgrade = sectionType === 'upgrade';
+
+    return (
+      <div
+        key={plan.id}
+        className={`relative flex h-full flex-col rounded-[24px] border p-5 ${
+          plan.popular || isUpgrade
+            ? 'border-sky-300 bg-gradient-to-br from-sky-50 to-emerald-50 shadow-[0_16px_40px_rgba(125,211,252,0.18)] dark:border-sky-500/20 dark:from-slate-900 dark:to-slate-950 dark:shadow-none'
+            : 'border-sky-100/80 bg-white/90 dark:border-slate-800 dark:bg-slate-950/80'
+        }`}
+      >
+        {(plan.popular || isUpgrade) && (
+          <div className="absolute right-4 top-4 rounded-full border border-sky-200 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-sky-700 dark:border-sky-500/20 dark:bg-slate-900 dark:text-sky-300">
+            {isUpgrade ? 'Upgrade' : 'Popular'}
+          </div>
+        )}
+        <div className="space-y-3">
+          <h3 className="pr-24 text-lg font-black uppercase tracking-[0.08em] text-slate-900 dark:text-white">{plan.name}</h3>
+          <div className="text-3xl font-black text-slate-900 dark:text-white">
+            ${plan.price}
+            <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">/{plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}</span>
+          </div>
+          <p className="min-h-[2.5rem] text-sm text-slate-600 dark:text-slate-300">{plan.description}</p>
+        </div>
+
+        <ul className="mb-6 mt-5 flex-grow space-y-3 text-sm text-slate-700 dark:text-slate-300">
+          {plan.features.map((feature: string, index: number) => (
+            <li key={index} className="flex gap-3">
+              <span className="font-black text-sky-600 dark:text-sky-300">+</span>
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-auto border-t border-sky-100/80 pt-4 dark:border-slate-800">
+          <label className="mb-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-sky-100/80 bg-sky-50/60 px-4 py-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-300">
+            <input
+              type="checkbox"
+              checked={recurringConsent}
+              onChange={(e) => setRecurringConsent(e.target.checked)}
+              className="mt-0.5 border-slate-400"
+            />
+            <span className="text-xs font-semibold uppercase tracking-[0.14em]">I Agree to Recurring Billing</span>
+          </label>
+          <button
+            disabled={isDisabled}
+            onClick={() => handleSelectPlan(plan.id)}
+            className={`inline-flex w-full items-center justify-center rounded-xl border px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] transition-all ${
+              isDisabled
+                ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500'
+                : 'border-sky-300 bg-gradient-to-r from-sky-500 to-emerald-400 text-white shadow-sm shadow-sky-200 hover:brightness-105 dark:border-sky-500/20 dark:shadow-none'
+            }`}
+          >
+            {upgrading
+              ? 'Processing...'
+              : isCurrentPlan
+                ? 'Current Plan'
+                : plan.price === 1 || plan.name.toLowerCase().includes('trial')
+                  ? 'Start Your 7-Day Free Trial for $1'
+                  : isUpgrade
+                    ? 'Upgrade Plan'
+                    : 'Select Plan'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6 bg-white border border-gray-300">
-      
-      {/* Header */}
-      <div className="border-b border-gray-300 pb-4 mb-4">
-        <h1 className="text-xl font-bold text-gray-900 uppercase">Subscription Management</h1>
-        <p className="text-sm text-gray-600">Standard Billing & Plans</p>
+    <div className="basic-admin-page-shell">
+      <div className="basic-admin-page-hero">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <span className="basic-admin-page-badge">Basic billing center</span>
+            <div className="space-y-2">
+              <h1 className="basic-admin-page-title">Subscription Management</h1>
+              <p className="basic-admin-page-description">
+                Review your current plan, compare upgrade options, and keep billing history close without the old plain shell.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <div className="basic-admin-page-pill">Billing mode: {billingFilter}</div>
+            {subscription && <div className="basic-admin-page-pill">Current plan: {subscription.plan.name}</div>}
+          </div>
+        </div>
       </div>
 
       {subscription && (
-        <div className="border border-gray-300 mb-8">
-          <div className="bg-gray-100 border-b border-gray-300 p-3 flex justify-between items-center">
-            <h2 className="text-sm font-bold text-gray-800 uppercase">Current Subscription</h2>
-            <div className="text-xs uppercase font-bold">{getStatusBadge(subscription.status)}</div>
-          </div>
-          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Plan Details</div>
-              <div className="text-2xl font-bold text-gray-900">{subscription.plan.name}</div>
-              <div className="text-lg font-mono text-gray-700">${subscription.plan.price} / {subscription.billing_cycle}</div>
+        <div className="basic-admin-page-panel space-y-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <span className="basic-admin-page-badge">Current subscription</span>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white">{subscription.plan.name}</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-300">{subscription.plan.price} / {subscription.billing_cycle}</p>
+              </div>
             </div>
-            <div className="space-y-2 text-sm text-gray-700">
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold uppercase text-xs text-gray-500">Period Start</span>
+            <div>{getStatusBadge(subscription.status)}</div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="basic-admin-page-section space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Plan details</div>
+              <div className="text-3xl font-black text-slate-900 dark:text-white">${subscription.plan.price}</div>
+              <div className="text-sm text-slate-600 dark:text-slate-300">Billed per {subscription.billing_cycle}</div>
+            </div>
+            <div className="basic-admin-page-section space-y-3 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex justify-between border-b border-sky-100/80 pb-2 dark:border-slate-800">
+                <span className="font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Period Start</span>
                 <span>{new Date(subscription.current_period_start).toLocaleDateString()}</span>
               </div>
-              <div className="flex justify-between border-b border-gray-200 pb-1">
-                <span className="font-semibold uppercase text-xs text-gray-500">Next Billing</span>
+              <div className="flex justify-between border-b border-sky-100/80 pb-2 dark:border-slate-800">
+                <span className="font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Next Billing</span>
                 <span>{new Date(subscription.current_period_end).toLocaleDateString()}</span>
               </div>
               {subscription.cancel_at_period_end && (
-                <div className="bg-red-50 text-red-700 p-2 text-xs border border-red-200 font-semibold uppercase mt-2">
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-rose-700 dark:border-rose-500/20 dark:bg-rose-950/20 dark:text-rose-300">
                   Cancels on {new Date(subscription.current_period_end).toLocaleDateString()}
                 </div>
               )}
             </div>
           </div>
+
           {subscription.status === 'active' && !subscription.cancel_at_period_end && (
-            <div className="bg-gray-50 border-t border-gray-300 p-3 text-right">
-              <button onClick={handleOpenCancelDialog} className="text-xs text-red-600 hover:text-red-800 font-bold uppercase underline">
+            <div className="flex justify-end">
+              <button
+                onClick={handleOpenCancelDialog}
+                className="text-xs font-bold uppercase tracking-[0.16em] text-rose-600 transition-colors hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
+              >
                 Cancel Subscription
               </button>
             </div>
@@ -76,83 +182,72 @@ export default function BasicSubscription({
         </div>
       )}
 
-      {/* Available Plans */}
-      <div className="border border-gray-300 mb-8">
-        <div className="bg-gray-100 border-b border-gray-300 p-3 flex justify-between items-center">
-          <h2 className="text-sm font-bold text-gray-800 uppercase">Available Plans</h2>
+      <div className="basic-admin-page-panel space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-white">Available Plans</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Manage Basic separately, or choose Pro and Elite if you want to upgrade.</p>
+          </div>
           <div className="flex gap-2">
-            <button 
-              onClick={() => setBillingFilter('monthly')} 
-              className={`text-xs font-bold uppercase px-3 py-1 border ${billingFilter === 'monthly' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300'}`}
+            <button
+              onClick={() => setBillingFilter('monthly')}
+              className={billingFilter === 'monthly' ? 'basic-admin-page-tab-active' : 'basic-admin-page-tab'}
             >
               Monthly
             </button>
-            <button 
-              onClick={() => setBillingFilter('yearly')} 
-              className={`text-xs font-bold uppercase px-3 py-1 border ${billingFilter === 'yearly' ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300'}`}
+            <button
+              onClick={() => setBillingFilter('yearly')}
+              className={billingFilter === 'yearly' ? 'basic-admin-page-tab-active' : 'basic-admin-page-tab'}
             >
               Yearly
             </button>
           </div>
         </div>
-        
-        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-          {availablePlans.filter(p => p.billing_cycle === billingFilter).map((plan) => (
-            <div key={plan.id} className={`border p-4 flex flex-col ${plan.popular ? 'border-black shadow-md relative' : 'border-gray-300'}`}>
-              {plan.popular && (
-                <div className="absolute top-0 right-0 bg-black text-white text-[10px] font-bold uppercase px-2 py-1">
-                  Popular
-                </div>
-              )}
-              <h3 className="text-lg font-bold text-gray-900 uppercase">{plan.name}</h3>
-              <div className="text-2xl font-mono font-bold my-2">${plan.price}<span className="text-sm text-gray-500 font-sans">/{plan.billing_cycle === 'monthly' ? 'mo' : 'yr'}</span></div>
-              <p className="text-xs text-gray-600 mb-4 h-10">{plan.description}</p>
-              
-              <ul className="text-sm text-gray-700 space-y-2 mb-6 flex-grow">
-                {plan.features.map((feature: string, i: number) => (
-                  <li key={i} className="flex gap-2 items-start">
-                    <span className="text-black font-bold">+</span>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              
-              <div className="mt-auto border-t border-gray-200 pt-4">
-                <label className="flex items-center gap-2 mb-3 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={recurringConsent} 
-                    onChange={(e) => setRecurringConsent(e.target.checked)}
-                    className="border-gray-400"
-                  />
-                  <span className="text-xs font-semibold text-gray-700 uppercase">I Agree to Recurring Billing</span>
-                </label>
-                <button
-                  disabled={!recurringConsent || upgrading || (subscription?.plan_id === plan.id && subscription?.status !== 'canceled')}
-                  onClick={() => handleSelectPlan(plan.id)}
-                  className={`w-full py-2 text-xs font-bold uppercase border ${
-                    !recurringConsent || upgrading || (subscription?.plan_id === plan.id && subscription?.status !== 'canceled')
-                      ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                      : 'bg-black text-white border-black hover:bg-gray-800'
-                  }`}
-                >
-                  {upgrading ? 'Processing...' : subscription?.plan_id === plan.id && subscription?.status !== 'canceled' ? 'Current Plan' : 'Select Plan'}
-                </button>
-              </div>
+
+        <div className="space-y-8">
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Basic Plan</h3>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Keep or start the Basic plan for the Basic dashboard.</p>
             </div>
-          ))}
+            {basicPlans.length > 0 ? (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {basicPlans.map((plan) => renderPlanCard(plan, 'basic'))}
+              </div>
+            ) : (
+              <div className="basic-admin-page-section p-6 text-sm text-slate-600 dark:text-slate-300">
+                No {billingFilter} Basic plan is available right now.
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white">Upgrade to Pro or Elite</h3>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Choose one of these plans when you are ready to move beyond Basic.</p>
+            </div>
+            {upgradePlans.length > 0 ? (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {upgradePlans.map((plan) => renderPlanCard(plan, 'upgrade'))}
+              </div>
+            ) : (
+              <div className="basic-admin-page-section p-6 text-sm text-slate-600 dark:text-slate-300">
+                No {billingFilter} Pro or Elite upgrade plan is available right now.
+              </div>
+            )}
+          </section>
         </div>
       </div>
 
-      <div className="border border-gray-300">
-        <div className="bg-gray-100 border-b border-gray-300 p-3">
-          <h2 className="text-sm font-bold text-gray-800 uppercase">Billing History</h2>
+      <div className="basic-admin-page-panel space-y-4">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white">Billing History</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Past charges and payment records for the active account.</p>
         </div>
-        <div className="p-4">
+        <div className="basic-admin-page-section">
           <BillingHistory />
         </div>
       </div>
-
     </div>
   );
 }

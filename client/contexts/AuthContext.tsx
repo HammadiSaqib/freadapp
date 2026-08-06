@@ -18,6 +18,8 @@ interface UserProfile {
   role: string;
   avatar?: string;
   email_verified?: boolean;
+  kyc_required?: boolean;
+  kyc_status?: 'not_started' | 'pending' | 'approved' | 'failed' | 'manual_review';
   // Custom credit repair URL override
   credit_repair_url?: string;
   onboarding_slug?: string;

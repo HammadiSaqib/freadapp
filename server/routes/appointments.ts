@@ -181,7 +181,7 @@ async function ensureAppointmentTables() {
       if (availabilityCount === 0) {
         const inserts: any[] = [];
         for (const weekday of [1, 2, 3, 4, 5]) {
-          inserts.push(weekday, '09:00:00', '17:00:00', 30, 10, 1, 'CapSol Team', '');
+          inserts.push(weekday, '17:00:00', '20:00:00', 30, 0, 1, 'CapSol Team', '');
         }
         await db.executeQuery(
           `INSERT INTO appointment_availability
@@ -194,6 +194,29 @@ async function ensureAppointmentTables() {
             (?, ?, ?, ?, ?, ?, ?, ?)`,
           inserts,
         );
+      } else {
+        const existingSeedRows = await db.executeQuery(
+          `SELECT id
+           FROM appointment_availability
+           WHERE weekday IN (1, 2, 3, 4, 5)
+             AND start_time = '09:00:00'
+             AND end_time = '17:00:00'
+             AND slot_interval_minutes = 30
+             AND COALESCE(buffer_minutes, 0) = 10
+             AND COALESCE(team_member_name, 'CapSol Team') = 'CapSol Team'`,
+        ) as any[];
+
+        if (Array.isArray(existingSeedRows) && existingSeedRows.length === 5) {
+          await db.executeQuery(
+            `UPDATE appointment_availability
+             SET start_time = '17:00:00',
+                 end_time = '20:00:00',
+                 buffer_minutes = 0,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id IN (${existingSeedRows.map(() => '?').join(',')})`,
+            existingSeedRows.map((row) => row.id),
+          );
+        }
       }
     })().catch((error) => {
       appointmentTablesReady = null;
@@ -316,8 +339,8 @@ router.get('/public/config', async (_req: Request, res: Response) => {
     res.json({
       success: true,
       data: {
-        timezone_label: 'Charlotte, North Carolina (ET)',
-        booking_notice: 'Choose a date, pick an available slot, and we will reserve your Zoom appointment.',
+        timezone_label: 'Eastern Time (ET)',
+        booking_notice: 'Live booking hours are Monday through Friday, 5:00 PM to 8:00 PM Eastern, in 30-minute slots.',
         services,
       },
     });

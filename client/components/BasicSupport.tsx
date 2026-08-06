@@ -21,35 +21,38 @@ export default function BasicSupport({
   livechatTab
 }: BasicSupportProps) {
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6 bg-white border border-gray-300">
-      
-      {/* Header */}
-      <div className="border-b border-gray-300 pb-4 mb-4">
-        <h1 className="text-xl font-bold text-gray-900 uppercase">Support Center</h1>
-        <p className="text-sm text-gray-600">Standard Assistance & Ticketing</p>
+    <div className="basic-admin-page-shell">
+      <div className="basic-admin-page-hero">
+        <div className="space-y-3">
+          <span className="basic-admin-page-badge">Basic support desk</span>
+          <h1 className="basic-admin-page-title">Support Center</h1>
+          <p className="basic-admin-page-description">
+            Jump between tickets, FAQs, contact details, and live chat with the same lighter basic portal treatment.
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Sidebar Tabs */}
-        <div className="w-full lg:w-64 shrink-0 border border-gray-300 bg-gray-50">
-          <div className="bg-gray-100 border-b border-gray-300 p-3">
-            <h2 className="text-sm font-bold text-gray-800 uppercase">Navigation</h2>
+      <div className="flex flex-col items-start gap-6 lg:flex-row">
+        <div className="basic-admin-page-panel w-full shrink-0 lg:w-72">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Navigation</h2>
+            <span className="basic-admin-page-badge">{activeTab}</span>
           </div>
-          <div className="flex flex-col divide-y divide-gray-200">
+          <div className="flex flex-col gap-2">
             {[
               { id: 'overview', label: 'Overview' },
               { id: 'tickets', label: 'My Tickets' },
               { id: 'faq', label: 'FAQ' },
               { id: 'contact', label: 'Contact Us' },
               { id: 'livechat', label: 'Live Chat' }
-            ].map(tab => (
+            ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`text-left px-4 py-3 text-sm font-semibold uppercase ${
-                  activeTab === tab.id 
-                    ? 'bg-black text-white' 
-                    : 'text-gray-700 hover:bg-gray-200'
+                className={`rounded-2xl px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                  activeTab === tab.id
+                    ? 'border border-sky-300 bg-gradient-to-r from-sky-500 to-emerald-400 text-white shadow-sm shadow-sky-200 dark:border-sky-500/20 dark:shadow-none'
+                    : 'border border-transparent text-slate-700 hover:border-sky-100 hover:bg-sky-50 dark:text-slate-300 dark:hover:border-slate-800 dark:hover:bg-slate-900'
                 }`}
               >
                 {tab.label}
@@ -58,10 +61,9 @@ export default function BasicSupport({
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 border border-gray-300 w-full min-h-[500px]">
-          <div className="bg-gray-100 border-b border-gray-300 p-3">
-            <h2 className="text-sm font-bold text-gray-800 uppercase">
+        <div className="basic-admin-page-panel w-full min-h-[500px] flex-1">
+          <div className="mb-5 flex items-center justify-between border-b border-sky-100/80 pb-4 dark:border-slate-800">
+            <h2 className="text-lg font-black text-slate-900 dark:text-white">
               {activeTab === 'overview' && 'Support Overview'}
               {activeTab === 'tickets' && 'Ticket Management'}
               {activeTab === 'faq' && 'Frequently Asked Questions'}
@@ -69,7 +71,7 @@ export default function BasicSupport({
               {activeTab === 'livechat' && 'Live Chat Support'}
             </h2>
           </div>
-          <div className="p-6 bg-white">
+          <div className="basic-admin-page-section min-h-[380px]">
             {activeTab === "overview" && overviewTab}
             {activeTab === "tickets" && ticketsTab}
             {activeTab === "faq" && faqTab}
@@ -78,7 +80,6 @@ export default function BasicSupport({
           </div>
         </div>
       </div>
-
     </div>
   );
 }

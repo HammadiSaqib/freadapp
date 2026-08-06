@@ -177,7 +177,7 @@ export default function AdminSessionTransfer() {
         try {
           await refreshProfile();
         } catch {
-          // Non-blocking: navigation should proceed even if profile refresh fails.
+          // Non-blocking: navigation should proceed even if profile refresh fails. test
         }
 
         let profile = user;

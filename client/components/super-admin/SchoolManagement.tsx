@@ -102,13 +102,19 @@ interface CourseModule {
 
 interface CourseVideo {
   id: string;
+  course_id: string;
+  course_title?: string;
   module_id: string;
+  module_title?: string;
   title: string;
   description: string;
   video_url: string;
+  thumbnail_url?: string;
   duration_seconds: number;
+  duration?: string;
   order_index: number;
-  is_published: boolean;
+  is_preview: boolean;
+  video_type?: string;
   created_at: string;
 }
 
@@ -241,7 +247,9 @@ const SchoolManagement: React.FC = () => {
   const [videoEditData, setVideoEditData] = useState({
     title: '',
     description: '',
-    is_published: false
+    video_url: '',
+    order_index: 0,
+    is_preview: false
   });
   const [videoUploadLoading, setVideoUploadLoading] = useState(false);
 
@@ -354,6 +362,84 @@ const SchoolManagement: React.FC = () => {
     return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
   };
 
+  const normalizeAssetUrl = (value?: string | null) => {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) {
+      return '';
+    }
+    if (/^(?:https?:)?\/\//i.test(rawValue) || rawValue.startsWith('data:') || rawValue.startsWith('blob:')) {
+      return rawValue;
+    }
+    if (rawValue.startsWith('/')) {
+      return rawValue;
+    }
+    return `/${rawValue.replace(/^\.?\/+/, '')}`;
+  };
+
+  const formatVideoDuration = (seconds?: number, fallback?: string) => {
+    const rawFallback = String(fallback || '').trim();
+    if (rawFallback) {
+      return rawFallback;
+    }
+
+    const totalSeconds = Number(seconds || 0);
+    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+      return 'N/A';
+    }
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const remainingSeconds = totalSeconds % 60;
+    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
+
+  const normalizeCourseRecord = (course: any): Course => {
+    const difficultyLevel = String(course?.level || course?.difficulty_level || course?.difficulty || 'beginner').toLowerCase();
+    const status = String(course?.status || (course?.is_published ? 'published' : 'draft')).toLowerCase();
+
+    return {
+      id: String(course?.id ?? ''),
+      title: String(course?.title || 'Untitled Course'),
+      description: String(course?.description || ''),
+      category_id: String(course?.category_id || course?.category || ''),
+      category_name: String(course?.category_name || course?.category || 'General'),
+      instructor_name: String(course?.instructor_name || course?.instructor || course?.creator_name || 'Instructor'),
+      duration_hours: Number(course?.duration_hours || 0),
+      difficulty_level: ['beginner', 'intermediate', 'advanced'].includes(difficultyLevel)
+        ? (difficultyLevel as Course['difficulty_level'])
+        : 'beginner',
+      price: Number(course?.price || 0),
+      is_featured: Boolean(course?.featured ?? course?.is_featured),
+      is_published: status === 'published',
+      thumbnail_url: normalizeAssetUrl(course?.thumbnail_url || course?.image_url) || undefined,
+      created_at: String(course?.created_at || ''),
+      updated_at: String(course?.updated_at || ''),
+      enrollment_count: Number(course?.enrollment_count || 0),
+      rating: Number(course?.rating || 0),
+      modules_count: Number(course?.modules_count || 0),
+      videos_count: Number(course?.videos_count || 0),
+      materials_count: Number(course?.materials_count || 0),
+      quizzes_count: Number(course?.quizzes_count || 0),
+    };
+  };
+
+  const normalizeVideoRecord = (video: any): CourseVideo => ({
+    id: String(video?.id ?? ''),
+    course_id: String(video?.course_id ?? ''),
+    course_title: video?.course_title || undefined,
+    module_id: String(video?.module_id ?? ''),
+    module_title: video?.module_title || undefined,
+    title: String(video?.title || 'Untitled Video'),
+    description: String(video?.description || ''),
+    video_url: String(video?.video_url || ''),
+    thumbnail_url: normalizeAssetUrl(video?.thumbnail_url) || undefined,
+    duration_seconds: Number(video?.duration_seconds || 0),
+    duration: formatVideoDuration(video?.duration_seconds, video?.duration),
+    order_index: Number(video?.order_index || 0),
+    is_preview: Boolean(video?.is_preview),
+    video_type: video?.video_type || undefined,
+    created_at: String(video?.created_at || ''),
+  });
+
   // Memoized API functions to prevent unnecessary re-renders
   const fetchCategories = useCallback(async () => {
     try {
@@ -387,7 +473,7 @@ const SchoolManagement: React.FC = () => {
         search: debouncedSearchTerm,
         category: categoryFilter !== 'all' ? categoryFilter : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
-        difficulty: difficultyFilter !== 'all' ? difficultyFilter : undefined,
+        level: difficultyFilter !== 'all' ? difficultyFilter : undefined,
         page: currentPage,
         limit: itemsPerPage
       };
@@ -397,7 +483,7 @@ const SchoolManagement: React.FC = () => {
       // Handle the response structure properly
       if (response.data && response.data.success) {
         const coursesData = response.data.data?.courses || [];
-        setCourses(coursesData);
+        setCourses(coursesData.map(normalizeCourseRecord));
         
         // Set pagination info
         const pagination = response.data.data?.pagination;
@@ -408,7 +494,7 @@ const SchoolManagement: React.FC = () => {
         // Fallback for different response structure
         const coursesData = Array.isArray(response.data) ? response.data : 
                            Array.isArray(response.data?.courses) ? response.data.courses : [];
-        setCourses(coursesData);
+        setCourses(coursesData.map(normalizeCourseRecord));
         setTotalPages(Math.ceil((response.total || response.data?.total || 0) / itemsPerPage));
       }
     } catch (error) {
@@ -464,7 +550,7 @@ const SchoolManagement: React.FC = () => {
     try {
       const response = await schoolManagementApi.getVideos();
       if (response.data && response.data.success) {
-        setVideos(response.data.data || []);
+        setVideos((response.data.data || []).map(normalizeVideoRecord));
       }
     } catch (error) {
       console.error('Error fetching videos:', error);
@@ -595,7 +681,9 @@ const SchoolManagement: React.FC = () => {
     setVideoEditData({
       title: video.title,
       description: video.description,
-      is_published: video.is_published
+      video_url: video.video_url,
+      order_index: video.order_index,
+      is_preview: video.is_preview
     });
     setIsVideoEditDialogOpen(true);
   };
@@ -604,7 +692,13 @@ const SchoolManagement: React.FC = () => {
     if (!selectedVideo) return;
 
     try {
-      await schoolManagementApi.updateVideo(selectedVideo.id, videoEditData);
+      await schoolManagementApi.updateVideo(selectedVideo.id, {
+        title: videoEditData.title,
+        description: videoEditData.description,
+        video_url: videoEditData.video_url,
+        order_index: Number(videoEditData.order_index || 0),
+        is_preview: videoEditData.is_preview,
+      });
       
       toast({
         title: "Success",
@@ -839,11 +933,12 @@ const SchoolManagement: React.FC = () => {
       {
         const priceValue = (formData.price_type === 'free') ? 0 : (parseFloat(formData.price as any) || 0);
         formDataToSend.append('price', priceValue.toString());
+        formDataToSend.append('is_free', String(formData.price_type === 'free'));
       }
       formDataToSend.append('duration_hours', (parseFloat(formData.duration_hours) || 0).toString());
-      formDataToSend.append('difficulty_level', formData.difficulty_level);
-      formDataToSend.append('is_featured', String(formData.is_featured));
-      formDataToSend.append('is_published', String(formData.is_published));
+      formDataToSend.append('duration_minutes', '0');
+      formDataToSend.append('level', formData.difficulty_level);
+      formDataToSend.append('featured', String(formData.is_featured));
       if ((formData as any).youtube_embed_url) {
         formDataToSend.append('youtube_embed_url', (formData as any).youtube_embed_url);
       }
@@ -963,16 +1058,17 @@ const SchoolManagement: React.FC = () => {
       // Add all form fields
       formDataToSend.append('title', formData.title);
       formDataToSend.append('description', formData.description);
-      formDataToSend.append('category_id', formData.category_id);
+      formDataToSend.append('category', formData.category_id);
       formDataToSend.append('instructor_name', formData.instructor_name);
       {
         const priceValue = (formData.price_type === 'free') ? 0 : (parseFloat(formData.price as any) || 0);
         formDataToSend.append('price', priceValue.toString());
+        formDataToSend.append('is_free', String(formData.price_type === 'free'));
       }
       formDataToSend.append('duration_hours', (parseFloat(formData.duration_hours) || 0).toString());
-      formDataToSend.append('difficulty_level', formData.difficulty_level);
-      formDataToSend.append('is_featured', String(formData.is_featured));
-      formDataToSend.append('is_published', String(formData.is_published));
+      formDataToSend.append('duration_minutes', '0');
+      formDataToSend.append('level', formData.difficulty_level);
+      formDataToSend.append('featured', String(formData.is_featured));
       if ((formData as any).youtube_embed_url) {
         formDataToSend.append('youtube_embed_url', (formData as any).youtube_embed_url);
       }
@@ -1692,8 +1788,19 @@ const SchoolManagement: React.FC = () => {
                       <TableRow key={course.id}>
                         <TableCell>
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-                              <BookOpen className="h-5 w-5 text-gray-600" />
+                            <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
+                              {course.thumbnail_url ? (
+                                <img
+                                  src={course.thumbnail_url}
+                                  alt={course.title}
+                                  className="h-full w-full object-cover"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <BookOpen className="h-5 w-5 text-gray-600" />
+                              )}
                             </div>
                             <div>
                               <p className="font-medium">{course.title}</p>
@@ -1866,6 +1973,9 @@ const SchoolManagement: React.FC = () => {
                                   src={video.thumbnail_url} 
                                   alt={video.title}
                                   className="w-full h-full object-cover rounded-lg"
+                                  onError={(event) => {
+                                    event.currentTarget.style.display = 'none';
+                                  }}
                                 />
                               ) : (
                                 <Video className="h-8 w-8 text-gray-400" />
@@ -2976,14 +3086,33 @@ const SchoolManagement: React.FC = () => {
                 rows={3}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-video-url">Video URL</Label>
+              <Input
+                id="edit-video-url"
+                value={videoEditData.video_url}
+                onChange={(e) => setVideoEditData(prev => ({ ...prev, video_url: e.target.value }))}
+                placeholder="https://..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-video-order">Display Order</Label>
+              <Input
+                id="edit-video-order"
+                type="number"
+                min="0"
+                value={videoEditData.order_index}
+                onChange={(e) => setVideoEditData(prev => ({ ...prev, order_index: parseInt(e.target.value || '0', 10) || 0 }))}
+              />
+            </div>
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                id="edit-video-published"
-                checked={videoEditData.is_published}
-                onChange={(e) => setVideoEditData(prev => ({ ...prev, is_published: e.target.checked }))}
+                id="edit-video-preview"
+                checked={videoEditData.is_preview}
+                onChange={(e) => setVideoEditData(prev => ({ ...prev, is_preview: e.target.checked }))}
               />
-              <Label htmlFor="edit-video-published">Published</Label>
+              <Label htmlFor="edit-video-preview">Available as preview</Label>
             </div>
           </div>
           <DialogFooter>

@@ -76,8 +76,8 @@ export default function BasicAdminReportPullPrompt({
   const handleSubmit = async () => {
     if (!clientId) {
       toast({
-        title: "Client Not Found",
-        description: "We couldn't find the client record to pull this report.",
+        title: "Profile Not Found",
+        description: "We couldn't find your profile record to pull this report.",
         variant: "destructive",
       });
       return;

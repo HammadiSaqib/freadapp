@@ -6,8 +6,11 @@ import { OAuth2Client } from 'google-auth-library';
 import { getQuery, runQuery } from '../database/databaseAdapter.js';
 import { ENV_CONFIG } from '../config/environment.js';
 import { emailService } from '../services/emailService.js';
+import { syncGhlAdminSignup } from '../services/ghlService.js';
+import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 import { extractLoginInfo } from '../utils/loginUtils.js';
 import { getScoreMachinePortalAccessStatus } from '../utils/scoreMachineEliteAccess.js';
+import { ensureKycSchema } from '../utils/kyc.js';
 
 const JWT_SECRET: Secret = ENV_CONFIG.JWT_SECRET;
 const googleOAuthClient = new OAuth2Client();
@@ -65,6 +68,7 @@ const updateProfileSchema = z.object({
   nmi_password: z.string().optional(),
   nmi_test_mode: z.boolean().optional(),
   nmi_gateway_logo: z.string().url().optional().or(z.literal('')),
+  notify_client_after_report_pull: z.boolean().optional(),
   funding_override_enabled: z.boolean().optional(),
   funding_override_signature_text: z.string().optional()
 });
@@ -75,6 +79,36 @@ export interface AuthRequest extends Request {
     email: string;
     role: string;
   }
+}
+
+function syncAdminSignupToGhlInBackground(params: {
+  userId?: number | string | null;
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  companyName?: string | null;
+  role?: string | null;
+  registrationData?: Record<string, any> | null;
+}) {
+  const role = String(params.role || 'admin').toLowerCase();
+  if (role !== 'admin') {
+    return;
+  }
+
+  void syncGhlAdminSignup(params)
+    .then((result) => {
+      if (!result?.skipped) {
+        console.log('GHL admin signup synced:', {
+          userId: params.userId || null,
+          email: params.email || null,
+          contactId: result?.contactId || null
+        });
+      }
+    })
+    .catch((error: any) => {
+      console.error('GHL admin signup sync failed:', error?.response?.data || error?.message || error);
+    });
 }
 
 // Helper functions
@@ -141,6 +175,7 @@ export async function createUser(userData: {
   first_name: string;
   last_name: string;
   company_name?: string;
+  phone?: string;
   role?: string;
   plan_id?: number;
   billing_cycle?: string;
@@ -149,18 +184,22 @@ export async function createUser(userData: {
   referral_commission_rate?: number;
   isPasswordHashed?: boolean;
 }): Promise<any> {
+  await ensureKycSchema();
   const hashedPassword = userData.isPasswordHashed ? userData.password : hashPassword(userData.password);
+  const role = userData.role || 'admin';
   
   const result = await runQuery(`
-    INSERT INTO users (email, password_hash, first_name, last_name, company_name, role)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (email, password_hash, first_name, last_name, company_name, role, kyc_required, kyc_status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     userData.email,
     hashedPassword,
     userData.first_name,
     userData.last_name,
     userData.company_name || null,
-    userData.role || 'admin'
+    role,
+    0,
+    'not_started',
   ]);
   
   // Use insertId for MySQL, lastID for SQLite
@@ -170,11 +209,24 @@ export async function createUser(userData: {
   // after the admin completes payment and setup process
   console.log(`✅ User created successfully. Subscription and affiliate setup will be handled in dashboard.`);
   
-  return await getUserById(insertedId);
+  const newUser = await getUserById(insertedId);
+  syncAdminSignupToGhlInBackground({
+    userId: insertedId,
+    email: userData.email,
+    phone: userData.phone || null,
+    firstName: userData.first_name,
+    lastName: userData.last_name,
+    companyName: userData.company_name || null,
+    role: userData.role || 'admin',
+    registrationData: userData
+  });
+
+  return newUser;
 }
 
 export async function updateUserLastLogin(userId: number): Promise<void> {
   await runQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+  syncGhlAdminLifecycleTagsInBackground(userId);
 }
 
 // Client helper functions
@@ -477,7 +529,7 @@ export class AuthController {
       }
       
       // Check if user is active (database stores as 1 for active, 0 for inactive)
-      if (!isUserActive(user)) {
+      if (!user.is_active || user.is_active === 0) {
         return res.status(401).json({ error: 'Support team account is deactivated' });
       }
       
@@ -541,7 +593,7 @@ export class AuthController {
         return res.status(403).json({ error: 'Access denied. Only printing team members can log in here.' });
       }
 
-      if (!isUserActive(user)) {
+      if (!user.is_active || user.is_active === 0) {
         return res.status(401).json({ error: 'Printing team account is deactivated' });
       }
 
@@ -691,7 +743,7 @@ export class AuthController {
       }
       
       // Check if target admin is active
-      if (!isUserActive(targetAdmin)) {
+      if (!targetAdmin.is_active) {
         return res.status(400).json({ error: 'Target admin account is deactivated' });
       }
       
@@ -813,7 +865,7 @@ export class AuthController {
       }
       
       // Check if user is active
-      if (!isUserActive(supportUser)) {
+      if (!supportUser.is_active || supportUser.is_active === 0) {
         return res.status(403).json({ error: 'Support user account is deactivated' });
       }
       
@@ -900,6 +952,7 @@ export class AuthController {
         // Auto-register new admin account from Google profile
         console.log('Creating new admin account from Google sign-in for:', email);
         try {
+          await ensureKycSchema();
           const { randomBytes } = await import('crypto');
           const randomPassword = randomBytes(32).toString('hex');
           const hashedPassword = hashPassword(randomPassword);
@@ -907,8 +960,8 @@ export class AuthController {
           const insertResult = await runQuery(
             `INSERT INTO users (
               email, password_hash, first_name, last_name, role,
-              email_verified, status, avatar, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, 'admin', TRUE, 'active', ?, NOW(), NOW())`,
+              email_verified, status, avatar, kyc_required, kyc_status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'admin', TRUE, 'active', ?, 0, 'not_started', NOW(), NOW())`,
             [email, hashedPassword, googleFirstName, googleLastName, googleAvatar]
           );
 
@@ -920,6 +973,20 @@ export class AuthController {
           }
 
           console.log('New admin account created from Google sign-in, ID:', newUserId);
+          syncAdminSignupToGhlInBackground({
+            userId: newUserId,
+            email,
+            phone: null,
+            firstName: googleFirstName,
+            lastName: googleLastName,
+            companyName: null,
+            role: 'admin',
+            registrationData: {
+              auth_provider: 'google',
+              avatar: googleAvatar,
+              referral_affiliate_id: parseResult.data.referral_affiliate_id || null
+            }
+          });
 
           // Handle affiliate referral if provided
           try {
@@ -1117,7 +1184,7 @@ export class AuthController {
       }
       
       // Check if user is active
-      if (!isUserActive(user)) {
+      if (!user.is_active) {
         return res.status(401).json({ error: 'Account is deactivated' });
       }
       
@@ -1203,6 +1270,7 @@ export class AuthController {
   // Register endpoint - send welcome email only; verification code will be sent upon first purchase
   static async register(req: Request, res: Response) {
     try {
+      await ensureKycSchema();
       console.log('=== REGISTRATION PROCESS STARTED ===');
       console.log('Registration request body:', JSON.stringify(req.body, null, 2));
       
@@ -1235,8 +1303,8 @@ export class AuthController {
       const userResult = await executeQuery(
         `INSERT INTO users (
           email, password_hash, first_name, last_name, company_name, role, 
-          email_verified, status, account_type, referral_source, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, FALSE, 'active', ?, ?, NOW(), NOW())`,
+          email_verified, status, account_type, referral_source, kyc_required, kyc_status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, FALSE, 'active', ?, ?, 0, 'not_started', NOW(), NOW())`,
         [
           userData.email,
           hashedPassword,
@@ -1251,6 +1319,21 @@ export class AuthController {
       
       const userId = userResult.insertId;
       console.log('User created successfully with ID:', userId);
+      syncAdminSignupToGhlInBackground({
+        userId,
+        email: userData.email,
+        phone: req.body?.phone || req.body?.phone_number || null,
+        firstName: userData.first_name,
+        lastName: userData.last_name,
+        companyName: userData.company_name || req.body?.company_name || null,
+        role: userData.role || 'admin',
+        registrationData: {
+          ...req.body,
+          user_id: userId,
+          account_type: 'admin',
+          referral_source: (req.body?.affiliate_id || userData.referral_affiliate_id) ? 'product_link' : null
+        }
+      });
 
       // If a referral affiliate ID was provided, create a pending referral record
       try {
@@ -1477,8 +1560,8 @@ export class AuthController {
       const hashedPassword = pendingData.password_hash; // Already hashed
       
       const result = await executeQuery(`
-        INSERT INTO users (email, password_hash, first_name, last_name, company_name, role)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO users (email, password_hash, first_name, last_name, company_name, role, kyc_required, kyc_status)
+        VALUES (?, ?, ?, ?, ?, ?, 0, 'not_started')
       `, [
         pendingData.email,
         hashedPassword,
@@ -1491,6 +1574,24 @@ export class AuthController {
       // Get the created user
       const insertedId = result.insertId;
       const newUser = await getUserById(insertedId);
+      syncAdminSignupToGhlInBackground({
+        userId: newUser.id,
+        email: newUser.email,
+        phone: pendingData.phone || null,
+        firstName: newUser.first_name,
+        lastName: newUser.last_name,
+        companyName: newUser.company_name || null,
+        role: newUser.role || 'admin',
+        registrationData: {
+          pending_registration_id: pendingData.id || null,
+          email: pendingData.email,
+          first_name: pendingData.first_name,
+          last_name: pendingData.last_name,
+          company_name: pendingData.company_name || null,
+          role: pendingData.role || 'admin',
+          verified_at: new Date().toISOString()
+        }
+      });
 
       console.log('✅ User created successfully:', { id: newUser.id, email: newUser.email });
       console.log('💡 User will set up subscription and affiliate profile in dashboard after payment');
@@ -1657,6 +1758,8 @@ export class AuthController {
         funding_override_enabled: user.funding_override_enabled ? true : false,
         funding_override_signature_text: user.funding_override_signature_text || null,
         funding_override_signed_at: user.funding_override_signed_at || null,
+        notify_client_after_report_pull: user.notify_client_after_report_pull !== false
+          && Number(user.notify_client_after_report_pull ?? 1) !== 0,
         phone: user.phone,
         address: user.address,
         city: user.city,
@@ -1665,6 +1768,8 @@ export class AuthController {
         role: user.role,
         avatar: user.avatar,
         email_verified: user.email_verified,
+        kyc_required: !!user.kyc_required,
+        kyc_status: user.kyc_status || 'not_started',
         created_at: user.created_at,
         last_login: user.last_login,
       };
@@ -1758,6 +1863,7 @@ export class AuthController {
         'credit_repair_url', 'onboarding_slug', 'intake_redirect_url', 'intake_logo_url', 'intake_primary_color',
         'intake_company_name', 'intake_website_url', 'intake_email', 'intake_phone_number',
         'nmi_merchant_id', 'nmi_public_key', 'nmi_api_key', 'nmi_username', 'nmi_password', 'nmi_test_mode', 'nmi_gateway_logo',
+        'notify_client_after_report_pull',
         'funding_override_enabled', 'funding_override_signature_text', 'funding_override_signed_at'
       ];
 
@@ -1796,6 +1902,8 @@ export class AuthController {
         funding_override_enabled: updatedUser.funding_override_enabled ? true : false,
         funding_override_signature_text: updatedUser.funding_override_signature_text || null,
         funding_override_signed_at: updatedUser.funding_override_signed_at || null,
+        notify_client_after_report_pull: updatedUser.notify_client_after_report_pull !== false
+          && Number(updatedUser.notify_client_after_report_pull ?? 1) !== 0,
         phone: updatedUser.phone,
         address: updatedUser.address,
         city: updatedUser.city,
