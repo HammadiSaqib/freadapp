@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { clientsApi } from "@/lib/api";
-import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import { billingApi, clientsApi } from "@/lib/api";
+import { isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import PaidClientEnrollmentDialog, {
+  getPaidClientEnrollmentRequest,
+  type PaidClientEnrollmentRequest,
+} from "@/components/PaidClientEnrollmentDialog";
 import {
   closeReportPullLoading,
   openReportPullLoading,
@@ -45,6 +49,9 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingEnrollment, setIsCheckingEnrollment] = useState(false);
+  const [isEnrollmentApproved, setIsEnrollmentApproved] = useState(false);
+  const [paidEnrollmentRequest, setPaidEnrollmentRequest] = useState<PaidClientEnrollmentRequest | null>(null);
   const [newClient, setNewClient] = useState({
     platform: "",
     email: "",
@@ -73,6 +80,54 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
 
   const { isEliteActive } = useScoreMachineEliteStatus();
   const authorizationCheckboxClassName = "mt-3 h-5 w-5 min-w-[1.25rem] rounded-md !border-transparent bg-white dark:bg-slate-950 shadow-[inset_0_0_0_2px_#2dabdc] data-[state=checked]: data-[state=checked]:text-white data-[state=checked]:shadow-[inset_0_0_0_2px_#2dabdc]";
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsCheckingEnrollment(false);
+      setIsEnrollmentApproved(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsCheckingEnrollment(true);
+    setIsEnrollmentApproved(false);
+
+    billingApi.getClientEnrollmentOptions()
+      .then((response) => {
+        if (cancelled) return;
+        const enrollment = response?.data?.enrollment || {};
+        if (enrollment.requiresPayment) {
+          const plans = Array.isArray(enrollment.clientPlans)
+            ? enrollment.clientPlans
+            : enrollment.clientPlan
+              ? [enrollment.clientPlan]
+              : [];
+          setPaidEnrollmentRequest({
+            plans,
+            clientData: {},
+            source: mode === "manual" ? "admin_dashboard_manual" : "admin_dashboard_scrape",
+          });
+          onClose();
+          return;
+        }
+        setIsEnrollmentApproved(true);
+        setIsCheckingEnrollment(false);
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        setIsCheckingEnrollment(false);
+        onClose();
+        toast({
+          title: "Unable to verify enrollment",
+          description: error?.response?.data?.error || "Please try Add New Client again.",
+          variant: "destructive",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, mode]);
 
   const handleSubmitClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -537,22 +592,15 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
       }
 
       if (isClientPlanPaymentRequired(error)) {
-        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
-          source: "admin_dashboard_scrape",
-          returnUrl: window.location.href,
-          clientData: pendingCheckoutClientData || {
+        const clientData = pendingCheckoutClientData || {
             platform: newClient.platform,
             email: newClient.email,
             platform_email: newClient.email,
             platform_password: newClient.password,
             ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
-          },
-        });
-        toast({
-          title: "Client payment link copied",
-          description: "Send this payment link to the client so they can complete enrollment.",
-        });
-        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        };
+        setPaidEnrollmentRequest(getPaidClientEnrollmentRequest(error, clientData, "admin_dashboard_scrape"));
+        onClose();
         return;
       }
       
@@ -676,10 +724,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
     } catch (error: any) {
       console.error("Error adding client manually:", error);
       if (isClientPlanPaymentRequired(error)) {
-        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
-          source: "admin_dashboard_manual",
-          returnUrl: window.location.href,
-          clientData: pendingManualClientData || {
+        const clientData = pendingManualClientData || {
             first_name: manualClient.first_name,
             last_name: manualClient.last_name,
             email: manualClient.email,
@@ -693,13 +738,9 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
             platform_email: manualClient.platform_email || undefined,
             platform_password: manualClient.platform_password || undefined,
             notes: manualClient.notes || undefined,
-          },
-        });
-        toast({
-          title: "Client payment link copied",
-          description: "Send this payment link to the client so they can complete enrollment.",
-        });
-        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        };
+        setPaidEnrollmentRequest(getPaidClientEnrollmentRequest(error, clientData, "admin_dashboard_manual"));
+        onClose();
         return;
       }
       toast({
@@ -741,8 +782,12 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={`sm:max-w-md ${isEliteActive ? "bg-white dark:bg-slate-950 border-0 dark:border dark:border-slate-800 dark:text-slate-100 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] rounded-3xl overflow-hidden p-0 gap-0 elite-nested-wrapper" : ""}`}>
+    <>
+    <Dialog open={isOpen && isEnrollmentApproved && !isCheckingEnrollment} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <DialogContent
+        style={{ zIndex: 12001 }}
+        className={`relative border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:max-w-md ${isEliteActive ? "border-0 dark:border dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] rounded-3xl overflow-hidden p-0 gap-0 elite-nested-wrapper" : ""}`}
+      >
         {isEliteActive && (
           <style dangerouslySetInnerHTML={{__html: `
             .elite-nested-wrapper label {
@@ -1145,5 +1190,11 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         </div>
       </DialogContent>
     </Dialog>
+    <PaidClientEnrollmentDialog
+      open={paidEnrollmentRequest !== null}
+      onOpenChange={(open) => { if (!open) setPaidEnrollmentRequest(null); }}
+      request={paidEnrollmentRequest}
+    />
+    </>
   );
 }

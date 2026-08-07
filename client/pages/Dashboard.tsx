@@ -48,7 +48,11 @@ import {
   openReportPullLoading,
   showReportPullError,
 } from "@/lib/reportPullFeedback";
-import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import { isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import PaidClientEnrollmentDialog, {
+  getPaidClientEnrollmentRequest,
+  type PaidClientEnrollmentRequest,
+} from "@/components/PaidClientEnrollmentDialog";
 import {
   Users,
   FileText,
@@ -86,7 +90,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { clientsApi, analyticsApi, apiRequest, api, creditReportScraperApi, authApi } from "@/lib/api";
+import { clientsApi, analyticsApi, apiRequest, api, creditReportScraperApi, authApi, billingApi } from "@/lib/api";
 import { contractsApi } from "@/lib/api";
 import { usePagePermissions } from "@/hooks/usePagePermissions";
 import axios from 'axios';
@@ -267,6 +271,8 @@ export default function Dashboard() {
     : null;
   const isDashboardOverviewCached = !!cachedDashboardOverview;
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
+  const [isCheckingClientEnrollment, setIsCheckingClientEnrollment] = useState(false);
+  const [paidEnrollmentRequest, setPaidEnrollmentRequest] = useState<PaidClientEnrollmentRequest | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAffiliateAccess, setHasAffiliateAccess] = useState(() => cachedDashboardOverview?.hasAffiliateAccess ?? false);
   const [affiliateVerificationStatus, setAffiliateVerificationStatus] = useState<string | null>(() => cachedDashboardOverview?.affiliateVerificationStatus ?? null);
@@ -910,8 +916,32 @@ export default function Dashboard() {
     }
   };
 
-  const handleAddClient = () => {
-    setIsAddClientOpen(true);
+  const handleAddClient = async () => {
+    if (isCheckingClientEnrollment) return;
+    setIsCheckingClientEnrollment(true);
+    try {
+      const response = await billingApi.getClientEnrollmentOptions();
+      const enrollment = response?.data?.enrollment || {};
+      if (enrollment.requiresPayment) {
+        const plans = Array.isArray(enrollment.clientPlans)
+          ? enrollment.clientPlans
+          : enrollment.clientPlan
+            ? [enrollment.clientPlan]
+            : [];
+        setPaidEnrollmentRequest({ plans, clientData: {}, source: "dashboard_scrape" });
+        setIsAddClientOpen(false);
+        return;
+      }
+      setIsAddClientOpen(true);
+    } catch (error: any) {
+      toast({
+        title: "Unable to verify enrollment",
+        description: error?.response?.data?.error || "Please try Add New Client again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingClientEnrollment(false);
+    }
   };
 
   const handleToggleLoginStatus = async (clientId: number, currentStatus: string) => {
@@ -1509,22 +1539,15 @@ export default function Dashboard() {
       }
 
       if (isClientPlanPaymentRequired(error)) {
-        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
-          source: "dashboard_scrape",
-          returnUrl: window.location.href,
-          clientData: pendingCheckoutClientData || {
+        const clientData = pendingCheckoutClientData || {
             platform: newClient.platform,
             email: newClient.email,
             platform_email: newClient.email,
             platform_password: newClient.password,
             ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
-          },
-        });
-        toast({
-          title: "Client payment link copied",
-          description: "Send this payment link to the client so they can complete enrollment.",
-        });
-        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        };
+        setPaidEnrollmentRequest(getPaidClientEnrollmentRequest(error, clientData, "dashboard_scrape"));
+        setIsAddClientOpen(false);
         return;
       }
       
@@ -1554,7 +1577,11 @@ export default function Dashboard() {
   };
 
   const handleAddClientDialogChange = (open: boolean) => {
-    setIsAddClientOpen(open);
+    if (open) {
+      void handleAddClient();
+      return;
+    }
+    setIsAddClientOpen(false);
     if (!open) {
       setNewClient({
         platform: "",
@@ -2930,7 +2957,7 @@ export default function Dashboard() {
 
       {/* Add New Client Dialog */}
         <Dialog open={isAddClientOpen} onOpenChange={handleAddClientDialogChange}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent style={{ zIndex: 12001 }} className="max-h-[90vh] max-w-2xl overflow-y-auto border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
           <DialogHeader>
             <DialogTitle className="gradient-text-primary">
               Add New Client
@@ -3210,6 +3237,11 @@ export default function Dashboard() {
           </motion.div>
         )}
       </AnimatePresence>
+      <PaidClientEnrollmentDialog
+        open={paidEnrollmentRequest !== null}
+        onOpenChange={(open) => { if (!open) setPaidEnrollmentRequest(null); }}
+        request={paidEnrollmentRequest}
+      />
     </DashboardLayout>
   );
 }

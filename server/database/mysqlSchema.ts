@@ -843,7 +843,39 @@ export async function initializeMySQLDatabase(): Promise<void> {
 // Create all MySQL tables with proper constraints and indexes
 async function createMySQLTables(): Promise<void> {
   console.log('📋 Creating MySQL tables...');
-  
+
+  // CREATE TABLE IF NOT EXISTS does not repair legacy/imported definitions.
+  // Restore missing id keys before creating any new foreign keys that reference
+  // those tables. Fresh databases have no rows here and use the definitions below.
+  const legacyTablesMissingIdKey = await executeQuery(
+    `SELECT c.TABLE_NAME
+       FROM INFORMATION_SCHEMA.COLUMNS c
+      WHERE c.TABLE_SCHEMA = DATABASE()
+        AND c.COLUMN_NAME = 'id'
+        AND c.TABLE_NAME IN (
+          'users', 'clients', 'admin_integrations', 'community_posts',
+          'integration_activity_logs',
+          'calendar_events', 'affiliates', 'affiliate_referrals',
+          'blog_categories', 'blog_posts', 'blog_tags', 'cards',
+          'contract_templates', 'courses', 'disputes'
+        )
+        AND (
+          LOWER(COALESCE(c.EXTRA, '')) NOT LIKE '%auto_increment%'
+          OR NOT EXISTS (
+            SELECT 1
+              FROM INFORMATION_SCHEMA.STATISTICS s
+             WHERE s.TABLE_SCHEMA = c.TABLE_SCHEMA
+               AND s.TABLE_NAME = c.TABLE_NAME
+               AND s.COLUMN_NAME = c.COLUMN_NAME
+               AND s.NON_UNIQUE = 0
+          )
+        )
+      ORDER BY c.TABLE_NAME`
+  );
+  for (const row of legacyTablesMissingIdKey as Array<{ TABLE_NAME: string }>) {
+    await repairTableIdAutoIncrement(row.TABLE_NAME);
+  }
+
   const tables = [
     // Users table with enhanced security features
     `CREATE TABLE IF NOT EXISTS users (
@@ -2491,6 +2523,20 @@ async function createMySQLTables(): Promise<void> {
       FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   ];
+
+  // Some integration tables reference clients, so these parent tables must be
+  // created first when initializing an empty database. Keep the remaining schema
+  // in its declared order.
+  const parentTablePriority = new Map([
+    ['users', 0],
+    ['admin_integrations', 1],
+    ['clients', 2]
+  ]);
+  tables.sort((left, right) => {
+    const leftName = left.match(/CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)/)?.[1] || '';
+    const rightName = right.match(/CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)/)?.[1] || '';
+    return (parentTablePriority.get(leftName) ?? 3) - (parentTablePriority.get(rightName) ?? 3);
+  });
   
   // Execute table creation in transaction
   await executeTransaction(async (connection) => {
@@ -2498,6 +2544,40 @@ async function createMySQLTables(): Promise<void> {
       await connection.execute(tableSQL);
     }
   });
+
+  // Imported dumps can contain the integration activity table without the
+  // indexes/constraints normally declared by CREATE TABLE. Restore them after
+  // all parent tables are guaranteed to exist.
+  await repairTableIdAutoIncrement('integration_activity_logs');
+  const integrationLogForeignKeys = await executeQuery(
+    `SELECT COLUMN_NAME
+       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'integration_activity_logs'
+        AND REFERENCED_TABLE_NAME IS NOT NULL`
+  );
+  const constrainedIntegrationLogColumns = new Set(
+    (integrationLogForeignKeys as Array<{ COLUMN_NAME: string }>).map((row) => row.COLUMN_NAME)
+  );
+  const integrationLogConstraintAlters: string[] = [];
+  if (!constrainedIntegrationLogColumns.has('integration_id')) {
+    integrationLogConstraintAlters.push(
+      'ADD CONSTRAINT fk_integration_activity_logs_integration FOREIGN KEY (integration_id) REFERENCES admin_integrations(id) ON DELETE CASCADE'
+    );
+  }
+  if (!constrainedIntegrationLogColumns.has('admin_id')) {
+    integrationLogConstraintAlters.push(
+      'ADD CONSTRAINT fk_integration_activity_logs_admin FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE'
+    );
+  }
+  if (!constrainedIntegrationLogColumns.has('client_id')) {
+    integrationLogConstraintAlters.push(
+      'ADD CONSTRAINT fk_integration_activity_logs_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL'
+    );
+  }
+  if (integrationLogConstraintAlters.length > 0) {
+    await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
+  }
   
   console.log('✅ MySQL tables created successfully');
 

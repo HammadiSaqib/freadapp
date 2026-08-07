@@ -2444,7 +2444,7 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
               Add New Admin
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent style={{ zIndex: 12001 }} className="max-h-[90vh] max-w-4xl overflow-y-auto border-gray-200 bg-white text-gray-950 shadow-2xl">
             <DialogHeader>
               <DialogTitle className="text-xl">Create New Admin Profile</DialogTitle>
               <DialogDescription>
@@ -3646,7 +3646,7 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent style={{ zIndex: 12001 }} className="max-h-[90vh] max-w-4xl overflow-y-auto border-gray-200 bg-white text-gray-950 shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Edit Admin Profile</DialogTitle>
             <DialogDescription>

@@ -11,7 +11,7 @@ export default function TaxProfessionalsFunding() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Tax Professionals Funding: Lines of Credit, Working Capital & Readiness | Score Machine</title>
+        <title>Tax Professionals Funding: Lines of Credit, Working Capital & Readiness | CapSol</title>
         <meta
           name="description"
           content="Explore funding options for tax professionals and small firms. Score Machine organizes credit insights and creates summaries to support responsible reviews. No approvals or outcomes are guaranteed."

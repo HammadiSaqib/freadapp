@@ -421,6 +421,14 @@ async function resolveAdminIdFromIntake(tokenRaw: unknown, slugRaw: unknown): Pr
 
 async function getClientEnrollmentSettings(adminId: number): Promise<{
   allowFreeEnrollment: boolean;
+  clientPlans: Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    price: number;
+    billing_cycle: string;
+    features: string[];
+  }>;
   clientPlan: null | {
     id: number;
     name: string;
@@ -461,6 +469,7 @@ async function getClientEnrollmentSettings(adminId: number): Promise<{
   if (allowFreeFromProfile || String(adminPlan?.client_registration_mode || '').toLowerCase() === 'free') {
     return {
       allowFreeEnrollment: true,
+      clientPlans: [],
       clientPlan: null,
       adminPlan: adminPlan ? {
         id: Number(adminPlan.id),
@@ -471,38 +480,35 @@ async function getClientEnrollmentSettings(adminId: number): Promise<{
     };
   }
 
-  let clientPlan = null;
-  if (adminPlan?.default_client_plan_id) {
-    clientPlan = await getQuery(
-      `SELECT id, name, price, billing_cycle
-         FROM subscription_plans
-        WHERE id = ?
-          AND plan_category = 'client'
-          AND is_active = TRUE
-        LIMIT 1`,
-      [adminPlan.default_client_plan_id]
-    );
-  }
-
-  if (!clientPlan) {
-    clientPlan = await getQuery(
-      `SELECT id, name, price, billing_cycle
-         FROM subscription_plans
-        WHERE plan_category = 'client'
-          AND is_active = TRUE
-        ORDER BY sort_order ASC, created_at ASC
-        LIMIT 1`
-    );
-  }
+  const planRows = await allQuery(
+    `SELECT id, name, description, price, billing_cycle, features
+       FROM subscription_plans
+      WHERE plan_category = 'client'
+        AND is_active = TRUE
+        AND billing_cycle IN ('monthly', 'yearly')
+      ORDER BY sort_order ASC, created_at ASC`
+  );
+  const clientPlans = (Array.isArray(planRows) ? planRows : []).map((plan: any) => ({
+    id: Number(plan.id),
+    name: String(plan.name || ''),
+    description: plan.description ? String(plan.description) : null,
+    price: Number(plan.price || 0),
+    billing_cycle: String(plan.billing_cycle || 'monthly'),
+    features: (() => {
+      try {
+        const parsed = typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features;
+        return Array.isArray(parsed) ? parsed.map((feature: any) => String(feature)) : [];
+      } catch {
+        return [];
+      }
+    })(),
+  }));
+  const clientPlan = clientPlans[0] || null;
 
   return {
     allowFreeEnrollment: false,
-    clientPlan: clientPlan ? {
-      id: Number(clientPlan.id),
-      name: String(clientPlan.name || ''),
-      price: Number(clientPlan.price || 0),
-      billing_cycle: String(clientPlan.billing_cycle || 'monthly'),
-    } : null,
+    clientPlans,
+    clientPlan,
     adminPlan: adminPlan ? {
       id: Number(adminPlan.id),
       name: String(adminPlan.name || ''),
@@ -1358,7 +1364,7 @@ export async function createClient(req: AuthRequest, res: Response) {
       }
     }
 
-    if (!enrollmentSettings.allowFreeEnrollment && enrollmentSettings.clientPlan) {
+    if (!enrollmentSettings.allowFreeEnrollment) {
       return res.status(402).json({
         success: false,
         error: 'Client payment required',
@@ -1367,6 +1373,7 @@ export async function createClient(req: AuthRequest, res: Response) {
         enrollment: {
           allowFreeEnrollment: false,
           clientPlan: enrollmentSettings.clientPlan,
+          clientPlans: enrollmentSettings.clientPlans,
           adminPlan: enrollmentSettings.adminPlan,
         }
       });
@@ -1451,8 +1458,9 @@ export async function getClientIntakeConfig(req: Request, res: Response) {
         onboardingSlug: admin.onboarding_slug || null,
         enrollment: {
           allowFreeEnrollment: enrollmentSettings.allowFreeEnrollment,
-          requiresPayment: !enrollmentSettings.allowFreeEnrollment && !!enrollmentSettings.clientPlan,
+          requiresPayment: !enrollmentSettings.allowFreeEnrollment,
           clientPlan: enrollmentSettings.clientPlan,
+          clientPlans: enrollmentSettings.clientPlans,
           adminPlan: enrollmentSettings.adminPlan,
         },
         redirectUrl: admin.intake_redirect_url || null,
@@ -1511,21 +1519,51 @@ export async function submitClientIntake(req: Request, res: Response) {
     }
 
     const enrollmentSettings = await getClientEnrollmentSettings(adminId);
-    if (!enrollmentSettings.allowFreeEnrollment && enrollmentSettings.clientPlan) {
-      return res.status(402).json({
-        success: false,
-        error: 'Client payment required',
-        code: 'CLIENT_PLAN_PAYMENT_REQUIRED',
-        message: 'This onboarding link requires the client plan payment before enrollment can be completed.',
-        enrollment: {
-          allowFreeEnrollment: false,
-          clientPlan: enrollmentSettings.clientPlan,
-          adminPlan: enrollmentSettings.adminPlan,
-        }
-      });
+    let paidEnrollmentRequest: any = null;
+    if (!enrollmentSettings.allowFreeEnrollment) {
+      const enrollmentSessionId = String((req.body as any)?.enrollmentSessionId || '').trim();
+      if (enrollmentSessionId) {
+        paidEnrollmentRequest = await getQuery(
+          `SELECT cer.*
+             FROM client_enrollment_requests cer
+             JOIN subscription_plans sp
+               ON sp.id = cer.plan_id
+              AND sp.plan_category = 'client'
+            WHERE cer.admin_id = ?
+              AND cer.stripe_checkout_session_id = ?
+            LIMIT 1`,
+          [adminId, enrollmentSessionId]
+        );
+      }
+
+      if (!paidEnrollmentRequest || String(paidEnrollmentRequest.status) !== 'paid') {
+        const alreadyCompleted = String(paidEnrollmentRequest?.status || '') === 'completed';
+        return res.status(alreadyCompleted ? 409 : 402).json({
+          success: false,
+          error: alreadyCompleted ? 'This paid enrollment has already been completed' : 'Client payment required',
+          code: alreadyCompleted ? 'CLIENT_ENROLLMENT_ALREADY_COMPLETED' : 'CLIENT_PLAN_PAYMENT_REQUIRED',
+          message: alreadyCompleted
+            ? 'This Stripe Checkout session cannot be reused for another intake.'
+            : 'Select a client plan and complete payment before submitting the intake form.',
+          enrollment: {
+            allowFreeEnrollment: false,
+            clientPlan: enrollmentSettings.clientPlan,
+            clientPlans: enrollmentSettings.clientPlans,
+            adminPlan: enrollmentSettings.adminPlan,
+          }
+        });
+      }
     }
 
     const intakeData = clientIntakeSchema.parse(req.body);
+    const checkoutEmail = String(paidEnrollmentRequest?.email || '').trim().toLowerCase();
+    if (checkoutEmail && checkoutEmail !== intakeData.email.trim().toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        error: 'The intake email must match the email used during Stripe Checkout',
+        code: 'CLIENT_ENROLLMENT_EMAIL_MISMATCH',
+      });
+    }
 
     const existingIntakeClient = await findExistingClientForAdminByPlatformEmail(adminId, {
       email: intakeData.email,
@@ -1770,6 +1808,41 @@ export async function submitClientIntake(req: Request, res: Response) {
       ]);
     } catch (userActivityError: any) {
       console.warn('Failed to log client intake user activity:', userActivityError?.message || userActivityError);
+    }
+
+    if (paidEnrollmentRequest?.id) {
+      const completionResult: any = await runQuery(
+        `UPDATE client_enrollment_requests
+            SET status = 'completed',
+                first_name = ?,
+                last_name = ?,
+                email = ?,
+                platform = ?,
+                platform_email = ?,
+                created_client_id = ?,
+                completed_at = COALESCE(completed_at, NOW()),
+                updated_at = NOW()
+          WHERE id = ?
+            AND admin_id = ?
+            AND status = 'paid'`,
+        [
+          extracted.firstName || null,
+          extracted.lastName || null,
+          intakeData.email,
+          intakeData.platform || null,
+          intakeData.email,
+          insertedId,
+          paidEnrollmentRequest.id,
+          adminId,
+        ]
+      );
+      if (Number(completionResult?.affectedRows || 0) !== 1) {
+        return res.status(409).json({
+          success: false,
+          error: 'This paid enrollment has already been completed',
+          code: 'CLIENT_ENROLLMENT_ALREADY_COMPLETED',
+        });
+      }
     }
 
     res.status(201).json({

@@ -1199,7 +1199,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
                     {JSON.stringify({
                       "@context": "https://schema.org",
                       "@type": "SoftwareApplication",
-                      name: "Score Machine",
+                      name: "CapSol",
                       operatingSystem: "Web-based",
                       applicationCategory: "FinanceApplication",
                       description:

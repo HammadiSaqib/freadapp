@@ -11,7 +11,7 @@ export default function LoanPreparation() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Loan Preparation Guide: Documents & Credit Review | Score Machine</title>
+        <title>Loan Preparation Guide: Documents & Credit Review | CapSol</title>
         <meta
           name="description"
           content="Prepare for loan reviews with organized documentation and structured credit insights. Score Machine helps create summaries and highlight general indicators. No approval or outcomes are guaranteed."

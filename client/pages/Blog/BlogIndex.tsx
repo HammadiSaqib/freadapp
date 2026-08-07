@@ -62,7 +62,7 @@ const BlogIndex = () => {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex flex-col">
       <Helmet>
-        <title>Blog - Score Machine | Credit Repair Insights & Updates</title>
+        <title>Blog - CapSol | Credit Repair Insights & Updates</title>
         <meta name="description" content="Latest news, updates, and expert insights on credit repair, financial freedom, and Score Machine platform features." />
       </Helmet>
 

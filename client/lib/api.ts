@@ -346,7 +346,7 @@ export const clientsApi = {
   deleteDebtPayoffPlan: (id: number) => api.delete(`/api/debt-payoff/${id}`),
   getClientIntakeToken: () => api.post('/api/clients/intake-token'),
   getClientIntakeConfig: (params: { token?: string; slug?: string }) => api.get('/api/clients/intake-config', { params }),
-  submitClientIntake: (data: { token?: string; slug?: string; platform: string; email: string; password: string; ssnLast4?: string }) =>
+  submitClientIntake: (data: { token?: string; slug?: string; enrollmentSessionId?: string; platform: string; email: string; password: string; ssnLast4?: string }) =>
     api.post('/api/clients/intake', data),
 
   // Equifax Settlement
@@ -530,6 +530,7 @@ export const analyticsApi = {
 export const billingApi = {
   getHistory: () => api.get('/api/billing/history'),
   getStripeHistory: () => api.get('/api/billing/stripe-history'),
+  getClientEnrollmentOptions: () => api.get('/api/billing/client-enrollment-options'),
   
   getSubscription: () => api.get('/api/billing/subscription'),
   
@@ -564,9 +565,11 @@ export const billingApi = {
   createClientEnrollmentCheckout: (data: {
     token?: string;
     slug?: string;
+    planId?: number;
+    payerType?: 'client' | 'admin';
     source?: string;
     returnUrl?: string;
-    clientData: Record<string, any>;
+    clientData?: Record<string, any>;
   }) => api.post('/api/billing/create-client-enrollment-checkout', data),
 
   finalizeClientEnrollmentSession: (sessionId: string) =>

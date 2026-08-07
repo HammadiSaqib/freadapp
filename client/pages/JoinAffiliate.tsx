@@ -408,7 +408,7 @@ const JoinAffiliate: React.FC<JoinAffiliateProps> = ({
   return (
     <div className={embed ? 'min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/20 font-sans py-8' : 'min-h-screen bg-white'}>
       <Helmet>
-        <title>{embed ? 'Affiliate Registration Embed - Score Machine' : 'Affiliate Program - Score Machine | Partner & Earn'}</title>
+        <title>{embed ? 'Affiliate Registration Embed - CapSol' : 'Affiliate Program - CapSol | Partner & Earn'}</title>
         <meta name="description" content="Join Score Machine’s Affiliate and Partner Programs. Earn recurring commissions by promoting a professional, AI-based credit analysis platform. Access training, analytics, tracking tools, and compliance-ready marketing resources." />
         {embed ? (
           <>

@@ -33,7 +33,11 @@ import { useState, useEffect } from "react";
 import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import { useNavigate } from "react-router-dom";
 import { creditReportScraperApi, clientsApi, apiRequest, contractsApi } from "@/lib/api";
-import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import { isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
+import PaidClientEnrollmentDialog, {
+  getPaidClientEnrollmentRequest,
+  type PaidClientEnrollmentRequest,
+} from "@/components/PaidClientEnrollmentDialog";
 import {
   closeReportPullLoading,
   openReportPullLoading,
@@ -1154,6 +1158,7 @@ export default function Reports() {
   const [addAuthorization, setAddAuthorization] = useState(false);
   const [showInlinePassword, setShowInlinePassword] = useState(false);
   const [isAddingClient, setIsAddingClient] = useState<boolean>(false);
+  const [paidEnrollmentRequest, setPaidEnrollmentRequest] = useState<PaidClientEnrollmentRequest | null>(null);
   
   // Fetch clients and platforms on component mount
   useEffect(() => {
@@ -1389,22 +1394,14 @@ export default function Reports() {
         reportPullFeedbackOpen = false;
       }
       if (isClientPlanPaymentRequired(error)) {
-        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
-          source: "reports_page_scrape",
-          returnUrl: window.location.href,
-          clientData: pendingCheckoutClientData || {
+        const clientData = pendingCheckoutClientData || {
             platform: addPlatform,
             email: addEmail,
             platform_email: addEmail,
             platform_password: addPassword,
             ...(addSsnLast4 ? { ssn_last_four: addSsnLast4 } : {}),
-          },
-        });
-        toast({
-          title: "Client payment link copied",
-          description: "Send this payment link to the client so they can complete enrollment.",
-        });
-        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        };
+        setPaidEnrollmentRequest(getPaidClientEnrollmentRequest(error, clientData, "reports_page_scrape"));
         return;
       }
       if (error.response?.status === 403 && error.response?.data?.error === "Client quota exceeded") {
@@ -2208,6 +2205,11 @@ export default function Reports() {
           </div>
         </CardContent>
       </Card>
+      <PaidClientEnrollmentDialog
+        open={paidEnrollmentRequest !== null}
+        onOpenChange={(open) => { if (!open) setPaidEnrollmentRequest(null); }}
+        request={paidEnrollmentRequest}
+      />
     </DashboardLayout>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { billingApi } from "@/lib/api";
+import { buildOnboardingIntakeUrl } from "@/lib/hostRouting";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
@@ -53,7 +54,16 @@ const ClientEnrollmentSuccess = () => {
     const redirectUrl = enrollment?.redirectUrl;
 
     if (returnUrl) {
-      window.location.assign(returnUrl);
+      const url = new URL(returnUrl, window.location.origin);
+      if (sessionId) url.searchParams.set("enrollment_session_id", sessionId);
+      window.location.assign(url.toString());
+      return;
+    }
+
+    if (enrollment?.onboardingSlug && sessionId) {
+      const intakeUrl = new URL(buildOnboardingIntakeUrl({ slugOrId: enrollment.onboardingSlug }));
+      intakeUrl.searchParams.set("enrollment_session_id", sessionId);
+      window.location.assign(intakeUrl.toString());
       return;
     }
 
@@ -78,12 +88,12 @@ const ClientEnrollmentSuccess = () => {
           </div>
           <div className="space-y-2">
             <CardTitle className="text-3xl">
-              {cancelled ? "Checkout Canceled" : "Enrollment Payment Received"}
+              {cancelled ? "Checkout Canceled" : "Enrollment Payment Confirmed"}
             </CardTitle>
             <CardDescription>
               {cancelled
                 ? "No charge was completed. You can go back and try again whenever you're ready."
-                : "We're finalizing the client enrollment now."}
+                : "Your secure intake form is ready."}
             </CardDescription>
           </div>
         </CardHeader>
@@ -102,19 +112,14 @@ const ClientEnrollmentSuccess = () => {
           {!loading && !error && !cancelled && (
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 space-y-3">
               <p className="text-sm text-slate-700">
-                {enrollment?.client?.first_name || enrollment?.companyName
-                  ? `The enrollment has been completed successfully${enrollment?.client?.first_name ? ` for ${enrollment.client.first_name} ${enrollment.client.last_name || ""}` : ""}.`
-                  : "The enrollment has been completed successfully."}
+                Payment has been verified successfully. Continue to complete the secure intake form.
               </p>
-              {enrollment?.clientId && (
-                <p className="text-xs text-slate-500">Client ID: {enrollment.clientId}</p>
-              )}
             </div>
           )}
 
           <div className="flex flex-col gap-3">
             <Button onClick={handleContinue} className="w-full">
-              {cancelled ? "Return" : "Continue"}
+              {cancelled ? "Return" : "Continue to Intake Form"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             {sessionId && <div className="text-center text-xs text-slate-400">Session: {sessionId}</div>}

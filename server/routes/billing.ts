@@ -88,7 +88,7 @@ function getPortalBaseUrlForStripeContext(req: Request, context: SubscriptionStr
 
   return context === 'basic_plans'
     ? 'https://admin.tsmbasic.com'
-    : 'https://admin.thescoremachine.com';
+    : 'https://admin.thecapsol.com';
 }
 
 function getPlanPermissionPages(pagePermissions: any): string[] {
@@ -362,6 +362,18 @@ async function resolveAdminIdFromClientEnrollmentContext(req: any): Promise<numb
 
 async function getClientEnrollmentSettingsForBilling(adminId: number): Promise<{
   allowFreeEnrollment: boolean;
+  clientPlans: Array<{
+    id: number;
+    name: string;
+    description: string | null;
+    price: number;
+    billing_cycle: string;
+    stripe_monthly_price_id?: string | null;
+    stripe_yearly_price_id?: string | null;
+    stripe_product_id?: string | null;
+    features: string[];
+    page_permissions?: any;
+  }>;
   clientPlan: null | {
     id: number;
     name: string;
@@ -407,6 +419,7 @@ async function getClientEnrollmentSettingsForBilling(adminId: number): Promise<{
   if (allowFreeFromProfile || String(adminPlan?.client_registration_mode || '').toLowerCase() === 'free') {
     return {
       allowFreeEnrollment: true,
+      clientPlans: [],
       clientPlan: null,
       adminPlan: adminPlan ? {
         id: Number(adminPlan.id),
@@ -417,44 +430,40 @@ async function getClientEnrollmentSettingsForBilling(adminId: number): Promise<{
     };
   }
 
-  let clientPlan: any = null;
-  if (adminPlan?.default_client_plan_id) {
-    const planRows = await executeQuery<any[]>(
-      `SELECT id, name, price, billing_cycle, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions
-         FROM subscription_plans
-        WHERE id = ?
-          AND plan_category = 'client'
-          AND is_active = TRUE
-        LIMIT 1`,
-      [adminPlan.default_client_plan_id]
-    );
-    clientPlan = Array.isArray(planRows) && planRows.length > 0 ? planRows[0] : null;
-  }
-
-  if (!clientPlan) {
-    const defaultRows = await executeQuery<any[]>(
-      `SELECT id, name, price, billing_cycle, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions
-         FROM subscription_plans
-        WHERE plan_category = 'client'
-          AND is_active = TRUE
-        ORDER BY sort_order ASC, created_at ASC
-        LIMIT 1`
-    );
-    clientPlan = Array.isArray(defaultRows) && defaultRows.length > 0 ? defaultRows[0] : null;
-  }
+  const planRows = await executeQuery<any[]>(
+    `SELECT id, name, description, price, billing_cycle, features,
+            stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions
+      FROM subscription_plans
+      WHERE plan_category = 'client'
+        AND is_active = TRUE
+        AND billing_cycle IN ('monthly', 'yearly')
+      ORDER BY sort_order ASC, created_at ASC`
+  );
+  const clientPlans = (Array.isArray(planRows) ? planRows : []).map((plan: any) => ({
+    id: Number(plan.id),
+    name: String(plan.name || ''),
+    description: plan.description ? String(plan.description) : null,
+    price: Number(plan.price || 0),
+    billing_cycle: String(plan.billing_cycle || 'monthly'),
+    stripe_monthly_price_id: plan.stripe_monthly_price_id || null,
+    stripe_yearly_price_id: plan.stripe_yearly_price_id || null,
+    stripe_product_id: plan.stripe_product_id || null,
+    features: (() => {
+      try {
+        const parsed = typeof plan.features === 'string' ? JSON.parse(plan.features) : plan.features;
+        return Array.isArray(parsed) ? parsed.map((feature: any) => String(feature)) : [];
+      } catch {
+        return [];
+      }
+    })(),
+    page_permissions: plan.page_permissions || null,
+  }));
+  const clientPlan = clientPlans[0] || null;
 
   return {
     allowFreeEnrollment: false,
-    clientPlan: clientPlan ? {
-      id: Number(clientPlan.id),
-      name: String(clientPlan.name || ''),
-      price: Number(clientPlan.price || 0),
-      billing_cycle: String(clientPlan.billing_cycle || 'monthly'),
-      stripe_monthly_price_id: clientPlan.stripe_monthly_price_id || null,
-      stripe_yearly_price_id: clientPlan.stripe_yearly_price_id || null,
-      stripe_product_id: clientPlan.stripe_product_id || null,
-      page_permissions: clientPlan.page_permissions || null,
-    } : null,
+    clientPlans,
+    clientPlan,
     adminPlan: adminPlan ? {
       id: Number(adminPlan.id),
       name: String(adminPlan.name || ''),
@@ -470,7 +479,156 @@ function buildClientEnrollmentBaseUrl(req: Request) {
   return `${protocol}://${host}`;
 }
 
+router.get('/client-enrollment-options', authenticateToken, async (req: any, res) => {
+  try {
+    const adminId = await resolveAdminIdFromClientEnrollmentContext(req);
+    const enrollment = await getClientEnrollmentSettingsForBilling(adminId);
+
+    return res.json({
+      success: true,
+      enrollment: {
+        ...enrollment,
+        requiresPayment: !enrollment.allowFreeEnrollment,
+      },
+    });
+  } catch (error: any) {
+    console.error('Failed to load client enrollment options:', error);
+    return res.status(500).json({
+      error: 'Unable to verify client enrollment requirements',
+      details: error?.message || 'Unknown error',
+    });
+  }
+});
+
+async function verifyClientEnrollmentCheckoutSessionPayment(sessionId: string) {
+  const { stripeClient, session } = await retrieveCheckoutSessionForSubscription(String(sessionId));
+  const metadata: any = session?.metadata || {};
+
+  if (!session || session.mode !== 'subscription' || metadata?.flow !== 'client_enrollment') {
+    throw new Error('Invalid client enrollment checkout session');
+  }
+
+  const enrollmentRequestId = Number(metadata?.enrollmentRequestId || 0);
+  const metadataAdminId = Number(metadata?.adminId || 0);
+  const metadataPlanId = Number(metadata?.planId || 0);
+  if (!enrollmentRequestId || !metadataAdminId || !metadataPlanId) {
+    throw new Error('Missing client enrollment metadata');
+  }
+
+  if (session.status !== 'complete' || !['paid', 'no_payment_required'].includes(String(session.payment_status || ''))) {
+    throw new Error('Client enrollment payment is not complete');
+  }
+
+  const stripeSubscriptionId = session.subscription ? String(session.subscription) : null;
+  const stripeCustomerId = session.customer ? String(session.customer) : null;
+  if (!stripeSubscriptionId) {
+    throw new Error('Client enrollment subscription is missing');
+  }
+
+  const stripeSubscription = await stripeClient.subscriptions.retrieve(stripeSubscriptionId);
+  if (!['active', 'trialing'].includes(String(stripeSubscription.status || ''))) {
+    throw new Error('Client enrollment subscription is not active');
+  }
+
+  const customerEmail = String(session.customer_details?.email || '').trim() || null;
+  const enrollment = await executeTransaction(async (connection) => {
+    const [requestRows] = await connection.execute(
+      `SELECT *
+         FROM client_enrollment_requests
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [enrollmentRequestId]
+    );
+    const request = Array.isArray(requestRows) ? requestRows[0] : null;
+    if (!request) {
+      throw new Error('Client enrollment request not found');
+    }
+    if (Number(request.admin_id) !== metadataAdminId || Number(request.plan_id) !== metadataPlanId) {
+      throw new Error('Client enrollment checkout does not match the enrollment request');
+    }
+    if (request.stripe_checkout_session_id && String(request.stripe_checkout_session_id) !== session.id) {
+      throw new Error('Client enrollment checkout session mismatch');
+    }
+
+    const requestPayload = (() => {
+      try {
+        return request.intake_payload ? JSON.parse(String(request.intake_payload)) : {};
+      } catch {
+        return {};
+      }
+    })();
+    const checkoutClientEmail = requestPayload?.payerType === 'admin' ? null : customerEmail;
+
+    if (String(request.status) !== 'completed') {
+      await connection.execute(
+        `UPDATE client_enrollment_requests
+            SET status = 'paid',
+                email = COALESCE(NULLIF(email, ''), ?),
+                stripe_checkout_session_id = ?,
+                stripe_subscription_id = ?,
+                stripe_customer_id = ?,
+                paid_at = COALESCE(paid_at, NOW()),
+                updated_at = NOW()
+          WHERE id = ?`,
+        [checkoutClientEmail, session.id, stripeSubscriptionId, stripeCustomerId, enrollmentRequestId]
+      );
+    }
+
+    return {
+      ...request,
+      email: request.email || checkoutClientEmail,
+      status: String(request.status) === 'completed' ? 'completed' : 'paid',
+    };
+  });
+
+  const adminRows = await executeQuery<any[]>(
+    `SELECT onboarding_slug, intake_redirect_url, intake_company_name, company_name
+       FROM users
+      WHERE id = ?
+      LIMIT 1`,
+    [metadataAdminId]
+  );
+  const planRows = await executeQuery<any[]>(
+    `SELECT id, name, description, price, billing_cycle, features
+       FROM subscription_plans
+      WHERE id = ? AND plan_category = 'client'
+      LIMIT 1`,
+    [metadataPlanId]
+  );
+  const admin = Array.isArray(adminRows) ? adminRows[0] : null;
+  const plan = Array.isArray(planRows) ? planRows[0] : null;
+  const payload = (() => {
+    try {
+      return enrollment.intake_payload ? JSON.parse(String(enrollment.intake_payload)) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  return {
+    sessionId: session.id,
+    enrollmentRequestId,
+    adminId: metadataAdminId,
+    planId: metadataPlanId,
+    status: enrollment.status,
+    canCompleteIntake: enrollment.status === 'paid',
+    customerEmail: enrollment.email || customerEmail,
+    stripeSubscriptionId,
+    stripeCustomerId,
+    onboardingSlug: admin?.onboarding_slug || null,
+    redirectUrl: admin?.intake_redirect_url || null,
+    companyName: admin?.intake_company_name || admin?.company_name || null,
+    plan: plan || null,
+    returnUrl: payload?.returnUrl || null,
+  };
+}
+
 async function finalizeClientEnrollmentCheckoutSession(sessionId: string) {
+  // Retained for compatibility with older internal references. Paid checkout now
+  // unlocks intake; it must never create a client before the intake is submitted.
+  return verifyClientEnrollmentCheckoutSessionPayment(sessionId);
+
   const { stripeClient, session } = await retrieveCheckoutSessionForSubscription(String(sessionId));
   const metadata: any = session?.metadata || {};
 
@@ -752,6 +910,18 @@ async function ensureBasicPlansStripeCustomersTable() {
   `);
 }
 
+async function stripeCustomerExists(stripeClient: Stripe, customerId: string) {
+  try {
+    const customer = await stripeClient.customers.retrieve(customerId);
+    return !customer.deleted;
+  } catch (error: any) {
+    if (error?.code === 'resource_missing') {
+      return false;
+    }
+    throw error;
+  }
+}
+
 async function getOrCreateCheckoutStripeCustomer(
   stripeClient: Stripe,
   context: SubscriptionStripeContext,
@@ -763,6 +933,9 @@ async function getOrCreateCheckoutStripeCustomer(
 
   if (context === 'default') {
     let customerId = userData.stripe_customer_id;
+    if (customerId && !(await stripeCustomerExists(stripeClient, String(customerId)))) {
+      customerId = null;
+    }
     if (!customerId) {
       const customer = await stripeClient.customers.create({
         email: userData.email,
@@ -785,7 +958,10 @@ async function getOrCreateCheckoutStripeCustomer(
     [userKind, userId]
   );
   if (Array.isArray(existingRows) && existingRows[0]?.stripe_customer_id) {
-    return String(existingRows[0].stripe_customer_id);
+    const existingCustomerId = String(existingRows[0].stripe_customer_id);
+    if (await stripeCustomerExists(stripeClient, existingCustomerId)) {
+      return existingCustomerId;
+    }
   }
 
   const customer = await stripeClient.customers.create({
@@ -824,18 +1000,15 @@ export async function initializeStripe() {
   try {
     console.log('🔧 Initializing Stripe...');
     const config = await getStripeConfig();
-    if (config && config.stripe_secret_key) {
+    const environmentSecretKey = String(process.env.STRIPE_SECRET_KEY || '').trim();
+    if (environmentSecretKey) {
+      console.log('✅ Using Stripe config from environment variables');
+      stripe = new Stripe(environmentSecretKey);
+    } else if (config && config.stripe_secret_key) {
       console.log('✅ Using Stripe config from database');
       stripe = new Stripe(config.stripe_secret_key);
     } else {
-      // Fallback to environment variables
-      const secretKey = process.env.STRIPE_SECRET_KEY;
-      if (secretKey) {
-        console.log('✅ Using Stripe config from environment variables');
-        stripe = new Stripe(secretKey);
-      } else {
-        console.error('❌ No Stripe configuration found in database or environment variables');
-      }
+      console.error('❌ No Stripe configuration found in environment variables or database');
     }
     
     if (stripe) {
@@ -880,6 +1053,9 @@ async function getOrCreateStripeCustomer(userId: number) {
   }
 
   let customerId = userRow.stripe_customer_id ? String(userRow.stripe_customer_id) : null;
+  if (customerId && !(await stripeCustomerExists(stripe, customerId))) {
+    customerId = null;
+  }
   if (!customerId) {
     const customer = await stripe.customers.create({
       email: String(userRow.email || ''),
@@ -1340,35 +1516,7 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
     let customerId = userData.stripe_customer_id;
     console.log('Existing customer ID:', customerId);
 
-    if (stripeContext === 'basic_plans') {
-      customerId = await getOrCreateCheckoutStripeCustomer(paymentStripe, stripeContext, userData, isAffiliate);
-    } else if (!customerId) {
-      console.log('🆕 Creating new Stripe customer...');
-      const customer = await paymentStripe.customers.create({
-        email: userData.email,
-        name: `${userData.first_name} ${userData.last_name}`,
-        metadata: {
-          userId: userId.toString()
-        }
-      });
-      customerId = customer.id;
-      console.log('✅ Stripe customer created:', customerId);
-      
-      // Update user/affiliate with Stripe customer ID
-      if (isAffiliate) {
-        await executeQuery(
-          'UPDATE affiliates SET stripe_customer_id = ? WHERE id = ?',
-          [customerId, userId]
-        );
-        console.log('💾 Updated affiliate with Stripe customer ID');
-      } else {
-        await executeQuery(
-          'UPDATE users SET stripe_customer_id = ? WHERE id = ?',
-          [customerId, userId]
-        );
-        console.log('💾 Updated user with Stripe customer ID');
-      }
-    }
+    customerId = await getOrCreateCheckoutStripeCustomer(paymentStripe, stripeContext, userData, isAffiliate);
     
     // Create payment intent
     console.log('💰 Creating payment intent with amount:', Math.round(amount * 100), 'cents');
@@ -1849,26 +1997,56 @@ router.post('/create-client-enrollment-checkout', optionalAuth, async (req: any,
     const adminId = await resolveAdminIdFromClientEnrollmentContext(req);
     const enrollmentSettings = await getClientEnrollmentSettingsForBilling(adminId);
 
-    if (enrollmentSettings.allowFreeEnrollment || !enrollmentSettings.clientPlan) {
+    if (enrollmentSettings.allowFreeEnrollment) {
       return res.status(400).json({
         error: 'Client enrollment payment is not required for this admin',
         code: 'CLIENT_PLAN_PAYMENT_NOT_REQUIRED',
       });
     }
 
-    const clientData = req.body?.clientData || {};
-    const source = String(req.body?.source || 'client_enrollment').trim() || 'client_enrollment';
-    const returnUrl = String(req.body?.returnUrl || '').trim() || null;
-    const email = String(clientData.email || '').trim();
-    const platformEmail = String(clientData.platform_email || email || '').trim();
-    const platform = String(clientData.platform || '').trim();
-
-    if (!email && !platformEmail) {
-      return res.status(400).json({ error: 'Client email is required to create enrollment checkout' });
+    if (enrollmentSettings.clientPlans.length === 0) {
+      return res.status(503).json({
+        error: 'No client enrollment plans are currently available',
+        code: 'CLIENT_PLANS_NOT_CONFIGURED',
+      });
     }
 
-    const plan = enrollmentSettings.clientPlan;
-    const stripeContext = getStripeContextForPlan(plan);
+    const clientData = req.body?.clientData || {};
+    const source = String(req.body?.source || 'client_enrollment').trim() || 'client_enrollment';
+    const enrollmentSource = req.user?.id ? 'admin_dashboard' : 'public_onboarding';
+    const returnUrl = String(req.body?.returnUrl || '').trim() || null;
+    if (returnUrl) {
+      let parsedReturnUrl: URL;
+      try {
+        parsedReturnUrl = new URL(returnUrl);
+      } catch {
+        return res.status(400).json({ error: 'Invalid client enrollment return URL' });
+      }
+      if (!['http:', 'https:'].includes(parsedReturnUrl.protocol)) {
+        return res.status(400).json({ error: 'Invalid client enrollment return URL' });
+      }
+      const requestOrigin = String(req.get('origin') || '').trim();
+      if (!req.user?.id && requestOrigin && parsedReturnUrl.origin !== requestOrigin) {
+        return res.status(400).json({ error: 'Client enrollment return URL must match the requesting site' });
+      }
+    }
+    const email = String(clientData.email || '').trim();
+    const payerType: 'client' | 'admin' = req.body?.payerType === 'admin' && req.user?.id ? 'admin' : 'client';
+    const payerEmail = payerType === 'admin'
+      ? String(req.user?.email || '').trim()
+      : email;
+    const requestedPlanId = Number(req.body?.planId || 0);
+    const plan = enrollmentSettings.clientPlans.find((candidate) => candidate.id === requestedPlanId)
+      || (!requestedPlanId && enrollmentSettings.clientPlans.length === 1 ? enrollmentSettings.clientPlans[0] : null);
+    if (!plan) {
+      return res.status(400).json({
+        error: 'Please select a valid client enrollment plan',
+        code: 'INVALID_CLIENT_PLAN',
+      });
+    }
+
+    // Client plans are global platform plans and always use the super-admin Stripe account.
+    const stripeContext: SubscriptionStripeContext = 'default';
     const checkoutStripe = await getStripeForSubscriptionContext(stripeContext);
 
     const billingCycle = String(plan.billing_cycle || 'monthly').toLowerCase() === 'yearly' ? 'yearly' : 'monthly';
@@ -1924,74 +2102,56 @@ router.post('/create-client-enrollment-checkout', optionalAuth, async (req: any,
     const payloadForStorage = {
       source,
       returnUrl,
+      payerType,
       actorUserId: req.user?.id ? Number(req.user.id) : adminId,
       clientData: {
         first_name: clientData.first_name || null,
         last_name: clientData.last_name || null,
         email: email || null,
         phone: clientData.phone || null,
-        address: clientData.address || null,
-        city: clientData.city || null,
-        state: clientData.state || null,
-        zip_code: clientData.zip_code || null,
-        ssn_last_four: clientData.ssn_last_four || clientData.ssnLast4 || null,
-        date_of_birth: clientData.date_of_birth || null,
-        employment_status: clientData.employment_status || null,
-        annual_income: clientData.annual_income || null,
-        status: clientData.status || 'active',
-        notes: clientData.notes || null,
-        platform: platform || null,
-        platform_email: platformEmail || null,
-        platform_password: clientData.platform_password || clientData.password || null,
       },
       token: req.body?.token || null,
       slug: req.body?.slug || null,
-      password: clientData.password || null,
-      ssnLast4: clientData.ssnLast4 || null,
     };
 
     const insertResult: any = await executeQuery(
       `INSERT INTO client_enrollment_requests
-         (admin_id, plan_id, source, status, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four, date_of_birth, employment_status, annual_income, platform, platform_email, platform_password, intake_payload)
-       VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (admin_id, plan_id, source, status, email, intake_payload)
+       VALUES (?, ?, ?, 'pending_payment', ?, ?)`,
       [
         adminId,
         plan.id,
-        source,
-        clientData.first_name || null,
-        clientData.last_name || null,
+        enrollmentSource,
         email || null,
-        clientData.phone || null,
-        clientData.address || null,
-        clientData.city || null,
-        clientData.state || null,
-        clientData.zip_code || null,
-        clientData.ssn_last_four || clientData.ssnLast4 || null,
-        clientData.date_of_birth || null,
-        clientData.employment_status || null,
-        clientData.annual_income || null,
-        platform || null,
-        platformEmail || null,
-        clientData.platform_password || clientData.password || null,
         JSON.stringify(payloadForStorage),
       ]
     );
 
     const enrollmentRequestId = Number(insertResult?.insertId || 0);
     const baseUrl = buildClientEnrollmentBaseUrl(req);
-    const successUrl = `${baseUrl}/client-enrollment/success?session_id={CHECKOUT_SESSION_ID}`;
-    const fallbackCancelUrl = returnUrl || `${baseUrl}/client-enrollment/success?cancelled=1`;
+    const appendReturnParameter = (url: string, parameter: string, value: string) => {
+      const hashIndex = url.indexOf('#');
+      const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
+      const withoutHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
+      return `${withoutHash}${withoutHash.includes('?') ? '&' : '?'}${parameter}=${value}${hash}`;
+    };
+    const successUrl = returnUrl
+      ? appendReturnParameter(returnUrl, 'enrollment_session_id', '{CHECKOUT_SESSION_ID}')
+      : `${baseUrl}/client-enrollment/success?session_id={CHECKOUT_SESSION_ID}`;
+    const fallbackCancelUrl = returnUrl
+      ? appendReturnParameter(returnUrl, 'enrollment_cancelled', '1')
+      : `${baseUrl}/client-enrollment/success?cancelled=1`;
 
-    const customerName = [clientData.first_name, clientData.last_name].filter(Boolean).join(' ').trim() || undefined;
     const session = await checkoutStripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: String(priceId), quantity: 1 }],
-      customer_email: email || platformEmail || undefined,
+      customer_email: payerEmail || undefined,
       success_url: successUrl,
       cancel_url: fallbackCancelUrl,
       metadata: {
         flow: 'client_enrollment',
         source,
+        payerType,
         adminId: String(adminId),
         planId: String(plan.id),
         enrollmentRequestId: String(enrollmentRequestId),
@@ -2001,11 +2161,11 @@ router.post('/create-client-enrollment-checkout', optionalAuth, async (req: any,
         metadata: {
           flow: 'client_enrollment',
           source,
+          payerType,
           adminId: String(adminId),
           planId: String(plan.id),
           enrollmentRequestId: String(enrollmentRequestId),
-          clientEmail: email || platformEmail || '',
-          clientName: customerName || '',
+          clientEmail: email || '',
           stripeContext,
         },
       },
@@ -2026,10 +2186,12 @@ router.post('/create-client-enrollment-checkout', optionalAuth, async (req: any,
       enrollment: {
         allowFreeEnrollment: false,
         clientPlan: plan,
+        clientPlans: enrollmentSettings.clientPlans,
         adminPlan: enrollmentSettings.adminPlan,
       },
     });
   } catch (error: any) {
+    console.error('❌ Error creating client enrollment checkout session:', error);
     const message = String(error?.message || 'Failed to create client enrollment checkout session');
     const status =
       message === 'Invalid intake token scope' ? 403 :
@@ -2827,7 +2989,7 @@ router.post('/finalize-client-enrollment-session', optionalAuth, async (req, res
       return res.status(400).json({ error: 'sessionId is required' });
     }
 
-    const result = await finalizeClientEnrollmentCheckoutSession(String(sessionId));
+    const result = await verifyClientEnrollmentCheckoutSessionPayment(String(sessionId));
     return res.json({
       success: true,
       enrollment: result,
@@ -2997,7 +3159,7 @@ router.post('/billing-portal', authenticateToken, async (req, res) => {
     if (!customerId) {
       return res.status(404).json({ error: 'Stripe customer not found for user' });
     }
-    const origin = req.get('origin') || 'https://thescoremachine.com';
+    const origin = req.get('origin') || 'https://thecapsol.com';
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/subscription`
@@ -3074,7 +3236,7 @@ router.get('/stripe-config', async (req, res) => {
     }
 
     const config = await getStripeConfig();
-    const publishableKey = config?.stripe_publishable_key || process.env.STRIPE_PUBLISHABLE_KEY;
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY || config?.stripe_publishable_key;
     
     res.json({
       success: true,
@@ -3096,7 +3258,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     const webhookStripe = await getStripeForSubscriptionContext(webhookContext);
     const endpointSecret = webhookContext === 'basic_plans'
       ? getBasicPlansStripeWebhookSecret()
-      : (config?.webhook_endpoint_secret || process.env.STRIPE_WEBHOOK_SECRET);
+      : (process.env.STRIPE_WEBHOOK_SECRET || config?.webhook_endpoint_secret);
     
     if (!webhookStripe || !endpointSecret) {
       return res.status(400).send('Webhook configuration missing');
@@ -3482,8 +3644,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const session = event.data.object as Stripe.Checkout.Session;
         try {
           if (session.metadata?.flow === 'client_enrollment') {
-            await finalizeClientEnrollmentCheckoutSession(String(session.id));
-            console.log('✅ Client enrollment finalized via webhook:', session.id);
+            await verifyClientEnrollmentCheckoutSessionPayment(String(session.id));
+            console.log('✅ Client enrollment payment verified via webhook:', session.id);
             break;
           }
 

@@ -11,7 +11,7 @@ export default function ZeroPercentInterestCreditCards() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>0% Interest Credit Cards: Promotional APRs & Readiness | Score Machine</title>
+        <title>0% Interest Credit Cards: Promotional APRs & Readiness | CapSol</title>
         <meta
           name="description"
           content="Learn about 0% interest credit cards and promotional APR offers for purchases or balance transfers. Use Score Machine to organize credit insights and create summaries for responsible reviews. No outcomes or approvals are guaranteed."

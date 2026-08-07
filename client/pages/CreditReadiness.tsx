@@ -11,7 +11,7 @@ export default function CreditReadiness() {
   return (
     <div className="min-h-screen bg-white">
       <Helmet>
-        <title>Credit Readiness Checklist & Insights | Score Machine</title>
+        <title>Credit Readiness Checklist & Insights | CapSol</title>
         <meta
           name="description"
           content="Review credit readiness with structured insights. Score Machine helps organize credit data, highlight indicators, and export summaries to support responsible decision making. No outcomes are guaranteed."

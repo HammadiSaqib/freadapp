@@ -6,15 +6,19 @@ export function isClientPlanPaymentRequired(error: any) {
 }
 
 export async function createClientEnrollmentCheckoutLink(options: {
-  clientData: Record<string, any>;
+  clientData?: Record<string, any>;
   token?: string;
   slug?: string;
+  planId?: number;
+  payerType?: "client" | "admin";
   source: string;
   returnUrl?: string;
 }) {
   const response = await billingApi.createClientEnrollmentCheckout({
     token: options.token,
     slug: options.slug,
+    planId: options.planId,
+    payerType: options.payerType,
     source: options.source,
     returnUrl: options.returnUrl || window.location.href,
     clientData: options.clientData,
@@ -29,9 +33,11 @@ export async function createClientEnrollmentCheckoutLink(options: {
 }
 
 export async function startClientEnrollmentCheckout(options: {
-  clientData: Record<string, any>;
+  clientData?: Record<string, any>;
   token?: string;
   slug?: string;
+  planId?: number;
+  payerType?: "client" | "admin";
   source: string;
   returnUrl?: string;
 }) {
@@ -41,9 +47,11 @@ export async function startClientEnrollmentCheckout(options: {
 }
 
 export async function copyClientEnrollmentCheckoutLink(options: {
-  clientData: Record<string, any>;
+  clientData?: Record<string, any>;
   token?: string;
   slug?: string;
+  planId?: number;
+  payerType?: "client" | "admin";
   source: string;
   returnUrl?: string;
 }) {

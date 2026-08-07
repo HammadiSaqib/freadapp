@@ -69,7 +69,7 @@ export default function FundingCalculator() {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <Helmet>
-        <title>Funding Calculator | Score Machine</title>
+        <title>Funding Calculator | CapSol</title>
         <meta
           name="description"
           content="Estimate monthly payments and total cost for a funding amount based on APR and term."
