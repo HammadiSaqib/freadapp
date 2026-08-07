@@ -4,7 +4,7 @@ import * as express from "express";
 
 async function startServer() {
   const { app, httpServer, websocketService } = await createServer();
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   const embedContentSecurityPolicy = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",
