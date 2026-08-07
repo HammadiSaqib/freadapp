@@ -32,6 +32,7 @@ type KycSubmission = {
   user_name: string;
   email: string;
   status: "not_started" | "pending" | "approved" | "failed" | "manual_review";
+  kyc_exempt?: boolean;
   kyc_required?: boolean;
   kyc_status?: string | null;
   admin_notes?: string | null;
@@ -161,6 +162,28 @@ export default function SuperAdminKycVerification() {
     }
   };
 
+  const handleToggleKyc = async (submission: KycSubmission, shouldExempt: boolean) => {
+    setActionLoading(submission.user_id);
+    try {
+      if (shouldExempt) {
+        await superAdminApi.disableUserKyc(submission.user_id);
+        toast({ title: "KYC disabled for this admin" });
+      } else {
+        await superAdminApi.enableUserKyc(submission.user_id);
+        toast({ title: "KYC enabled for this admin" });
+      }
+      await loadSubmissions();
+    } catch (error: any) {
+      toast({
+        title: shouldExempt ? "Unable to disable KYC" : "Unable to enable KYC",
+        description: error?.response?.data?.error || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleRequestResubmission = async () => {
     if (!selectedSubmission) {
       return;
@@ -260,6 +283,7 @@ export default function SuperAdminKycVerification() {
                   <TableHead>User</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>KYC Access</TableHead>
                   <TableHead>Admin Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -267,14 +291,14 @@ export default function SuperAdminKycVerification() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
                       <Loader2 className="mx-auto mb-2 h-4 w-4 animate-spin" />
                       Loading KYC submissions...
                     </TableCell>
                   </TableRow>
                 ) : submissions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
+                    <TableCell colSpan={6} className="py-8 text-center text-sm text-slate-500">
                       No KYC submissions found.
                     </TableCell>
                   </TableRow>
@@ -290,11 +314,21 @@ export default function SuperAdminKycVerification() {
                         {submission.status.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={submission.kyc_exempt
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "border-violet-200 bg-violet-50 text-violet-700"}
+                      >
+                        {submission.kyc_exempt ? "Exempt" : "Enabled"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="max-w-[280px] text-sm text-slate-600">
                       {submission.admin_notes || "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+                      <div className="flex flex-wrap justify-end gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -333,6 +367,15 @@ export default function SuperAdminKycVerification() {
                         >
                           {actionLoading === submission.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                           Manual Review
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void handleToggleKyc(submission, !submission.kyc_exempt)}
+                          disabled={actionLoading === submission.user_id}
+                        >
+                          {actionLoading === submission.user_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          {submission.kyc_exempt ? "Enable KYC" : "Exempt KYC"}
                         </Button>
                       </div>
                     </TableCell>

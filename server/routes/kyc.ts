@@ -14,6 +14,7 @@ import {
   KYC_SUPPORT_PHONE_LINK,
   logKycAuditEvent,
   markUserKycRequired,
+  setUserKycExempt,
 } from '../utils/kyc.js';
 
 const router = express.Router();
@@ -79,12 +80,16 @@ const effectiveKycStatusSql = `
 function toKycResponse(state: Awaited<ReturnType<typeof getUserKycState>>) {
   const user = state?.user;
   const latestVerification = state?.latestVerification;
-  const kycRequired = Number(user?.kyc_required || 0) === 1;
-  const status = String(user?.kyc_status || 'not_started');
+  const status = String(latestVerification?.status || user?.kyc_status || 'not_started');
+  const clientCount = Number(state?.clientCount || 0);
+  const kycExempt = Number(user?.kyc_exempt || 0) === 1;
+  const kycRequired = !kycExempt && (Number(user?.kyc_required || 0) === 1 || (clientCount >= 1 && status !== 'approved'));
 
   return {
     kyc_required: kycRequired,
+    kyc_exempt: kycExempt,
     kyc_status: status,
+    existing_client_count: clientCount,
     admin_notes: latestVerification?.admin_notes || null,
     reviewed_at: latestVerification?.reviewed_at || null,
     submitted_at: latestVerification?.created_at || null,
@@ -245,6 +250,7 @@ superAdminRouter.get('/', authenticateToken, requireSuperAdmin, async (req: Auth
          u.first_name,
          u.last_name,
          u.email,
+         u.kyc_exempt,
          u.kyc_required,
          u.kyc_status,
          reviewer.first_name AS reviewer_first_name,
@@ -276,6 +282,7 @@ superAdminRouter.get('/', authenticateToken, requireSuperAdmin, async (req: Auth
       submissions: Array.isArray(rows)
         ? rows.map((row) => ({
             ...row,
+            kyc_exempt: Number(row.kyc_exempt || 0) === 1,
             kyc_required: Number(row.kyc_required || 0) === 1,
             user_name: [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || row.email,
           }))
@@ -313,7 +320,7 @@ superAdminRouter.post('/users/:userId/disable', authenticateToken, requireSuperA
       return res.status(400).json({ error: 'KYC can only be disabled for admin users' });
     }
 
-    await markUserKycRequired(userId, false, 'not_started');
+    await setUserKycExempt(userId, true, 'not_started');
 
     return res.json({
       success: true,
@@ -322,6 +329,55 @@ superAdminRouter.post('/users/:userId/disable', authenticateToken, requireSuperA
   } catch (error: any) {
     console.error('Failed to disable KYC:', error);
     return res.status(500).json({ error: 'Failed to disable KYC' });
+  }
+});
+
+superAdminRouter.post('/users/:userId/enable', authenticateToken, requireSuperAdmin, async (req: AuthRequest, res: Response) => {
+  try {
+    await ensureKycSchema();
+
+    const userId = Number(req.params.userId || 0);
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid user id' });
+    }
+
+    const users = await executeQuery<any[]>(
+      `SELECT u.id, u.role,
+              COALESCE(kv.status, u.kyc_status, 'not_started') AS effective_status
+       FROM users u
+       LEFT JOIN (
+         SELECT user_id, MAX(id) AS latest_id
+         FROM kyc_verifications
+         GROUP BY user_id
+       ) latest ON latest.user_id = u.id
+       LEFT JOIN kyc_verifications kv ON kv.id = latest.latest_id
+       WHERE u.id = ?
+       LIMIT 1`,
+      [userId],
+    );
+
+    const user = Array.isArray(users) && users.length > 0 ? users[0] : null;
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (String(user.role || '').toLowerCase() !== 'admin') {
+      return res.status(400).json({ error: 'KYC can only be enabled for admin users' });
+    }
+
+    const nextStatus = String(user.effective_status || 'not_started') === 'approved'
+      ? 'approved'
+      : 'not_started';
+
+    await setUserKycExempt(userId, false, nextStatus as any);
+
+    return res.json({
+      success: true,
+      message: 'KYC enabled for this admin successfully.',
+    });
+  } catch (error: any) {
+    console.error('Failed to enable KYC:', error);
+    return res.status(500).json({ error: 'Failed to enable KYC' });
   }
 });
 

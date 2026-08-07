@@ -2957,7 +2957,18 @@ export default function Dashboard() {
 
       {/* Add New Client Dialog */}
         <Dialog open={isAddClientOpen} onOpenChange={handleAddClientDialogChange}>
-        <DialogContent style={{ zIndex: 12001 }} className="max-h-[90vh] max-w-2xl overflow-y-auto border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100">
+        <DialogContent
+          style={{
+            zIndex: 12001,
+            position: "fixed",
+            left: "50vw",
+            top: "50vh",
+            transform: "translate(-50%, -50%)",
+            maxHeight: "calc(100vh - 2rem)",
+            animation: "none",
+          }}
+          className="max-w-2xl overflow-y-auto border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
+        >
           <DialogHeader>
             <DialogTitle className="gradient-text-primary">
               Add New Client

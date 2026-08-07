@@ -838,6 +838,7 @@ export const superAdminApi = {
   moveKycToManualReview: (id: string | number, data?: { admin_notes?: string }) =>
     api.post(`/api/super-admin/kyc/${id}/manual-review`, data || {}),
   disableUserKyc: (userId: string | number) => api.post(`/api/super-admin/kyc/users/${userId}/disable`),
+  enableUserKyc: (userId: string | number) => api.post(`/api/super-admin/kyc/users/${userId}/enable`),
   getInvitations: (params?: { page?: number; limit?: number }) =>
     api.get('/api/super-admin/invitations', { params }),
   sendInvitation: (data: { email: string; role: string }) =>

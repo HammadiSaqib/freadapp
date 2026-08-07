@@ -74,8 +74,16 @@ export async function ensureKycSchema() {
        ADD COLUMN kyc_status VARCHAR(32) NOT NULL DEFAULT 'not_started'`,
     );
   }
+  const hasKycExempt = await columnExists('users', 'kyc_exempt');
+  if (!hasKycExempt) {
+    await executeQuery(
+      `ALTER TABLE users
+       ADD COLUMN kyc_exempt TINYINT(1) NOT NULL DEFAULT 0`,
+    );
+  }
   await executeQuery(`ALTER TABLE users MODIFY COLUMN kyc_required TINYINT(1) NOT NULL DEFAULT 0`);
   await executeQuery(`ALTER TABLE users MODIFY COLUMN kyc_status VARCHAR(32) NOT NULL DEFAULT 'not_started'`);
+  await executeQuery(`ALTER TABLE users MODIFY COLUMN kyc_exempt TINYINT(1) NOT NULL DEFAULT 0`);
 
   await executeQuery(`
     CREATE TABLE IF NOT EXISTS kyc_verifications (
@@ -141,6 +149,7 @@ export async function ensureKycSchema() {
   await executeQuery(
     `UPDATE users
      SET kyc_required = COALESCE(kyc_required, 0),
+         kyc_exempt = COALESCE(kyc_exempt, 0),
          kyc_status = CASE
            WHEN kyc_status = 'approved' THEN 'approved'
            WHEN kyc_status IN ('resubmit_required', 'rejected') THEN 'failed'
@@ -148,6 +157,7 @@ export async function ensureKycSchema() {
            ELSE 'not_started'
          END
      WHERE kyc_required IS NULL
+        OR kyc_exempt IS NULL
         OR kyc_status IS NULL
         OR kyc_status = ''
         OR kyc_status IN ('not_required', 'not_submitted', 'resubmit_required', 'rejected')`,
@@ -166,25 +176,28 @@ export async function ensureKycSchema() {
   // future features that may insert a client without calling the application
   // guard. Locking the owner row also serializes simultaneous first-client
   // requests so two parallel calls cannot both bypass the one-profile limit.
-  if (!(await triggerExists('before_clients_insert_require_kyc'))) {
-    await executeQuery(`
-      CREATE TRIGGER before_clients_insert_require_kyc
-      BEFORE INSERT ON clients
-      FOR EACH ROW
-      BEGIN
-        DECLARE owner_kyc_status VARCHAR(32) DEFAULT 'not_started';
-        DECLARE existing_client_count INT DEFAULT 0;
-        SELECT COALESCE(kyc_status, 'not_started') INTO owner_kyc_status
-          FROM users WHERE id = NEW.user_id FOR UPDATE;
-        IF owner_kyc_status <> 'approved' THEN
-          SELECT COUNT(*) INTO existing_client_count FROM clients WHERE user_id = NEW.user_id;
-          IF existing_client_count >= 1 THEN
-            SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'KYC_REQUIRED';
-          END IF;
-        END IF;
-      END
-    `);
+  if (await triggerExists('before_clients_insert_require_kyc')) {
+    await executeQuery(`DROP TRIGGER IF EXISTS before_clients_insert_require_kyc`);
   }
+  await executeQuery(`
+    CREATE TRIGGER before_clients_insert_require_kyc
+    BEFORE INSERT ON clients
+    FOR EACH ROW
+    BEGIN
+      DECLARE owner_kyc_status VARCHAR(32) DEFAULT 'not_started';
+      DECLARE owner_kyc_exempt TINYINT(1) DEFAULT 0;
+      DECLARE existing_client_count INT DEFAULT 0;
+      SELECT COALESCE(kyc_status, 'not_started'), COALESCE(kyc_exempt, 0)
+        INTO owner_kyc_status, owner_kyc_exempt
+        FROM users WHERE id = NEW.user_id FOR UPDATE;
+      IF owner_kyc_exempt <> 1 AND owner_kyc_status <> 'approved' THEN
+        SELECT COUNT(*) INTO existing_client_count FROM clients WHERE user_id = NEW.user_id;
+        IF existing_client_count >= 1 THEN
+          SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'KYC_REQUIRED';
+        END IF;
+      END IF;
+    END
+  `);
 
   ensuredSchema = true;
 }
@@ -193,7 +206,7 @@ export async function getUserKycState(userId: number) {
   await ensureKycSchema();
 
   const users = await executeQuery<any[]>(
-    `SELECT id, email, first_name, last_name, role, kyc_required, kyc_status
+    `SELECT id, email, first_name, last_name, role, kyc_required, kyc_status, kyc_exempt
      FROM users
      WHERE id = ?
      LIMIT 1`,
@@ -205,6 +218,12 @@ export async function getUserKycState(userId: number) {
   }
 
   const user = users[0];
+  const clientRows = await executeQuery<any[]>(
+    `SELECT COUNT(*) AS client_count
+     FROM clients
+     WHERE user_id = ?`,
+    [userId],
+  );
   const latestRows = await executeQuery<any[]>(
     `SELECT id, user_id, image_url, status, admin_notes, reviewed_by, reviewed_at,
             provider_reference_id, triggered_at, started_at, completed_at, created_at, updated_at
@@ -217,6 +236,7 @@ export async function getUserKycState(userId: number) {
 
   return {
     user,
+    clientCount: Number(clientRows?.[0]?.client_count || 0),
     latestVerification: Array.isArray(latestRows) && latestRows.length > 0 ? latestRows[0] : null,
   };
 }
@@ -228,6 +248,19 @@ export async function markUserKycRequired(userId: number, required: boolean, sta
      SET kyc_required = ?, kyc_status = ?, updated_at = NOW()
      WHERE id = ?`,
     [required ? 1 : 0, status, userId],
+  );
+}
+
+export async function setUserKycExempt(userId: number, exempt: boolean, status?: KycClientStatus) {
+  await ensureKycSchema();
+  await executeQuery(
+    `UPDATE users
+     SET kyc_exempt = ?,
+         kyc_required = ?,
+         kyc_status = COALESCE(?, kyc_status),
+         updated_at = NOW()
+     WHERE id = ?`,
+    [exempt ? 1 : 0, exempt ? 0 : 1, status || null, userId],
   );
 }
 
@@ -269,12 +302,12 @@ export async function checkClientCreationKyc(input: {
   await ensureKycSchema();
 
   const rows = await executeQuery<any[]>(
-    `SELECT u.kyc_status, COUNT(c.id) AS client_count,
+    `SELECT u.kyc_status, COALESCE(u.kyc_exempt, 0) AS kyc_exempt, COUNT(c.id) AS client_count,
             (SELECT kv.id FROM kyc_verifications kv WHERE kv.user_id = u.id ORDER BY kv.id DESC LIMIT 1) AS verification_id
      FROM users u
      LEFT JOIN clients c ON c.user_id = u.id
      WHERE u.id = ?
-     GROUP BY u.id, u.kyc_status
+     GROUP BY u.id, u.kyc_status, u.kyc_exempt
      LIMIT 1`,
     [input.userId],
   );
@@ -284,8 +317,9 @@ export async function checkClientCreationKyc(input: {
   }
 
   const status = String(row.kyc_status || 'not_started') as KycClientStatus;
+  const exempt = Number(row.kyc_exempt || 0) === 1;
   const clientCount = Number(row.client_count || 0);
-  if (status === 'approved' || clientCount === 0) {
+  if (exempt || status === 'approved' || clientCount === 0) {
     return { allowed: true, code: 'KYC_OK', status, clientCount };
   }
 

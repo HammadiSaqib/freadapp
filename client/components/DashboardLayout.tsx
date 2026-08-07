@@ -161,12 +161,7 @@ export default function DashboardLayout({
   };
 
   const handleLayoutAddClient = () => {
-    if (isEliteActive || !onAddClient) {
-      setIsSharedAddClientOpen(true);
-      return;
-    }
-
-    onAddClient();
+    setIsSharedAddClientOpen(true);
   };
 
   if (isBasicAdminPortalUser && !isEliteActive) {

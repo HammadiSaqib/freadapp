@@ -104,7 +104,8 @@ export default function ReportPullFeedbackHost() {
     <>
       <Dialog open={Boolean(loadingState)}>
         <DialogContent
-          className="overflow-hidden border-0 bg-transparent p-0 shadow-none sm:max-w-2xl [&>button]:hidden"
+          style={{ zIndex: 13001 }}
+          className="left-0 top-0 flex h-screen w-screen max-h-none max-w-none translate-x-0 translate-y-0 items-center justify-center overflow-hidden border-0 bg-black/70 p-6 shadow-none sm:max-w-none [&>button]:hidden"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onInteractOutside={(event) => event.preventDefault()}
         >
@@ -165,7 +166,10 @@ export default function ReportPullFeedbackHost() {
       </Dialog>
 
       <Dialog open={Boolean(errorState)} onOpenChange={(open) => !open && setErrorState(null)}>
-        <DialogContent className="overflow-hidden border-0 bg-transparent p-0 shadow-none sm:max-w-xl">
+        <DialogContent
+          style={{ zIndex: 13001 }}
+          className="overflow-hidden border-0 bg-transparent p-0 shadow-none sm:max-w-xl"
+        >
           <div className="relative overflow-hidden rounded-[28px] border border-rose-200/70 bg-white shadow-[0_24px_90px_rgba(15,23,42,0.18)]">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(251,113,133,0.22),_transparent_45%),linear-gradient(180deg,_rgba(255,255,255,0.98),_rgba(255,255,255,1))]" />
             <div className="relative p-8 sm:p-9">

@@ -159,7 +159,18 @@ export default function PaidClientEnrollmentDialog({ open, onOpenChange, request
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent style={{ zIndex: 12001 }} className="max-h-[90vh] overflow-y-auto border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:max-w-3xl">
+      <DialogContent
+        style={{
+          zIndex: 12001,
+          position: "fixed",
+          left: "50vw",
+          top: "50vh",
+          transform: "translate(-50%, -50%)",
+          maxHeight: "calc(100vh - 2rem)",
+          animation: "none",
+        }}
+        className="overflow-y-auto border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:max-w-3xl"
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-2xl">
             <CreditCard className="h-6 w-6 text-emerald-600" />

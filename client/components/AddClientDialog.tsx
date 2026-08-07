@@ -785,8 +785,16 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
     <>
     <Dialog open={isOpen && isEnrollmentApproved && !isCheckingEnrollment} onOpenChange={(open) => { if (!open) handleClose(); }}>
       <DialogContent
-        style={{ zIndex: 12001 }}
-        className={`relative border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:max-w-md ${isEliteActive ? "border-0 dark:border dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] rounded-3xl overflow-hidden p-0 gap-0 elite-nested-wrapper" : ""}`}
+        style={{
+          zIndex: 12001,
+          position: "fixed",
+          left: "50vw",
+          top: "50vh",
+          transform: "translate(-50%, -50%)",
+          maxHeight: "calc(100vh - 2rem)",
+          animation: "none",
+        }}
+        className={`relative overflow-y-auto overflow-x-hidden border-slate-200 bg-white text-slate-950 shadow-2xl dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 sm:max-w-md ${isEliteActive ? "border-0 dark:border dark:border-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_-15px_rgba(2,6,23,0.7)] rounded-3xl p-0 gap-0 elite-nested-wrapper" : ""}`}
       >
         {isEliteActive && (
           <style dangerouslySetInnerHTML={{__html: `
