@@ -30,6 +30,7 @@ const publicLocalhostOrigins = [
 const trustedProductionBaseDomains = [
   'thescoremachine.com',
   'tsmbasic.com',
+  'thecapsol.com',
 ] as const;
 
 function isTrustedProductionOrigin(origin: string) {

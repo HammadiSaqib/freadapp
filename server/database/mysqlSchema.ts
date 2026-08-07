@@ -10,6 +10,7 @@ import { SecurityLogger } from '../utils/securityLogger.js';
 import { initializeSuperAdminDatabase } from './superAdminSchema.js';
 import { seedAffiliateData } from './seedAffiliateData.js';
 import { ENV_CONFIG } from '../config/environment.js';
+import { getForeignKeyCleanupSql, isRecoverableForeignKeyError } from './foreignKeyUtils.js';
 
 const securityLogger = new SecurityLogger();
 
@@ -2576,7 +2577,31 @@ async function createMySQLTables(): Promise<void> {
     );
   }
   if (integrationLogConstraintAlters.length > 0) {
-    await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
+    try {
+      await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
+    } catch (error: any) {
+      if (isRecoverableForeignKeyError(error)) {
+        console.warn('⚠️  Encountered legacy foreign-key issue while applying integration activity constraints; attempting cleanup before retrying.');
+        try {
+          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'admin_id', 'users', false));
+        } catch (cleanupError: any) {
+          console.warn('⚠️  Failed to clean integration_activity_logs.admin_id references:', cleanupError.message);
+        }
+        try {
+          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'client_id', 'clients', true));
+        } catch (cleanupError: any) {
+          console.warn('⚠️  Failed to clean integration_activity_logs.client_id references:', cleanupError.message);
+        }
+        try {
+          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'integration_id', 'admin_integrations', false));
+        } catch (cleanupError: any) {
+          console.warn('⚠️  Failed to clean integration_activity_logs.integration_id references:', cleanupError.message);
+        }
+        await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
+      } else {
+        throw error;
+      }
+    }
   }
   
   console.log('✅ MySQL tables created successfully');

@@ -11,7 +11,7 @@ export function resolveApiBaseUrl() {
 
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname.toLowerCase();
-    const trustedProductionBaseDomains = ['thescoremachine.com', 'tsmbasic.com'];
+    const trustedProductionBaseDomains = ['thescoremachine.com', 'tsmbasic.com', 'thecapsol.com'];
     const isTrustedProductionHostname = trustedProductionBaseDomains.some(
       (domain) => hostname === domain || hostname === `www.${domain}` || hostname.endsWith(`.${domain}`),
     );

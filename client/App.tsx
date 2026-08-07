@@ -277,6 +277,7 @@ type AppProps = {
   routerProps?: Record<string, unknown>;
   helmetContext?: object;
   blogSsrData?: BlogSsrData;
+  requestHostname?: string;
 };
 
 const { Helmet, HelmetProvider } = helmetPkg as typeof import("react-helmet-async");
@@ -1121,20 +1122,23 @@ function renderPortalAliasRoutes(alias: NonAdminPortalAlias) {
   );
 }
 
-function PublicHostRootRoute() {
-  if (typeof window === "undefined") {
-    return <Index />;
+function PublicHostRootRoute({ hostname }: { hostname?: string }) {
+  const resolvedHostname =
+    hostname ?? (typeof window !== "undefined" ? window.location.hostname : "");
+  const portalAlias = resolvedHostname ? getHostAlias(resolvedHostname) : null;
+  const publicAlias = resolvedHostname ? getPublicHostAlias(resolvedHostname) : null;
+
+  if (portalAlias === "admin") {
+    return <Navigate to="/dashboard" replace />;
   }
 
-  return getPublicHostAlias(window.location.hostname) === "onboarding" ? <ClientIntake /> : <Index />;
+  return publicAlias === "onboarding" ? <ClientIntake /> : <Index />;
 }
 
-function DynamicPublicHostRoute() {
-  if (typeof window === "undefined") {
-    return <NotFound />;
-  }
-
-  const publicAlias = getPublicHostAlias(window.location.hostname);
+function DynamicPublicHostRoute({ hostname }: { hostname?: string }) {
+  const resolvedHostname =
+    hostname ?? (typeof window !== "undefined" ? window.location.hostname : "");
+  const publicAlias = resolvedHostname ? getPublicHostAlias(resolvedHostname) : null;
 
   if (publicAlias === "ref") {
     return <ReferralLandingPage />;
@@ -1157,10 +1161,11 @@ function FundingDIYRoute() {
   return isEliteActive ? <EliteFundingDIY /> : <StandardFundingDIY />;
 }
 
-const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
+const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname }: AppProps) => {
   const Router = router ?? BrowserRouter;
-  const hostAlias =
-    typeof window !== "undefined" ? getHostAlias(window.location.hostname) : null;
+  const resolvedHostname =
+    typeof window !== "undefined" ? window.location.hostname : (requestHostname ?? "");
+  const hostAlias = resolvedHostname ? getHostAlias(resolvedHostname) : null;
   const shouldUsePortalAliasRouter = hostAlias !== null && hostAlias !== "admin";
   useEffect(() => {
     if (!gaMeasurementId) return;
@@ -1230,7 +1235,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             renderPortalAliasRoutes(hostAlias as NonAdminPortalAlias)
           ) : (
             <>
-          <Route path="/" element={<PublicHostRootRoute />} />
+          <Route path="/" element={<PublicHostRootRoute hostname={requestHostname} />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/pricing/embed" element={<Pricing embed />} />
           <Route path="/shop" element={<Shop />} />
@@ -2088,7 +2093,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
           <Route path="/book-appointment" element={<BookAppointment />} />
           <Route path="/contact/embed" element={<Contact embed />} />
           <Route path="/ref/:affiliateId" element={<ReferralLandingPage />} />
-          <Route path="/:publicId" element={<DynamicPublicHostRoute />} />
+          <Route path="/:publicId" element={<DynamicPublicHostRoute hostname={requestHostname} />} />
           <Route path="/invoice/:token" element={<InvoiceView />} />
           
           {/* Member Routes */}

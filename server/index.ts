@@ -233,6 +233,7 @@ const publicLocalhostOrigins = [
 const trustedProductionBaseDomains = [
   'thescoremachine.com',
   'tsmbasic.com',
+  'thecapsol.com',
 ] as const;
 
 const defaultCorsOrigins = [
@@ -248,6 +249,9 @@ const defaultCorsOrigins = [
   'https://api.tsmbasic.com',
   'https://tsmbasic.com',
   'https://www.tsmbasic.com',
+  'https://api.thecapsol.com',
+  'https://thecapsol.com',
+  'https://www.thecapsol.com',
 ];
 
 const envCorsOrigins = (process.env.CORS_ORIGIN || "")
@@ -516,7 +520,7 @@ export async function createServer(vite?: ViteDevServer) {
         template = await vite.transformIndexHtml(req.originalUrl, template);
       }
 
-      let render: (url: string, blogSsrData: any) => Promise<{ appHtml: string; headTags: string }>;
+      let render: (url: string, blogSsrData: any, requestHostname?: string) => Promise<{ appHtml: string; headTags: string }>;
       if (vite) {
         const mod = await vite.ssrLoadModule("/client/entry-server.tsx");
         render = mod.render;
@@ -531,7 +535,7 @@ export async function createServer(vite?: ViteDevServer) {
         render = mod.render;
       }
 
-      const { appHtml, headTags } = await render(req.originalUrl, null);
+      const { appHtml, headTags } = await render(req.originalUrl, null, req.get("host") || req.hostname);
       const html = template
         .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`)
         .replace("</head>", `${headTags}</head>`);
@@ -563,7 +567,7 @@ export async function createServer(vite?: ViteDevServer) {
         template = await vite.transformIndexHtml(req.originalUrl, template);
       }
 
-      let render: (url: string, blogSsrData: any) => Promise<{ appHtml: string; headTags: string }>;
+      let render: (url: string, blogSsrData: any, requestHostname?: string) => Promise<{ appHtml: string; headTags: string }>;
       if (vite) {
         const mod = await vite.ssrLoadModule("/client/entry-server.tsx");
         render = mod.render;
@@ -573,7 +577,7 @@ export async function createServer(vite?: ViteDevServer) {
         render = mod.render;
       }
 
-      const { appHtml, headTags } = await render(req.originalUrl, blogSsrData);
+      const { appHtml, headTags } = await render(req.originalUrl, blogSsrData, req.get("host") || req.hostname);
       const serializedData = JSON.stringify(blogSsrData).replace(/</g, "\\u003c");
       const html = template
         .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`)

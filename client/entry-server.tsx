@@ -4,7 +4,11 @@ import { StaticRouter } from "react-router-dom/server";
 import App from "./App";
 import { BlogSsrData } from "./contexts/BlogSsrContext";
 
-export async function render(url: string, blogSsrData: BlogSsrData) {
+export async function render(
+  url: string,
+  blogSsrData: BlogSsrData,
+  requestHostname?: string,
+) {
   const helmetContext: { helmet?: any } = {};
   const appHtml = renderToString(
     <App
@@ -12,6 +16,7 @@ export async function render(url: string, blogSsrData: BlogSsrData) {
       routerProps={{ location: url }}
       helmetContext={helmetContext}
       blogSsrData={blogSsrData ?? null}
+      requestHostname={requestHostname}
     />,
   );
 
