@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "scoremachine-api",
+      name: "thecapsol-api",
       // Run the built server bundle (run `npm run build` first)
       script: "dist/server/production.mjs",
       instances: 1,

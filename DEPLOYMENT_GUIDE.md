@@ -72,13 +72,13 @@ node vps-database-migration.cjs
 ### Step 4: Restart PM2 Process
 On the VPS, restart the application:
 ```bash
-pm2 restart scoremachine-api
-pm2 logs scoremachine-api --lines 50
+pm2 restart thecapsol-api
+pm2 logs thecapsol-api --lines 50
 ```
 
 ### Step 5: Verify Deployment
 1. Check PM2 status: `pm2 status`
-2. Monitor logs: `pm2 logs scoremachine-api`
+2. Monitor logs: `pm2 logs thecapsol-api`
 3. Test API endpoints that use groups functionality
 4. Verify no SQL syntax errors in logs
 5. Confirm database connection is successful
@@ -102,9 +102,9 @@ pm2 logs scoremachine-api --lines 50
 If issues occur:
 
 ### Application Rollback:
-1. Stop the application: `pm2 stop scoremachine-api`
+1. Stop the application: `pm2 stop thecapsol-api`
 2. Restore previous version from backup
-3. Restart: `pm2 start scoremachine-api`
+3. Restart: `pm2 start thecapsol-api`
 
 ### Database Rollback:
 1. The migration script creates automatic backups
@@ -146,7 +146,7 @@ After deployment, test:
 5. Review migration logs for specific errors
 
 ### If Application Won't Start:
-1. Check PM2 logs: `pm2 logs scoremachine-api`
+1. Check PM2 logs: `pm2 logs thecapsol-api`
 
 ## Domain & SSL Deployment (Nginx + PM2)
 
@@ -176,7 +176,7 @@ cd /root/ScoreMachineV2RawCode
 git pull origin master
 npm ci
 npm run build
-pm2 start ecosystem.config.cjs --name scoremachine-api
+pm2 start ecosystem.config.cjs --name thecapsol-api
 pm2 save
 pm2 status
 ```
@@ -338,7 +338,7 @@ sudo certbot --nginx \
 - If `TokenExpiredError` appears, clear browser storage (localStorage/sessionStorage) and login again.
 
 ### 8) Logs and Monitoring
-- App logs: `pm2 logs scoremachine-api --lines 100`
+- App logs: `pm2 logs thecapsol-api --lines 100`
 - Nginx: `sudo tail -n 100 /var/log/nginx/access.log /var/log/nginx/error.log`
 
 ### Common Pitfalls
