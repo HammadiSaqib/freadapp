@@ -80,9 +80,10 @@ router.get('/pricing', async (req, res) => {
     }
 
     const planRows = await executeQuery(
-      `SELECT id, name, description, price, billing_cycle, features, page_permissions, sort_order, max_users, max_clients, max_disputes
+      `SELECT id, name, description, price, billing_cycle, features, page_permissions, sort_order, max_users, max_clients, max_disputes, plan_category
        FROM subscription_plans
        WHERE is_active = 1
+         AND COALESCE(plan_category, 'admin') = 'admin'
        ORDER BY sort_order ASC, price ASC`,
       []
     );

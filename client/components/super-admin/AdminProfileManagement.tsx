@@ -78,6 +78,7 @@ interface AdminProfile {
   send_dispute_letter_email?: boolean | number;
   send_inactivity_email?: boolean | number;
   send_report_pull_reminder_email?: boolean | number;
+  allow_free_client_enrollment?: boolean | number;
 }
 
 interface AffiliateOption {
@@ -99,6 +100,7 @@ interface AdminFormData {
   sendDisputeLetterEmail: boolean;
   sendInactivityEmail: boolean;
   sendReportPullReminderEmail: boolean;
+  allowFreeClientEnrollment: boolean;
 }
 
 interface PlanOption {
@@ -381,7 +383,9 @@ const normalizeAdminProfile = (admin: AdminProfile): AdminProfile => ({
   send_inactivity_email: admin.send_inactivity_email !== false
     && Number(admin.send_inactivity_email ?? 1) !== 0,
   send_report_pull_reminder_email: admin.send_report_pull_reminder_email !== false
-    && Number(admin.send_report_pull_reminder_email ?? 1) !== 0
+    && Number(admin.send_report_pull_reminder_email ?? 1) !== 0,
+  allow_free_client_enrollment: admin.allow_free_client_enrollment !== false
+    && Number(admin.allow_free_client_enrollment ?? 0) !== 0
 });
 
 const normalizePlanStatus = (status?: string | null): string => {
@@ -395,8 +399,17 @@ const normalizePlanStatus = (status?: string | null): string => {
 
 const getAdminDisplayStatus = (admin: AdminProfile): string => {
   const accountStatus = String(admin.status || '').trim().toLowerCase();
+  const permissions = normalizePermissions(admin.permissions);
+  const isSubscriptionExempt =
+    (admin.allow_free_client_enrollment !== false && Number(admin.allow_free_client_enrollment ?? 0) !== 0)
+    || permissions.includes('subscription_exempt')
+    || permissions.includes('no_subscription_required');
 
   const planStatus = normalizePlanStatus(admin.plan_status);
+  if (planStatus === 'exempt' || isSubscriptionExempt) {
+    return accountStatus === 'inactive' || accountStatus === 'suspended' ? accountStatus : 'active';
+  }
+
   if (planStatus === 'canceled' || planStatus === 'expired') {
     return planStatus;
   }
@@ -653,6 +666,21 @@ const AdminForm = React.memo(({
           onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, sendReportPullReminderEmail: checked }))}
         />
       </div>
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-4">
+        <div className="space-y-1">
+          <Label htmlFor="admin-free-client-enrollment" className="text-sm font-medium">
+            Allow free client enrollment for this admin
+          </Label>
+          <p className="text-xs font-normal text-gray-500">
+            When enabled, this admin can add clients without charging the client plan fee from onboarding or inside their CRM.
+          </p>
+        </div>
+        <Switch
+          id="admin-free-client-enrollment"
+          checked={formData.allowFreeClientEnrollment}
+          onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, allowFreeClientEnrollment: checked }))}
+        />
+      </div>
     </div>
 
     {/* Permissions */}
@@ -795,7 +823,8 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
     password: '',
     sendDisputeLetterEmail: true,
     sendInactivityEmail: true,
-    sendReportPullReminderEmail: true
+    sendReportPullReminderEmail: true,
+    allowFreeClientEnrollment: false
   });
   const [disputeLetterEmailEnabled, setDisputeLetterEmailEnabled] = useState(false);
   const [disputeLetterEmailSettingLoading, setDisputeLetterEmailSettingLoading] = useState(false);
@@ -2205,9 +2234,14 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
       resetForm();
     } catch (error) {
       console.error('🔴 Frontend - Error saving admin profile:', error);
+      const serverError =
+        (error as any)?.response?.data?.error ||
+        (error as any)?.response?.data?.message ||
+        (error as any)?.message ||
+        `Failed to ${selectedAdmin ? 'update' : 'create'} admin profile`;
       toast({
         title: "Error",
-        description: `Failed to ${selectedAdmin ? 'update' : 'create'} admin profile`,
+        description: serverError,
         variant: "destructive"
       });
     } finally {
@@ -2289,7 +2323,8 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
       password: '',
       sendDisputeLetterEmail: true,
       sendInactivityEmail: true,
-      sendReportPullReminderEmail: true
+      sendReportPullReminderEmail: true,
+      allowFreeClientEnrollment: false
     });
     setSelectedAdmin(null);
     setShowPassword(false);
@@ -2311,7 +2346,9 @@ const AdminProfileManagement: React.FC<AdminProfileManagementProps> = ({
       sendInactivityEmail: normalizedAdmin.send_inactivity_email !== false
         && Number(normalizedAdmin.send_inactivity_email ?? 1) !== 0,
       sendReportPullReminderEmail: normalizedAdmin.send_report_pull_reminder_email !== false
-        && Number(normalizedAdmin.send_report_pull_reminder_email ?? 1) !== 0
+        && Number(normalizedAdmin.send_report_pull_reminder_email ?? 1) !== 0,
+      allowFreeClientEnrollment: normalizedAdmin.allow_free_client_enrollment !== false
+        && Number(normalizedAdmin.allow_free_client_enrollment ?? 0) !== 0
     });
     setIsEditDialogOpen(true);
   };

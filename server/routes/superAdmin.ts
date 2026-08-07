@@ -78,6 +78,85 @@ const shopUpload = multer({
   }
 });
 
+function isMissingUserIdDefault(error: any) {
+  return error?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+    && String(error?.sqlMessage || error?.message || '').toLowerCase().includes("field 'id'");
+}
+
+async function repairUsersIdAutoIncrement(db: ReturnType<typeof getDatabaseAdapter>): Promise<boolean> {
+  if (db.getType() !== 'mysql') {
+    return false;
+  }
+
+  const columns = await db.allQuery(
+    `SELECT COLUMN_NAME, COLUMN_KEY, EXTRA
+       FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'users'`
+  );
+  const idColumn = (columns as any[]).find((column: any) => column.COLUMN_NAME === 'id');
+
+  if (!idColumn) {
+    console.warn('⚠️ users.id column is missing; unable to repair AUTO_INCREMENT automatically');
+    return false;
+  }
+
+  if (String(idColumn.EXTRA || '').toLowerCase().includes('auto_increment')) {
+    return true;
+  }
+
+  const primaryIndexes = await db.allQuery("SHOW INDEX FROM `users` WHERE Key_name = 'PRIMARY'");
+  const hasPrimaryKey = Array.isArray(primaryIndexes) && primaryIndexes.length > 0;
+  const idIsPrimary = String(idColumn.COLUMN_KEY || '').toUpperCase() === 'PRI';
+
+  if (!hasPrimaryKey) {
+    await db.executeQuery('ALTER TABLE `users` ADD PRIMARY KEY (id)');
+  } else if (!idIsPrimary) {
+    console.warn('⚠️ users.id is not AUTO_INCREMENT and another primary key exists');
+    return false;
+  }
+
+  await db.executeQuery('ALTER TABLE `users` MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT');
+  console.log('✅ Repaired users.id AUTO_INCREMENT');
+  return true;
+}
+
+async function executeAdminUserInsertWithFallback(
+  db: ReturnType<typeof getDatabaseAdapter>,
+  sql: string,
+  params: any[]
+) {
+  try {
+    return await db.executeQuery(sql, params);
+  } catch (error: any) {
+    if (!isMissingUserIdDefault(error) || db.getType() !== 'mysql') {
+      throw error;
+    }
+
+    console.warn('users.id is missing AUTO_INCREMENT; attempting repair before retrying admin insert');
+
+    try {
+      const repaired = await repairUsersIdAutoIncrement(db);
+      if (repaired) {
+        return await db.executeQuery(sql, params);
+      }
+    } catch (repairError: any) {
+      console.warn('Unable to repair users.id automatically before retry:', repairError?.message || repairError);
+    }
+
+    const nextRow = await db.getQuery('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM users');
+    const nextId = Number((nextRow as any)?.next_id) || 1;
+    const fallbackSql = sql.replace(/INSERT\s+INTO\s+users\s*\(/i, 'INSERT INTO users (id, ');
+
+    if (fallbackSql === sql) {
+      throw error;
+    }
+
+    const insertResult = await db.executeQuery(fallbackSql, [nextId, ...params]);
+    return { ...insertResult, insertId: (insertResult as any)?.insertId || nextId };
+  }
+}
+
 const affiliateCommissionSettingsSchema = z.object({
   level2_rate_free: z.coerce.number().min(0).max(100),
   level2_rate_paid: z.coerce.number().min(0).max(100)
@@ -471,6 +550,7 @@ const createPlanSchema = z.object({
   name: z.string().min(1).max(255),
   description: z.string().nullish(),
   price: z.coerce.number().min(0),
+  plan_category: z.enum(['admin', 'client']).default('admin'),
   billing_cycle: z.enum(['monthly', 'yearly', 'lifetime']),
   features: z.array(z.string()),
   page_permissions: z.union([
@@ -492,6 +572,9 @@ const createPlanSchema = z.object({
   stripe_monthly_price_id: z.string().optional(),
   stripe_yearly_price_id: z.string().optional(),
   stripe_product_id: z.string().optional(),
+  auto_create_affiliate_account: z.boolean().optional(),
+  client_registration_mode: z.enum(['paid', 'free']).optional(),
+  default_client_plan_id: z.coerce.number().int().positive().nullable().optional(),
   max_users: z.coerce.number().min(0).optional(),
   max_clients: z.coerce.number().min(0).optional(),
   max_disputes: z.coerce.number().min(0).optional(),
@@ -800,7 +883,8 @@ const createAdminProfileSchema = z.object({
   notes: z.string().optional(),
   sendDisputeLetterEmail: z.boolean().default(true),
   sendInactivityEmail: z.boolean().default(true),
-  sendReportPullReminderEmail: z.boolean().default(true)
+  sendReportPullReminderEmail: z.boolean().default(true),
+  allowFreeClientEnrollment: z.boolean().default(false)
 });
 
 const updateAdminProfileSchema = z.object({
@@ -818,7 +902,8 @@ const updateAdminProfileSchema = z.object({
   notes: z.string().optional(),
   sendDisputeLetterEmail: z.boolean().optional(),
   sendInactivityEmail: z.boolean().optional(),
-  sendReportPullReminderEmail: z.boolean().optional()
+  sendReportPullReminderEmail: z.boolean().optional(),
+  allowFreeClientEnrollment: z.boolean().optional()
 });
 
 const updateAdminAffiliateReferralSchema = z.object({
@@ -900,7 +985,7 @@ const systemSettingSchema = z.object({
 // Get all subscription plans
 router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { page = 1, limit = 10, search, is_active } = req.query;
+    const { page = 1, limit = 10, search, is_active, plan_category } = req.query;
     const isAll = String(limit).toLowerCase() === 'all' || Number(limit) <= 0;
     const offset = isAll ? 0 : (Number(page) - 1) * Number(limit);
     const requesterRole = String((req as any)?.user?.role || '').toLowerCase();
@@ -920,6 +1005,11 @@ router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: 
     } else if (requesterRole !== 'super_admin') {
       whereClause += ' AND sp.is_active = ?';
       params.push(true);
+    }
+
+    if (plan_category && ['admin', 'client'].includes(String(plan_category))) {
+      whereClause += ' AND COALESCE(sp.plan_category, \'admin\') = ?';
+      params.push(String(plan_category));
     }
 
     const db = getDatabaseAdapter();
@@ -976,11 +1066,15 @@ router.get('/plans', authenticateToken, requireAdmin, async (req: Request, res: 
       return {
         ...plan,
         features: parsedFeatures,
+        plan_category: plan.plan_category || 'admin',
         page_permissions: permPages,
         is_specific: isSpecific,
         allowed_admin_emails: allowedEmails,
         restricted_to_current_subscribers: restrictedToSubscribers,
         allowed_affiliate_ids: allowedAffiliateIds,
+        auto_create_affiliate_account: Number(plan.auto_create_affiliate_account ?? 0) === 1 || plan.auto_create_affiliate_account === true,
+        client_registration_mode: plan.client_registration_mode || 'paid',
+        default_client_plan_id: plan.default_client_plan_id ? Number(plan.default_client_plan_id) : null,
         assigned_courses: assignedCourses.map((row: any) => row.course_id)
       };
     }));
@@ -1176,7 +1270,11 @@ router.get('/plans/:id', authenticateToken, requireAdmin, async (req: Request, r
       data: {
         ...plan,
         features: plan.features ? JSON.parse(plan.features) : [],
-        page_permissions: plan.page_permissions ? JSON.parse(plan.page_permissions) : []
+        plan_category: plan.plan_category || 'admin',
+        page_permissions: plan.page_permissions ? JSON.parse(plan.page_permissions) : [],
+        auto_create_affiliate_account: Number(plan.auto_create_affiliate_account ?? 0) === 1 || plan.auto_create_affiliate_account === true,
+        client_registration_mode: plan.client_registration_mode || 'paid',
+        default_client_plan_id: plan.default_client_plan_id ? Number(plan.default_client_plan_id) : null
       }
     });
   } catch (error) {
@@ -1416,12 +1514,13 @@ router.post('/plans', authenticateToken, requireSuperAdmin, async (req: Request,
     })();
 
     const result = await db.executeQuery(
-      `INSERT INTO subscription_plans (name, description, price, billing_cycle, features, page_permissions, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, max_users, max_clients, max_disputes, is_active, sort_order, created_by, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO subscription_plans (name, description, price, plan_category, billing_cycle, features, page_permissions, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, auto_create_affiliate_account, client_registration_mode, default_client_plan_id, max_users, max_clients, max_disputes, is_active, sort_order, created_by, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         planData.name,
         planData.description || null,
         planData.price,
+        planData.plan_category || 'admin',
         planData.billing_cycle,
         JSON.stringify(planData.features || []),
         JSON.stringify(permObj),
@@ -1429,6 +1528,9 @@ router.post('/plans', authenticateToken, requireSuperAdmin, async (req: Request,
         planData.stripe_monthly_price_id || null,
         planData.stripe_yearly_price_id || null,
         planData.stripe_product_id || null,
+        planData.auto_create_affiliate_account ? 1 : 0,
+        planData.client_registration_mode || 'paid',
+        planData.default_client_plan_id ?? null,
         planData.max_users ?? null,
         planData.max_clients ?? null,
         planData.max_disputes ?? null,
@@ -1472,10 +1574,14 @@ router.post('/plans', authenticateToken, requireSuperAdmin, async (req: Request,
     const planResponse = {
       ...createdPlan,
       features: createdPlan.features ? JSON.parse(createdPlan.features) : [],
+      plan_category: createdPlan.plan_category || 'admin',
       page_permissions: Array.isArray(parsedPermCreated) ? parsedPermCreated : (parsedPermCreated?.pages || []),
       is_specific: Array.isArray(parsedPermCreated) ? false : !!parsedPermCreated?.is_specific,
       restricted_to_current_subscribers: Array.isArray(parsedPermCreated) ? false : !!parsedPermCreated?.restricted_to_current_subscribers,
       allowed_admin_emails: Array.isArray(parsedPermCreated) ? [] : (parsedPermCreated?.allowed_admin_emails || []),
+      auto_create_affiliate_account: Number(createdPlan.auto_create_affiliate_account ?? 0) === 1 || createdPlan.auto_create_affiliate_account === true,
+      client_registration_mode: createdPlan.client_registration_mode || 'paid',
+      default_client_plan_id: createdPlan.default_client_plan_id ? Number(createdPlan.default_client_plan_id) : null,
       assigned_courses: assignedCourses.map((row: any) => row.course_id)
     };
 
@@ -1564,8 +1670,10 @@ router.put('/plans/:id', authenticateToken, requireSuperAdmin, async (req: Reque
           updateValues.push(JSON.stringify(value));
         } else if (key !== 'page_permissions') {
           updateFields.push(`${key} = ?`);
-          if (['trial_price_id', 'stripe_monthly_price_id', 'stripe_yearly_price_id', 'stripe_product_id'].includes(key)) {
+          if (['trial_price_id', 'stripe_monthly_price_id', 'stripe_yearly_price_id', 'stripe_product_id', 'default_client_plan_id'].includes(key)) {
             updateValues.push(value || null);
+          } else if (['auto_create_affiliate_account'].includes(key)) {
+            updateValues.push(value ? 1 : 0);
           } else {
             updateValues.push(value);
           }
@@ -1623,6 +1731,10 @@ router.put('/plans/:id', authenticateToken, requireSuperAdmin, async (req: Reque
       ...updatedPlan,
       features: JSON.parse(updatedPlan.features),
       page_permissions: updatedPlan.page_permissions ? JSON.parse(updatedPlan.page_permissions) : [],
+      plan_category: updatedPlan.plan_category || 'admin',
+      auto_create_affiliate_account: Number(updatedPlan.auto_create_affiliate_account ?? 0) === 1 || updatedPlan.auto_create_affiliate_account === true,
+      client_registration_mode: updatedPlan.client_registration_mode || 'paid',
+      default_client_plan_id: updatedPlan.default_client_plan_id ? Number(updatedPlan.default_client_plan_id) : null,
       restricted_to_current_subscribers: (() => { try { const p = updatedPlan.page_permissions ? JSON.parse(updatedPlan.page_permissions) : []; return Array.isArray(p) ? false : !!p?.restricted_to_current_subscribers; } catch { return false; } })(),
       assigned_courses: assignedCourses.map(row => row.course_id)
     };
@@ -2355,7 +2467,7 @@ router.get('/admins', authenticateToken, requireSuperAdminOrSupportRead, async (
       try {
         const placeholders = adminIds.map(() => '?').join(', ');
         const profileRows = await db.allQuery(
-          `SELECT user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active
+          `SELECT user_id, permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active
            FROM admin_profiles
            WHERE user_id IN (${placeholders})`,
           adminIds
@@ -2408,6 +2520,13 @@ router.get('/admins', authenticateToken, requireSuperAdminOrSupportRead, async (
     const adminsWithPermissions = admins.map((admin: any) => {
       const profile = profilesByUserId.get(Number(admin.id));
       const referral = referralByUserId.get(Number(admin.id));
+      const allowFreeClientEnrollment =
+        Number(profile?.allow_free_client_enrollment ?? 0) === 1 || profile?.allow_free_client_enrollment === true;
+      const parsedPermissions = parseAdminPermissions(profile?.permissions ?? admin.permissions);
+      const hasSubscriptionExemptionPermission =
+        Array.isArray(parsedPermissions) &&
+        (parsedPermissions.includes('subscription_exempt') || parsedPermissions.includes('no_subscription_required'));
+      const isSubscriptionExempt = allowFreeClientEnrollment || hasSubscriptionExemptionPermission;
 
       return {
         ...admin,
@@ -2417,8 +2536,11 @@ router.get('/admins', authenticateToken, requireSuperAdminOrSupportRead, async (
         phone: profile?.phone || admin.phone,
         emergency_contact: profile?.emergency_contact || admin.emergency_contact,
         notes: profile?.notes || admin.notes,
+        allow_free_client_enrollment: allowFreeClientEnrollment,
         is_active: profile?.is_active ?? admin.is_active,
-        permissions: parseAdminPermissions(profile?.permissions ?? admin.permissions),
+        permissions: parsedPermissions,
+        plan_name: String(admin.plan_name || '').trim() || (isSubscriptionExempt ? 'Subscription Exempt' : admin.plan_name),
+        plan_status: isSubscriptionExempt ? 'exempt' : admin.plan_status,
         referred_by_affiliate_id: referral?.affiliate_id ?? null,
         referred_by_affiliate_name: referral?.affiliate_name ?? null,
         referred_by_affiliate_email: referral?.affiliate_email ?? null
@@ -2487,7 +2609,7 @@ router.get('/admins/:id', authenticateToken, requireAdmin, async (req: Request, 
     let adminProfile = null;
     try {
       adminProfile = await db.getQuery(
-        `SELECT permissions, access_level, department, title, phone, emergency_contact, notes, is_active
+        `SELECT permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active
          FROM admin_profiles
          WHERE user_id = ?`,
         [adminId]
@@ -2520,6 +2642,7 @@ router.get('/admins/:id', authenticateToken, requireAdmin, async (req: Request, 
         phone: adminProfile?.phone || admin.phone,
         emergency_contact: adminProfile?.emergency_contact || admin.emergency_contact,
         notes: adminProfile?.notes || admin.notes,
+        allow_free_client_enrollment: Number(adminProfile?.allow_free_client_enrollment ?? 0) === 1 || adminProfile?.allow_free_client_enrollment === true,
         is_active: adminProfile?.is_active ?? admin.is_active,
         permissions: parseAdminPermissions(adminProfile?.permissions ?? admin.permissions),
         latest_kyc: latestKyc ? {
@@ -3171,7 +3294,8 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
     // Create new user with admin role, with safe fallback if audit columns are missing
     let result;
     try {
-      result = await db.executeQuery(
+      result = await executeAdminUserInsertWithFallback(
+        db,
         `INSERT INTO users (first_name, last_name, email, password_hash, role, status, send_dispute_letter_email, send_inactivity_email, send_report_pull_reminder_email, created_by, updated_by)
          VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?, ?, ?)`,
         [firstName, lastName, adminData.email, hashedPassword, normalizedStatus, adminData.sendDisputeLetterEmail, adminData.sendInactivityEmail, adminData.sendReportPullReminderEmail, userId, userId]
@@ -3182,7 +3306,8 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
       const code: string = insertErr?.code || '';
       if (code === 'ER_BAD_FIELD_ERROR' || msg.includes("Unknown column 'created_by'")) {
         console.warn('⚠️  users.created_by/updated_by missing; inserting without audit columns');
-        result = await db.executeQuery(
+        result = await executeAdminUserInsertWithFallback(
+          db,
           `INSERT INTO users (first_name, last_name, email, password_hash, role, status, send_dispute_letter_email, send_inactivity_email, send_report_pull_reminder_email)
            VALUES (?, ?, ?, ?, 'admin', ?, ?, ?, ?)`,
           [firstName, lastName, adminData.email, hashedPassword, normalizedStatus, adminData.sendDisputeLetterEmail, adminData.sendInactivityEmail, adminData.sendReportPullReminderEmail]
@@ -3193,8 +3318,10 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
     }
 
     const newUserId = result.insertId;
+    const shouldAutoCreateAffiliateOnDirectAdminCreate = false;
 
-    // Auto-create affiliate profile for this new admin with same email and password
+    // Legacy auto-affiliate behavior remains here for direct admin creation;
+    // paid-plan affiliate automation is controlled in billing finalization.
     try {
       // Check if an affiliate with this email already exists
       const existingAffiliate = await db.getQuery(
@@ -3202,7 +3329,9 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
         [adminData.email]
       );
 
-      if (!existingAffiliate) {
+      if (!shouldAutoCreateAffiliateOnDirectAdminCreate) {
+        console.log('Skipping direct admin affiliate auto-creation; affiliate provisioning is handled by paid plan checkout.');
+      } else if (!existingAffiliate) {
         const dbType = db.getType();
         const emailVerifiedValue = dbType === 'mysql' ? true : 1;
 
@@ -3242,25 +3371,58 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
 
     // Create admin profile entry if admin_profiles table exists
     try {
-      await db.executeQuery(
-        `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active, created_by, updated_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          newUserId,
-          JSON.stringify(adminData.permissions),
-          mapAdminUiAccessLevelToDb(adminData.accessLevel),
-          adminData.department || 'General',
-          adminData.title || 'Admin User',
-          adminData.phone || null,
-          adminData.emergency_contact || null,
-          adminData.notes || null,
-          adminData.status === 'active' ? 1 : 0,
-          userId,
-          userId
-        ]
-      );
+      const profileValues = [
+        newUserId,
+        JSON.stringify(adminData.permissions),
+        mapAdminUiAccessLevelToDb(adminData.accessLevel),
+        adminData.department || 'General',
+        adminData.title || 'Admin User',
+        adminData.phone || null,
+        adminData.emergency_contact || null,
+        adminData.notes || null,
+        adminData.allowFreeClientEnrollment ? 1 : 0,
+        adminData.status === 'active' ? 1 : 0,
+        userId,
+        userId
+      ];
+
+      try {
+        await db.executeQuery(
+          `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          profileValues
+        );
+      } catch (profileInsertErr: any) {
+        const msg: string = profileInsertErr?.sqlMessage || profileInsertErr?.message || '';
+        const code: string = profileInsertErr?.code || '';
+
+        if (
+          code === 'ER_BAD_FIELD_ERROR' ||
+          msg.includes("Unknown column 'created_by'") ||
+          msg.includes("Unknown column 'updated_by'")
+        ) {
+          await db.executeQuery(
+            `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+            [
+              newUserId,
+              JSON.stringify(adminData.permissions),
+              mapAdminUiAccessLevelToDb(adminData.accessLevel),
+              adminData.department || 'General',
+              adminData.title || 'Admin User',
+              adminData.phone || null,
+              adminData.emergency_contact || null,
+              adminData.notes || null,
+              adminData.allowFreeClientEnrollment ? 1 : 0,
+              adminData.status === 'active' ? 1 : 0
+            ]
+          );
+        } else {
+          throw profileInsertErr;
+        }
+      }
     } catch (profileError) {
-      console.log('Admin profiles table may not exist, skipping profile creation');
+      console.warn('Admin profiles table may not exist or admin profile creation failed:', profileError);
     }
 
     // Fetch the created user
@@ -3270,6 +3432,7 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
               COALESCE(ap.department, 'General') as department,
               COALESCE(ap.title, 'Admin User') as title,
               COALESCE(ap.permissions, '[]') as permissions,
+              COALESCE(ap.allow_free_client_enrollment, 0) as allow_free_client_enrollment,
               CASE WHEN u.status = 'active' THEN 1 ELSE 0 END as is_active
        FROM users u
        LEFT JOIN admin_profiles ap ON u.id = ap.user_id
@@ -3298,7 +3461,8 @@ router.post('/admins', authenticateToken, requireSuperAdmin, async (req: Request
       success: true,
       data: {
         ...sanitizedAdmin,
-        permissions: typeof createdAdmin.permissions === 'string' ? JSON.parse(createdAdmin.permissions) : createdAdmin.permissions
+        permissions: typeof createdAdmin.permissions === 'string' ? JSON.parse(createdAdmin.permissions) : createdAdmin.permissions,
+        allow_free_client_enrollment: Number(createdAdmin.allow_free_client_enrollment ?? 0) === 1 || createdAdmin.allow_free_client_enrollment === true
       }
     });
   } catch (error) {
@@ -3471,6 +3635,11 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
         profileValues.push(adminData.notes);
       }
 
+      if (adminData.allowFreeClientEnrollment !== undefined) {
+        profileUpdates.push('allow_free_client_enrollment = ?');
+        profileValues.push(adminData.allowFreeClientEnrollment ? 1 : 0);
+      }
+
       if (adminData.status) {
         profileUpdates.push('is_active = ?');
         profileValues.push(adminData.status === 'active' ? 1 : 0);
@@ -3512,6 +3681,7 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
             adminData.phone ?? existingAdmin.phone ?? null,
             adminData.emergency_contact || null,
             adminData.notes || null,
+            adminData.allowFreeClientEnrollment ? 1 : 0,
             profileIsActive,
             userId,
             userId
@@ -3519,8 +3689,8 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
 
           try {
             await db.executeQuery(
-              `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active, created_by, updated_by, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+              `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active, created_by, updated_by, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
               defaultProfileValues
             );
           } catch (profileInsertErr: any) {
@@ -3533,8 +3703,8 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
               msg.includes("Unknown column 'updated_by'")
             ) {
               await db.executeQuery(
-                `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, is_active, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                `INSERT INTO admin_profiles (user_id, permissions, access_level, department, title, phone, emergency_contact, notes, allow_free_client_enrollment, is_active, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
                 [
                   adminId,
                   JSON.stringify(normalizedPermissions),
@@ -3544,6 +3714,7 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
                   adminData.phone ?? existingAdmin.phone ?? null,
                   adminData.emergency_contact || null,
                   adminData.notes || null,
+                  adminData.allowFreeClientEnrollment ? 1 : 0,
                   profileIsActive
                 ]
               );
@@ -3564,6 +3735,7 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
               COALESCE(ap.department, 'General') as department,
               COALESCE(ap.title, 'Admin User') as title,
               COALESCE(ap.permissions, '[]') as permissions,
+              COALESCE(ap.allow_free_client_enrollment, 0) as allow_free_client_enrollment,
               CASE WHEN u.status = 'active' THEN 1 ELSE 0 END as is_active
        FROM users u
        LEFT JOIN admin_profiles ap ON u.id = ap.user_id
@@ -3579,7 +3751,8 @@ router.put('/admins/:id', authenticateToken, requireSuperAdmin, async (req: Requ
       success: true,
       data: {
         ...sanitizedAdmin,
-        permissions: typeof updatedAdmin.permissions === 'string' ? JSON.parse(updatedAdmin.permissions) : updatedAdmin.permissions
+        permissions: typeof updatedAdmin.permissions === 'string' ? JSON.parse(updatedAdmin.permissions) : updatedAdmin.permissions,
+        allow_free_client_enrollment: Number(updatedAdmin.allow_free_client_enrollment ?? 0) === 1 || updatedAdmin.allow_free_client_enrollment === true
       }
     });
   } catch (error) {
@@ -3811,7 +3984,24 @@ router.delete('/admins/:id', authenticateToken, requireSuperAdmin, async (req: R
     }
 
     // Change user role from admin to user instead of deleting
-    await db.executeQuery("UPDATE users SET role = 'user', updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", [currentUserId, adminId]);
+    try {
+      await db.executeQuery(
+        "UPDATE users SET role = 'user', updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        [currentUserId, adminId]
+      );
+    } catch (updateError: any) {
+      const msg: string = updateError?.sqlMessage || updateError?.message || '';
+      const code: string = updateError?.code || '';
+
+      if (code === 'ER_BAD_FIELD_ERROR' || msg.includes("Unknown column 'updated_by'")) {
+        await db.executeQuery(
+          "UPDATE users SET role = 'user', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+          [adminId]
+        );
+      } else {
+        throw updateError;
+      }
+    }
 
     try {
       const titleMsg = 'Admin User Deleted';

@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Bell, Search, Settings, Menu, Moon, Sun, Monitor, LayoutDashboard, UserCheck, Package, Users, FileText, Receipt, HandHeart, ClipboardList, Mail, AlertTriangle, Building2, Brain, UserRoundCog } from "lucide-react";
+import { Bell, Search, Settings, Menu, Moon, Sun, Monitor, LayoutDashboard, UserCheck, Package, CreditCard, Users, FileText, Receipt, HandHeart, ClipboardList, Mail, AlertTriangle, Building2, Brain, UserRoundCog } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "@/lib/api";
@@ -113,7 +113,8 @@ export default function SuperAdminLayout({
   const bottomNavItems = [
     { name: 'Overview', href: '/super-admin/overview', icon: LayoutDashboard },
     { name: 'Admins', href: '/super-admin/admins', icon: UserCheck },
-    { name: 'Plans', href: '/super-admin/plans', icon: Package },
+    { name: 'Admin Plans', href: '/super-admin/plans', icon: Package },
+    { name: 'Client Plans', href: '/super-admin/client-plans', icon: CreditCard },
     { name: 'AI Plans', href: '/super-admin/ai-plans-credits', icon: Brain },
     { name: 'Users', href: '/super-admin/users', icon: Users },
     { name: 'Employee Progress', href: '/super-admin/employee-progress', icon: UserRoundCog },

@@ -35,7 +35,15 @@ interface Subscription {
   updated_at: string;
 }
 
-const BillingHistory: React.FC = () => {
+interface BillingHistoryProps {
+  showCurrentSubscription?: boolean;
+  onManageCancellation?: () => void;
+}
+
+const BillingHistory: React.FC<BillingHistoryProps> = ({
+  showCurrentSubscription = true,
+  onManageCancellation,
+}) => {
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
@@ -195,6 +203,11 @@ const BillingHistory: React.FC = () => {
   };
 
   const handleManageCancellation = () => {
+    if (onManageCancellation) {
+      onManageCancellation();
+      return;
+    }
+
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -241,7 +254,7 @@ const BillingHistory: React.FC = () => {
       </div>
 
       {/* Current Subscription */}
-      {subscription && (
+      {showCurrentSubscription && subscription && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -293,7 +293,7 @@ const SubscriptionContent: React.FC = () => {
       console.log('🔄 Fetching subscription plans for dashboard...');
       let databasePlans: SubscriptionPlan[] = [];
       try {
-        const adminResp = await superAdminApi.getPlans({ page: 1, limit: 100, is_active: true });
+        const adminResp = await superAdminApi.getPlans({ page: 1, limit: 100, is_active: true, plan_category: 'admin' });
         console.log('📡 Admin Plans API Response:', adminResp);
         const plansData = adminResp.data?.data || [];
         const activePlansData = Array.isArray(plansData)
@@ -302,7 +302,8 @@ const SubscriptionContent: React.FC = () => {
                 dbPlan?.is_active !== false &&
                 dbPlan?.is_active !== 0 &&
                 dbPlan?.is_active !== '0' &&
-                dbPlan?.is_active !== 'false'
+                dbPlan?.is_active !== 'false' &&
+                (dbPlan?.plan_category || 'admin') === 'admin'
             )
           : [];
         if (activePlansData.length > 0) {
@@ -332,7 +333,9 @@ const SubscriptionContent: React.FC = () => {
           const plansResponse = await pricingApi.getPlans();
           console.log('📡 Public Plans API Response:', plansResponse);
           if (plansResponse.data && plansResponse.data.success && plansResponse.data.data) {
-            databasePlans = plansResponse.data.data.map((dbPlan: any) => ({
+            databasePlans = plansResponse.data.data
+              .filter((dbPlan: any) => (dbPlan?.plan_category || 'admin') === 'admin')
+              .map((dbPlan: any) => ({
               id: dbPlan.id.toString(),
               name: dbPlan.name,
               price: parseFloat(dbPlan.price),

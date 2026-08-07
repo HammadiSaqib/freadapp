@@ -62,6 +62,7 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
         { name: "Progress Report", href: "/member/progress-report", icon: TrendingUp },
         { name: "Underwriting", href: "/member/underwriting", icon: FileText },
         { name: "Funding Audit", href: "/member/funding", icon: DollarSign },
+        { name: "Subscription", href: "/member/subscription", icon: CreditCard },
       ],
     },
   ];
@@ -121,6 +122,7 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
   const bottomNavExtras = [
     { name: 'Monitoring', href: '/member/monitoring', icon: Shield },
     { name: 'Score History', href: '/member/score-history', icon: TrendingUp },
+    { name: 'Subscription', href: '/member/subscription', icon: CreditCard },
     { name: 'Support', href: '/member/support', icon: HelpCircle },
     { name: 'Settings', href: '/member/settings', icon: Settings },
   ];
@@ -259,6 +261,15 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
               >
                 <PieChart className="h-4 w-4 mr-2" />
                 Credit Analysis
+              </Button>
+              <Button
+                onClick={() => navigate("/member/subscription")}
+                variant="outline"
+                size="sm"
+                className="w-full justify-start border-green-500/20 text-green-600 hover:bg-green-500 dark:hover:bg-green-900/20"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Subscription
               </Button>
               <Button
                 onClick={() => navigate("/member/monitoring")}

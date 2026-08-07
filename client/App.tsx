@@ -71,9 +71,11 @@ const Features = React.lazy(() => import("./pages/Features"));
 const Subscription = React.lazy(() => import("./pages/Subscription"));
 const BillingSuccess = React.lazy(() => import("./pages/BillingSuccess"));
 const BillingCancel = React.lazy(() => import("./pages/BillingCancel"));
+const ClientEnrollmentSuccess = React.lazy(() => import("./pages/ClientEnrollmentSuccess"));
 const SuperAdmin = React.lazy(() => import("./pages/SuperAdmin"));
 const SuperAdminOverview = React.lazy(() => import("./pages/super-admin/SuperAdminOverview"));
 const SuperAdminPlans = React.lazy(() => import("./pages/super-admin/SuperAdminPlans"));
+const SuperAdminClientPlans = React.lazy(() => import("./pages/super-admin/SuperAdminClientPlans"));
 const SuperAdminAiPlansCredits = React.lazy(() => import("./pages/super-admin/SuperAdminAiPlansCredits"));
 const SuperAdminKycVerification = React.lazy(() => import("./pages/super-admin/SuperAdminKycVerification"));
 const SuperAdminAdmins = React.lazy(() => import("./pages/super-admin/SuperAdminAdmins"));
@@ -181,6 +183,7 @@ const ClientFunding = React.lazy(() => import("./pages/client/Funding"));
 const ClientPublicRecords = React.lazy(() => import("./pages/client/PublicRecords"));
 const ClientMonitoring = React.lazy(() => import("./pages/client/Monitoring"));
 const ClientScoreHistory = React.lazy(() => import("./pages/client/ScoreHistory"));
+const ClientSubscription = React.lazy(() => import("./pages/client/Subscription"));
 const ClientSettings = React.lazy(() => import("./pages/client/Settings"));
 const ClientSupport = React.lazy(() => import("./pages/client/Support"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
@@ -209,6 +212,7 @@ const PUBLIC_NO_INDEX_PATHS = new Set([
   "/car-loan-calculator",
   "/blog",
   "/contact",
+  "/client-enrollment/success",
   "/join-affiliate",
   "/terms",
   "/privacy",
@@ -370,6 +374,14 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
           element: (
             <SuperAdminProtectedRoute>
               <SuperAdminPlans />
+            </SuperAdminProtectedRoute>
+          ),
+        },
+        {
+          path: "/client-plans",
+          element: (
+            <SuperAdminProtectedRoute>
+              <SuperAdminClientPlans />
             </SuperAdminProtectedRoute>
           ),
         },
@@ -1489,6 +1501,10 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             }
           />
           <Route
+            path="/client-enrollment/success"
+            element={<ClientEnrollmentSuccess />}
+          />
+          <Route
             path="/debug-permissions"
             element={
               <ProtectedRoute allowUnpaidAccess={true}>
@@ -1514,6 +1530,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             element={
               <SuperAdminProtectedRoute>
                 <SuperAdminPlans />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin/client-plans"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminClientPlans />
               </SuperAdminProtectedRoute>
             }
           />
@@ -2171,6 +2195,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData }: AppProps) => {
             element={
               <ClientProtectedRoute>
                 <ClientScoreHistory />
+              </ClientProtectedRoute>
+            }
+          />
+          <Route
+            path="/member/subscription"
+            element={
+              <ClientProtectedRoute>
+                <ClientSubscription />
               </ClientProtectedRoute>
             }
           />

@@ -53,9 +53,15 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       badge: null,
     },
     {
-      name: "Plans",
+      name: "Admin Plans",
       href: "/super-admin/plans",
       icon: Package,
+      badge: null,
+    },
+    {
+      name: "Client Plans",
+      href: "/super-admin/client-plans",
+      icon: CreditCard,
       badge: null,
     },
     {
@@ -338,13 +344,22 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
                 className="w-full justify-start border-ocean-blue/20 text-ocean-blue hover:bg-gradient-soft"
               >
                 <Package className="h-4 w-4 mr-2" />
-                Add Plan
+                Admin Plans
+              </Button>
+              <Button
+                onClick={() => navigate("/super-admin/client-plans")}
+                variant="outline"
+                size="sm"
+                className="w-full justify-start border-sea-green/20 text-sea-green hover:bg-gradient-soft"
+              >
+                <CreditCard className="h-4 w-4 mr-2" />
+                Client Plans
               </Button>
               <Button
                 onClick={() => navigate("/super-admin/admins")}
                 variant="outline"
                 size="sm"
-                className="w-full justify-start border-sea-green/20 text-sea-green hover:bg-gradient-soft"
+                className="w-full justify-start border-slate-300 text-slate-700 hover:bg-gradient-soft"
               >
                 <UserCheck className="h-4 w-4 mr-2" />
                 Manage Admins

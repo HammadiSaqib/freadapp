@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import { clientsApi } from "@/lib/api";
+import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
 import {
   closeReportPullLoading,
   openReportPullLoading,
@@ -85,6 +86,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
     }
     setIsSubmitting(true);
     let reportPullFeedbackOpen = false;
+    let pendingCheckoutClientData: Record<string, any> | null = null;
 
     try {
       // Check if user is authenticated
@@ -479,6 +481,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
         notes: notesMessage,
       };
+      pendingCheckoutClientData = clientData;
 
       console.log("Creating client with extracted data:", clientData);
       const response = await clientsApi.createClient(clientData);
@@ -532,6 +535,26 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         showReportPullError();
         reportPullFeedbackOpen = false;
       }
+
+      if (isClientPlanPaymentRequired(error)) {
+        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
+          source: "admin_dashboard_scrape",
+          returnUrl: window.location.href,
+          clientData: pendingCheckoutClientData || {
+            platform: newClient.platform,
+            email: newClient.email,
+            platform_email: newClient.email,
+            platform_password: newClient.password,
+            ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
+          },
+        });
+        toast({
+          title: "Client payment link copied",
+          description: "Send this payment link to the client so they can complete enrollment.",
+        });
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       
       // Handle quota exceeded error specifically
       if (error.response?.status === 403 && error.response?.data?.error === 'Client quota exceeded') {
@@ -565,6 +588,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
       return;
     }
     setIsSubmitting(true);
+    let pendingManualClientData: Record<string, any> | null = null;
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -610,6 +634,7 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
         platform_password: manualClient.platform_password || undefined,
         notes: (manualClient.notes || "Client created manually") + (platformNote ? ` | ${platformNote}` : ""),
       };
+      pendingManualClientData = data;
 
       const response = await clientsApi.createClient(data);
       const responseData = response?.data ?? response;
@@ -650,6 +675,33 @@ export default function AddClientDialog({ isOpen, onClose, onSuccess, mode = "sc
       // Stay on the current page after manual addition
     } catch (error: any) {
       console.error("Error adding client manually:", error);
+      if (isClientPlanPaymentRequired(error)) {
+        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
+          source: "admin_dashboard_manual",
+          returnUrl: window.location.href,
+          clientData: pendingManualClientData || {
+            first_name: manualClient.first_name,
+            last_name: manualClient.last_name,
+            email: manualClient.email,
+            phone: manualClient.phone || undefined,
+            date_of_birth: manualClient.date_of_birth || undefined,
+            address: manualClient.address || undefined,
+            city: manualClient.city || undefined,
+            state: manualClient.state || undefined,
+            zip_code: manualClient.zip_code || undefined,
+            platform: manualClient.platform || undefined,
+            platform_email: manualClient.platform_email || undefined,
+            platform_password: manualClient.platform_password || undefined,
+            notes: manualClient.notes || undefined,
+          },
+        });
+        toast({
+          title: "Client payment link copied",
+          description: "Send this payment link to the client so they can complete enrollment.",
+        });
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       toast({
         title: "Error",
         description: error?.message || "Failed to add client",

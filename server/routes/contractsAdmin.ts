@@ -111,7 +111,7 @@ router.get('/latest', requireRole('admin', 'super_admin'), async (req: Request, 
     }
 
     if (!contract) {
-      return res.status(404).json({ success: false, error: 'No contract found for admin' });
+      return res.json({ success: true, data: null });
     }
 
     // Prefer template content; fall back to contract body if template missing
@@ -219,7 +219,12 @@ router.get('/tsm-elite/latest', async (req: Request, res: Response) => {
 
     const eligibility = await getScoreMachineEliteAccessStatus(Number(user.id));
     if (!eligibility.hasAccess) {
-      return res.status(403).json({ success: false, error: 'Score Machine Elite is not enabled for this account' });
+      return res.json({
+        success: true,
+        has_access: false,
+        data: null,
+        error: null,
+      });
     }
 
     const template = await getLatestActiveTsmEliteTemplate();

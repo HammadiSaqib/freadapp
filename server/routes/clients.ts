@@ -419,6 +419,99 @@ async function resolveAdminIdFromIntake(tokenRaw: unknown, slugRaw: unknown): Pr
   throw new Error('Intake token required');
 }
 
+async function getClientEnrollmentSettings(adminId: number): Promise<{
+  allowFreeEnrollment: boolean;
+  clientPlan: null | {
+    id: number;
+    name: string;
+    price: number;
+    billing_cycle: string;
+  };
+  adminPlan: null | {
+    id: number;
+    name: string;
+    client_registration_mode: 'paid' | 'free';
+    default_client_plan_id?: number | null;
+  };
+}> {
+  const profile = await getQuery(
+    `SELECT allow_free_client_enrollment
+       FROM admin_profiles
+      WHERE user_id = ?
+      LIMIT 1`,
+    [adminId]
+  );
+
+  const allowFreeFromProfile = Number(profile?.allow_free_client_enrollment ?? 0) === 1 || profile?.allow_free_client_enrollment === true;
+
+  const adminPlan = await getQuery(
+    `SELECT sp.id, sp.name, sp.client_registration_mode, sp.default_client_plan_id
+       FROM subscriptions s
+       JOIN subscription_plans sp
+         ON sp.name = s.plan_name
+        AND sp.plan_category = 'admin'
+        AND (sp.billing_cycle = s.plan_type OR sp.billing_cycle = 'monthly')
+      WHERE s.user_id = ?
+        AND LOWER(TRIM(COALESCE(s.status, ''))) = 'active'
+      ORDER BY s.updated_at DESC, s.created_at DESC, sp.sort_order ASC
+      LIMIT 1`,
+    [adminId]
+  );
+
+  if (allowFreeFromProfile || String(adminPlan?.client_registration_mode || '').toLowerCase() === 'free') {
+    return {
+      allowFreeEnrollment: true,
+      clientPlan: null,
+      adminPlan: adminPlan ? {
+        id: Number(adminPlan.id),
+        name: String(adminPlan.name || ''),
+        client_registration_mode: 'free',
+        default_client_plan_id: adminPlan.default_client_plan_id ? Number(adminPlan.default_client_plan_id) : null,
+      } : null,
+    };
+  }
+
+  let clientPlan = null;
+  if (adminPlan?.default_client_plan_id) {
+    clientPlan = await getQuery(
+      `SELECT id, name, price, billing_cycle
+         FROM subscription_plans
+        WHERE id = ?
+          AND plan_category = 'client'
+          AND is_active = TRUE
+        LIMIT 1`,
+      [adminPlan.default_client_plan_id]
+    );
+  }
+
+  if (!clientPlan) {
+    clientPlan = await getQuery(
+      `SELECT id, name, price, billing_cycle
+         FROM subscription_plans
+        WHERE plan_category = 'client'
+          AND is_active = TRUE
+        ORDER BY sort_order ASC, created_at ASC
+        LIMIT 1`
+    );
+  }
+
+  return {
+    allowFreeEnrollment: false,
+    clientPlan: clientPlan ? {
+      id: Number(clientPlan.id),
+      name: String(clientPlan.name || ''),
+      price: Number(clientPlan.price || 0),
+      billing_cycle: String(clientPlan.billing_cycle || 'monthly'),
+    } : null,
+    adminPlan: adminPlan ? {
+      id: Number(adminPlan.id),
+      name: String(adminPlan.name || ''),
+      client_registration_mode: 'paid',
+      default_client_plan_id: adminPlan.default_client_plan_id ? Number(adminPlan.default_client_plan_id) : null,
+    } : null,
+  };
+}
+
 function fallbackNameFromEmail(email: string) {
   const emailLocal = (email || '').split('@')[0] || '';
   const parts = emailLocal.replace(/[^a-zA-Z._\-\s]/g, ' ').split(/[._\-\s]+/).filter(Boolean);
@@ -1020,6 +1113,8 @@ export async function createClient(req: AuthRequest, res: Response) {
       }
     }
 
+    const enrollmentSettings = await getClientEnrollmentSettings(baseUserId);
+
     if (shouldReuseExistingScrapedClient(clientData)) {
       const existingClient = await findExistingClientForAdminByPlatformEmail(baseUserId, {
         email: clientData.platform_email || clientData.email,
@@ -1262,6 +1357,20 @@ export async function createClient(req: AuthRequest, res: Response) {
         // If parsing fails, continue to general error handling
       }
     }
+
+    if (!enrollmentSettings.allowFreeEnrollment && enrollmentSettings.clientPlan) {
+      return res.status(402).json({
+        success: false,
+        error: 'Client payment required',
+        code: 'CLIENT_PLAN_PAYMENT_REQUIRED',
+        message: 'This admin requires clients to pay before they can be added to the CRM.',
+        enrollment: {
+          allowFreeEnrollment: false,
+          clientPlan: enrollmentSettings.clientPlan,
+          adminPlan: enrollmentSettings.adminPlan,
+        }
+      });
+    }
     
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
@@ -1294,6 +1403,7 @@ export async function createClientIntakeToken(req: AuthRequest, res: Response) {
 export async function getClientIntakeConfig(req: Request, res: Response) {
   try {
     const adminId = await resolveAdminIdFromIntake((req.query as any)?.token, (req.query as any)?.slug);
+    const enrollmentSettings = await getClientEnrollmentSettings(adminId);
     const userColumns = await getExistingUserColumns();
     const intakeSelect = [
       userColumns.has('intake_redirect_url') ? 'u.intake_redirect_url' : 'NULL AS intake_redirect_url',
@@ -1339,6 +1449,12 @@ export async function getClientIntakeConfig(req: Request, res: Response) {
       success: true,
       data: {
         onboardingSlug: admin.onboarding_slug || null,
+        enrollment: {
+          allowFreeEnrollment: enrollmentSettings.allowFreeEnrollment,
+          requiresPayment: !enrollmentSettings.allowFreeEnrollment && !!enrollmentSettings.clientPlan,
+          clientPlan: enrollmentSettings.clientPlan,
+          adminPlan: enrollmentSettings.adminPlan,
+        },
         redirectUrl: admin.intake_redirect_url || null,
         logoUrl: admin.intake_logo_url || null,
         primaryColor: admin.intake_primary_color || null,
@@ -1392,6 +1508,21 @@ export async function submitClientIntake(req: Request, res: Response) {
 
     if (!adminId) {
       return res.status(403).json({ error: 'Invalid intake token scope' });
+    }
+
+    const enrollmentSettings = await getClientEnrollmentSettings(adminId);
+    if (!enrollmentSettings.allowFreeEnrollment && enrollmentSettings.clientPlan) {
+      return res.status(402).json({
+        success: false,
+        error: 'Client payment required',
+        code: 'CLIENT_PLAN_PAYMENT_REQUIRED',
+        message: 'This onboarding link requires the client plan payment before enrollment can be completed.',
+        enrollment: {
+          allowFreeEnrollment: false,
+          clientPlan: enrollmentSettings.clientPlan,
+          adminPlan: enrollmentSettings.adminPlan,
+        }
+      });
     }
 
     const intakeData = clientIntakeSchema.parse(req.body);

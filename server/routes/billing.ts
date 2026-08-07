@@ -1,7 +1,8 @@
 import express from 'express';
 import Stripe from 'stripe';
 import { ENV_CONFIG } from '../config/environment.js';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import jwt from 'jsonwebtoken';
+import { authenticateToken, optionalAuth } from '../middleware/authMiddleware.js';
 import { executeQuery, executeTransaction } from '../database/mysqlConfig.js';
 import { BillingTransaction, Subscription, StripeConfig } from '../database/mysqlSchema.js';
 import CommissionService from '../services/commissionService.js';
@@ -11,6 +12,8 @@ import crypto from 'crypto';
 import { createAffiliate } from '../controllers/authController.js';
 import type { Request } from 'express';
 import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
+import { validateClientQuota } from '../utils/planValidation.js';
+import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
 
 const router = express.Router();
 
@@ -234,6 +237,492 @@ async function retrieveCheckoutSessionForSubscription(sessionId: string) {
   }
 
   throw firstError || new Error('Checkout session not found');
+}
+
+function normalizeSlug(value: string) {
+  const trimmed = String(value || '').trim().toLowerCase();
+  if (!trimmed) return '';
+  return trimmed
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+function fallbackNameFromEmail(email: string) {
+  const emailLocal = String(email || '').split('@')[0] || '';
+  const parts = emailLocal.replace(/[^a-zA-Z._\-\s]/g, ' ').split(/[._\-\s]+/).filter(Boolean);
+  const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  if (parts.length >= 2) {
+    return { firstName: cap(parts[0]), lastName: cap(parts[1]) };
+  }
+  if (parts.length === 1) {
+    return { firstName: cap(parts[0]), lastName: 'Unknown' };
+  }
+  return { firstName: 'Unknown', lastName: 'Client' };
+}
+
+function isMissingClientIdDefault(error: any) {
+  return error?.code === 'ER_NO_DEFAULT_FOR_FIELD'
+    && String(error?.sqlMessage || error?.message || '').toLowerCase().includes("field 'id'");
+}
+
+async function executeClientInsert(connection: any, sql: string, params: any[]) {
+  try {
+    const [insertResult] = await connection.execute(sql, params);
+    return insertResult;
+  } catch (error: any) {
+    if (!isMissingClientIdDefault(error)) {
+      throw error;
+    }
+
+    const [rows] = await connection.execute('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM clients FOR UPDATE');
+    const nextId = Number(Array.isArray(rows) ? rows[0]?.next_id : rows?.next_id) || 1;
+    const fallbackSql = sql.replace(/INSERT\s+INTO\s+clients\s*\(/i, 'INSERT INTO clients (id, ');
+
+    if (fallbackSql === sql) {
+      throw error;
+    }
+
+    const [insertResult] = await connection.execute(fallbackSql, [nextId, ...params]);
+    return { ...(insertResult as any), insertId: nextId };
+  }
+}
+
+async function resolveAdminIdFromClientEnrollmentContext(req: any): Promise<number> {
+  if (req.user?.id) {
+    const role = String(req.user.role || '').toLowerCase();
+    if (role === 'admin' || role === 'super_admin') {
+      return Number(req.user.id);
+    }
+
+    const employeeRows = await executeQuery<any[]>(
+      `SELECT admin_id
+         FROM employees
+        WHERE user_id = ?
+          AND status = 'active'
+        ORDER BY updated_at DESC, created_at DESC
+        LIMIT 1`,
+      [Number(req.user.id)]
+    );
+
+    if (Array.isArray(employeeRows) && employeeRows[0]?.admin_id) {
+      return Number(employeeRows[0].admin_id);
+    }
+  }
+
+  const token = String(req.body?.token || req.query?.token || '').trim();
+  const rawSlug = String(req.body?.slug || req.query?.slug || '').trim();
+  const slug = normalizeSlug(rawSlug);
+
+  if (token) {
+    const decoded = jwt.verify(token, ENV_CONFIG.JWT_SECRET, { clockTolerance: 60 }) as any;
+    if (decoded?.scope !== 'client_intake') {
+      throw new Error('Invalid intake token scope');
+    }
+    const adminId = Number(decoded?.adminId || decoded?.id || 0);
+    if (!adminId) {
+      throw new Error('Invalid or expired intake token');
+    }
+    return adminId;
+  }
+
+  if (slug) {
+    const rows = await executeQuery<any[]>(
+      `SELECT id
+         FROM users
+        WHERE onboarding_slug = ?
+          AND role IN ('admin', 'super_admin')
+        LIMIT 1`,
+      [slug]
+    );
+    if (Array.isArray(rows) && rows[0]?.id) {
+      return Number(rows[0].id);
+    }
+
+    if (/^\d+$/.test(rawSlug)) {
+      const idRows = await executeQuery<any[]>(
+        `SELECT id
+           FROM users
+          WHERE id = ?
+            AND role IN ('admin', 'super_admin')
+          LIMIT 1`,
+        [Number(rawSlug)]
+      );
+      if (Array.isArray(idRows) && idRows[0]?.id) {
+        return Number(idRows[0].id);
+      }
+    }
+
+    throw new Error('Onboarding link not found');
+  }
+
+  throw new Error('Intake token required');
+}
+
+async function getClientEnrollmentSettingsForBilling(adminId: number): Promise<{
+  allowFreeEnrollment: boolean;
+  clientPlan: null | {
+    id: number;
+    name: string;
+    price: number;
+    billing_cycle: string;
+    stripe_monthly_price_id?: string | null;
+    stripe_yearly_price_id?: string | null;
+    stripe_product_id?: string | null;
+    page_permissions?: any;
+  };
+  adminPlan: null | {
+    id: number;
+    name: string;
+    client_registration_mode: 'paid' | 'free';
+    default_client_plan_id?: number | null;
+  };
+}> {
+  const profileRows = await executeQuery<any[]>(
+    `SELECT allow_free_client_enrollment
+       FROM admin_profiles
+      WHERE user_id = ?
+      LIMIT 1`,
+    [adminId]
+  );
+  const profile = Array.isArray(profileRows) && profileRows.length > 0 ? profileRows[0] : null;
+  const allowFreeFromProfile = Number(profile?.allow_free_client_enrollment ?? 0) === 1 || profile?.allow_free_client_enrollment === true;
+
+  const adminPlanRows = await executeQuery<any[]>(
+    `SELECT sp.id, sp.name, sp.client_registration_mode, sp.default_client_plan_id
+       FROM subscriptions s
+       JOIN subscription_plans sp
+         ON sp.name = s.plan_name
+        AND sp.plan_category = 'admin'
+        AND (sp.billing_cycle = s.plan_type OR sp.billing_cycle = 'monthly')
+      WHERE s.user_id = ?
+        AND LOWER(TRIM(COALESCE(s.status, ''))) = 'active'
+      ORDER BY s.updated_at DESC, s.created_at DESC, sp.sort_order ASC
+      LIMIT 1`,
+    [adminId]
+  );
+  const adminPlan = Array.isArray(adminPlanRows) && adminPlanRows.length > 0 ? adminPlanRows[0] : null;
+
+  if (allowFreeFromProfile || String(adminPlan?.client_registration_mode || '').toLowerCase() === 'free') {
+    return {
+      allowFreeEnrollment: true,
+      clientPlan: null,
+      adminPlan: adminPlan ? {
+        id: Number(adminPlan.id),
+        name: String(adminPlan.name || ''),
+        client_registration_mode: 'free',
+        default_client_plan_id: adminPlan.default_client_plan_id ? Number(adminPlan.default_client_plan_id) : null,
+      } : null,
+    };
+  }
+
+  let clientPlan: any = null;
+  if (adminPlan?.default_client_plan_id) {
+    const planRows = await executeQuery<any[]>(
+      `SELECT id, name, price, billing_cycle, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions
+         FROM subscription_plans
+        WHERE id = ?
+          AND plan_category = 'client'
+          AND is_active = TRUE
+        LIMIT 1`,
+      [adminPlan.default_client_plan_id]
+    );
+    clientPlan = Array.isArray(planRows) && planRows.length > 0 ? planRows[0] : null;
+  }
+
+  if (!clientPlan) {
+    const defaultRows = await executeQuery<any[]>(
+      `SELECT id, name, price, billing_cycle, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions
+         FROM subscription_plans
+        WHERE plan_category = 'client'
+          AND is_active = TRUE
+        ORDER BY sort_order ASC, created_at ASC
+        LIMIT 1`
+    );
+    clientPlan = Array.isArray(defaultRows) && defaultRows.length > 0 ? defaultRows[0] : null;
+  }
+
+  return {
+    allowFreeEnrollment: false,
+    clientPlan: clientPlan ? {
+      id: Number(clientPlan.id),
+      name: String(clientPlan.name || ''),
+      price: Number(clientPlan.price || 0),
+      billing_cycle: String(clientPlan.billing_cycle || 'monthly'),
+      stripe_monthly_price_id: clientPlan.stripe_monthly_price_id || null,
+      stripe_yearly_price_id: clientPlan.stripe_yearly_price_id || null,
+      stripe_product_id: clientPlan.stripe_product_id || null,
+      page_permissions: clientPlan.page_permissions || null,
+    } : null,
+    adminPlan: adminPlan ? {
+      id: Number(adminPlan.id),
+      name: String(adminPlan.name || ''),
+      client_registration_mode: 'paid',
+      default_client_plan_id: adminPlan.default_client_plan_id ? Number(adminPlan.default_client_plan_id) : null,
+    } : null,
+  };
+}
+
+function buildClientEnrollmentBaseUrl(req: Request) {
+  const protocol = getRequestProtocol(req);
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').trim();
+  return `${protocol}://${host}`;
+}
+
+async function finalizeClientEnrollmentCheckoutSession(sessionId: string) {
+  const { stripeClient, session } = await retrieveCheckoutSessionForSubscription(String(sessionId));
+  const metadata: any = session?.metadata || {};
+
+  if (!session || session.mode !== 'subscription' || metadata?.flow !== 'client_enrollment') {
+    throw new Error('Invalid client enrollment checkout session');
+  }
+
+  const enrollmentRequestId = Number(metadata?.enrollmentRequestId || 0);
+  if (!enrollmentRequestId) {
+    throw new Error('Missing client enrollment metadata');
+  }
+
+  const stripeSubscriptionId = session.subscription ? String(session.subscription) : null;
+  const stripeCustomerId = session.customer ? String(session.customer) : null;
+
+  let stripeSub: any = null;
+  if (stripeSubscriptionId) {
+    stripeSub = await stripeClient.subscriptions.retrieve(stripeSubscriptionId);
+  }
+
+  const result = await executeTransaction(async (connection) => {
+    const [requestRows] = await connection.execute(
+      `SELECT *
+         FROM client_enrollment_requests
+        WHERE id = ?
+        LIMIT 1
+        FOR UPDATE`,
+      [enrollmentRequestId]
+    );
+    const enrollment = Array.isArray(requestRows) ? requestRows[0] : null;
+
+    if (!enrollment) {
+      throw new Error('Client enrollment request not found');
+    }
+
+    const payload = (() => {
+      try {
+        return enrollment.intake_payload ? JSON.parse(String(enrollment.intake_payload)) : {};
+      } catch {
+        return {};
+      }
+    })();
+
+    const adminId = Number(enrollment.admin_id || metadata?.adminId || 0);
+    if (!adminId) {
+      throw new Error('Client enrollment admin is missing');
+    }
+
+    if (enrollment.created_client_id) {
+      await connection.execute(
+        `UPDATE client_enrollment_requests
+            SET status = 'completed',
+                stripe_checkout_session_id = ?,
+                stripe_subscription_id = ?,
+                stripe_customer_id = ?,
+                paid_at = COALESCE(paid_at, NOW()),
+                completed_at = COALESCE(completed_at, NOW()),
+                updated_at = NOW()
+          WHERE id = ?`,
+        [session.id, stripeSubscriptionId, stripeCustomerId, enrollmentRequestId]
+      );
+
+      const [clientRows] = await connection.execute(
+        'SELECT * FROM clients WHERE id = ? LIMIT 1',
+        [Number(enrollment.created_client_id)]
+      );
+
+      return {
+        createdClient: Array.isArray(clientRows) ? clientRows[0] : null,
+        createdClientId: Number(enrollment.created_client_id),
+        payload,
+        adminId,
+      };
+    }
+
+    const quotaValidation = await validateClientQuota(adminId);
+    if (!quotaValidation.canAdd) {
+      throw new Error(quotaValidation.error || 'Client quota exceeded');
+    }
+
+    const platformEmail = String(
+      enrollment.platform_email ||
+      payload?.clientData?.platform_email ||
+      payload?.clientData?.email ||
+      enrollment.email ||
+      ''
+    ).trim();
+    const email = String(
+      enrollment.email ||
+      payload?.clientData?.email ||
+      platformEmail ||
+      ''
+    ).trim();
+    const platform = String(
+      enrollment.platform ||
+      payload?.clientData?.platform ||
+      ''
+    ).trim().toLowerCase();
+
+    let existingClient: any = null;
+    if (platformEmail && platform) {
+      const [platformRows] = await connection.execute(
+        `SELECT *
+           FROM clients
+          WHERE user_id = ?
+            AND LOWER(TRIM(COALESCE(platform, ''))) = ?
+            AND LOWER(TRIM(COALESCE(NULLIF(platform_email, ''), email, ''))) = ?
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [adminId, platform, platformEmail.toLowerCase()]
+      );
+      existingClient = Array.isArray(platformRows) ? platformRows[0] : null;
+    }
+
+    if (!existingClient && email) {
+      const [emailRows] = await connection.execute(
+        `SELECT *
+           FROM clients
+          WHERE user_id = ?
+            AND LOWER(TRIM(COALESCE(email, ''))) = ?
+          ORDER BY updated_at DESC, id DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [adminId, email.toLowerCase()]
+      );
+      existingClient = Array.isArray(emailRows) ? emailRows[0] : null;
+    }
+
+    if (existingClient?.id) {
+      await connection.execute(
+        `UPDATE client_enrollment_requests
+            SET status = 'completed',
+                stripe_checkout_session_id = ?,
+                stripe_subscription_id = ?,
+                stripe_customer_id = ?,
+                created_client_id = ?,
+                paid_at = COALESCE(paid_at, NOW()),
+                completed_at = COALESCE(completed_at, NOW()),
+                updated_at = NOW()
+          WHERE id = ?`,
+        [session.id, stripeSubscriptionId, stripeCustomerId, Number(existingClient.id), enrollmentRequestId]
+      );
+
+      return {
+        createdClient: existingClient,
+        createdClientId: Number(existingClient.id),
+        payload,
+        adminId,
+      };
+    }
+
+    const fallbackName = fallbackNameFromEmail(email || platformEmail || 'client@example.com');
+    const firstName = String(enrollment.first_name || payload?.clientData?.first_name || fallbackName.firstName).trim();
+    const lastName = String(enrollment.last_name || payload?.clientData?.last_name || fallbackName.lastName).trim();
+    const actorUserId = Number(payload?.actorUserId || adminId);
+    const notesBase = String(payload?.clientData?.notes || '').trim();
+    const notes = [notesBase, 'Client enrollment completed via Stripe client plan checkout']
+      .filter(Boolean)
+      .join(' | ');
+
+    const insertResult = await executeClientInsert(connection, `
+      INSERT INTO clients (
+        user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
+        date_of_birth, employment_status, annual_income, status, notes,
+        platform, platform_email, platform_password, created_by, updated_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      adminId,
+      firstName || null,
+      lastName || null,
+      email || null,
+      enrollment.phone || payload?.clientData?.phone || null,
+      enrollment.address || payload?.clientData?.address || null,
+      enrollment.city || payload?.clientData?.city || null,
+      enrollment.state || payload?.clientData?.state || null,
+      enrollment.zip_code || payload?.clientData?.zip_code || null,
+      enrollment.ssn_last_four || payload?.clientData?.ssn_last_four || payload?.ssnLast4 || null,
+      enrollment.date_of_birth || payload?.clientData?.date_of_birth || null,
+      enrollment.employment_status || payload?.clientData?.employment_status || null,
+      enrollment.annual_income || payload?.clientData?.annual_income || null,
+      payload?.clientData?.status || 'active',
+      notes || null,
+      platform || null,
+      platformEmail || null,
+      enrollment.platform_password || payload?.clientData?.platform_password || payload?.password || null,
+      actorUserId,
+      actorUserId
+    ]);
+
+    const createdClientId = Number((insertResult as any)?.insertId || 0);
+
+    await connection.execute(
+      `UPDATE client_enrollment_requests
+          SET status = 'completed',
+              stripe_checkout_session_id = ?,
+              stripe_subscription_id = ?,
+              stripe_customer_id = ?,
+              created_client_id = ?,
+              paid_at = COALESCE(paid_at, NOW()),
+              completed_at = COALESCE(completed_at, NOW()),
+              updated_at = NOW()
+        WHERE id = ?`,
+      [session.id, stripeSubscriptionId, stripeCustomerId, createdClientId, enrollmentRequestId]
+    );
+
+    try {
+      await connection.execute(
+        `INSERT INTO activities (user_id, client_id, type, description)
+         VALUES (?, ?, 'client_added', ?)`,
+        [adminId, createdClientId, `New client added via paid enrollment: ${firstName} ${lastName}${platform ? ` (${platform})` : ''}`]
+      );
+    } catch {}
+
+    const [clientRows] = await connection.execute(
+      'SELECT * FROM clients WHERE id = ? LIMIT 1',
+      [createdClientId]
+    );
+
+    return {
+      createdClient: Array.isArray(clientRows) ? clientRows[0] : null,
+      createdClientId,
+      payload,
+      adminId,
+    };
+  });
+
+  if (result?.createdClientId) {
+    syncAdminClientToGhlInBackground(Number(result.adminId), Number(result.createdClientId), 'client_created');
+  }
+
+  const adminRows = await executeQuery<any[]>(
+    `SELECT onboarding_slug, intake_redirect_url, intake_company_name, company_name
+       FROM users
+      WHERE id = ?
+      LIMIT 1`,
+    [Number(result.adminId)]
+  );
+  const admin = Array.isArray(adminRows) && adminRows.length > 0 ? adminRows[0] : null;
+
+  return {
+    sessionId: session.id,
+    stripeSubscriptionId,
+    stripeCustomerId,
+    client: result.createdClient,
+    clientId: result.createdClientId,
+    onboardingSlug: admin?.onboarding_slug || null,
+    redirectUrl: admin?.intake_redirect_url || null,
+    companyName: admin?.intake_company_name || admin?.company_name || null,
+    source: String(result.payload?.source || metadata?.source || 'client_enrollment'),
+    returnUrl: result.payload?.returnUrl || null,
+  };
 }
 
 async function getStripeContextFromPlanId(planId: number): Promise<SubscriptionStripeContext> {
@@ -664,7 +1153,60 @@ router.get('/subscription', authenticateToken, async (req, res) => {
       }
     } else {
       // For admin/super_admin users, use direct user_id lookup
+      try {
+        const adminProfileRows = await executeQuery<any[]>(
+          `SELECT permissions, allow_free_client_enrollment
+             FROM admin_profiles
+            WHERE user_id = ?
+            LIMIT 1`,
+          [userId]
+        );
+
+        const adminProfile = Array.isArray(adminProfileRows) && adminProfileRows.length > 0
+          ? adminProfileRows[0]
+          : null;
+
+        const allowFreeClientEnrollment =
+          Number(adminProfile?.allow_free_client_enrollment ?? 0) === 1 ||
+          adminProfile?.allow_free_client_enrollment === true;
+
+        let parsedPermissions: string[] = [];
+        try {
+          const rawPermissions = adminProfile?.permissions;
+          if (typeof rawPermissions === 'string') {
+            const parsed = JSON.parse(rawPermissions);
+            if (Array.isArray(parsed)) parsedPermissions = parsed;
+            else if (parsed && Array.isArray(parsed.permissions)) parsedPermissions = parsed.permissions;
+          } else if (Array.isArray(rawPermissions)) {
+            parsedPermissions = rawPermissions;
+          } else if (rawPermissions && Array.isArray(rawPermissions.permissions)) {
+            parsedPermissions = rawPermissions.permissions;
+          }
+        } catch (permissionParseError) {
+          console.warn('Failed to parse admin permissions while checking exemption:', permissionParseError);
+        }
+
+        const hasPermissionExemption =
+          parsedPermissions.includes('subscription_exempt') ||
+          parsedPermissions.includes('no_subscription_required');
+
+        if (allowFreeClientEnrollment || hasPermissionExemption) {
+          subscription = {
+            id: 0,
+            user_id: userId,
+            plan_name: 'Subscription Exempt',
+            plan_type: 'monthly',
+            status: 'exempt',
+            current_period_start: new Date().toISOString(),
+            current_period_end: null,
+          } as any;
+          console.log('Admin is subscription-exempt; returning virtual exempt subscription');
+        }
+      } catch (adminProfileError) {
+        console.warn('Failed to check admin subscription exemption:', adminProfileError);
+      }
       console.log('🔍 [BILLING] Fetching subscription for admin user:', userId);
+      if (!subscription) {
       const subscriptionResult = await executeQuery<Subscription[]>(
         'SELECT * FROM subscriptions WHERE user_id = ?',
         [userId]
@@ -675,8 +1217,9 @@ router.get('/subscription', authenticateToken, async (req, res) => {
         console.log('✅ [BILLING] Found subscription for admin user:', subscription.plan_name);
       }
 
+      }
       // If no active subscription, check if the user has an active affiliate trial
-      if (!subscription || String(subscription.status || '').toLowerCase() !== 'active') {
+      if (!subscription || (String(subscription.status || '').toLowerCase() !== 'active' && String(subscription.status || '').toLowerCase() !== 'exempt')) {
         try {
           const trialRows = await executeQuery<any[]>(
             `SELECT trial_expires_at FROM users WHERE id = ? AND trial_expires_at IS NOT NULL AND trial_expires_at > NOW() LIMIT 1`,
@@ -937,13 +1480,16 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
 
     // Fetch plan to get Stripe Price IDs
     const planRows = await executeQuery<any[]>(
-      'SELECT id, name, price, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions FROM subscription_plans WHERE id = ? AND is_active = TRUE',
+      'SELECT id, name, price, plan_category, trial_price_id, stripe_monthly_price_id, stripe_yearly_price_id, stripe_product_id, page_permissions FROM subscription_plans WHERE id = ? AND is_active = TRUE',
       [planId]
     );
     if (!Array.isArray(planRows) || planRows.length === 0) {
       return res.status(404).json({ error: 'Plan not found or inactive' });
     }
     const plan = planRows[0];
+    if (String(plan.plan_category || 'admin').toLowerCase() !== 'admin') {
+      return res.status(403).json({ error: 'Client enrollment plans cannot be purchased from the admin subscription checkout.' });
+    }
     const stripeContext = getStripeContextForPlan(plan);
     const checkoutStripe = await getStripeForSubscriptionContext(stripeContext);
     console.log('Subscription checkout Stripe context:', stripeContext, 'plan:', plan.name);
@@ -1295,6 +1841,203 @@ router.post('/create-subscription-checkout', authenticateToken, async (req, res)
   } catch (error: any) {
     console.error('❌ Error creating subscription checkout session:', error);
     res.status(500).json({ error: 'Failed to create subscription checkout session', details: error?.message || 'Unknown error' });
+  }
+});
+
+router.post('/create-client-enrollment-checkout', optionalAuth, async (req: any, res) => {
+  try {
+    const adminId = await resolveAdminIdFromClientEnrollmentContext(req);
+    const enrollmentSettings = await getClientEnrollmentSettingsForBilling(adminId);
+
+    if (enrollmentSettings.allowFreeEnrollment || !enrollmentSettings.clientPlan) {
+      return res.status(400).json({
+        error: 'Client enrollment payment is not required for this admin',
+        code: 'CLIENT_PLAN_PAYMENT_NOT_REQUIRED',
+      });
+    }
+
+    const clientData = req.body?.clientData || {};
+    const source = String(req.body?.source || 'client_enrollment').trim() || 'client_enrollment';
+    const returnUrl = String(req.body?.returnUrl || '').trim() || null;
+    const email = String(clientData.email || '').trim();
+    const platformEmail = String(clientData.platform_email || email || '').trim();
+    const platform = String(clientData.platform || '').trim();
+
+    if (!email && !platformEmail) {
+      return res.status(400).json({ error: 'Client email is required to create enrollment checkout' });
+    }
+
+    const plan = enrollmentSettings.clientPlan;
+    const stripeContext = getStripeContextForPlan(plan);
+    const checkoutStripe = await getStripeForSubscriptionContext(stripeContext);
+
+    const billingCycle = String(plan.billing_cycle || 'monthly').toLowerCase() === 'yearly' ? 'yearly' : 'monthly';
+    let priceId = billingCycle === 'yearly' ? plan.stripe_yearly_price_id : plan.stripe_monthly_price_id;
+    let stripePriceValid = false;
+
+    try {
+      if (priceId) {
+        const stripePrice = await checkoutStripe.prices.retrieve(String(priceId));
+        stripePriceValid = !!stripePrice?.id;
+      }
+    } catch {}
+
+    if (!stripePriceValid) {
+      const planPriceNum = Number(plan.price || 0);
+      if (!Number.isFinite(planPriceNum) || planPriceNum <= 0) {
+        return res.status(400).json({ error: 'Client plan price is not configured' });
+      }
+
+      let productId = String(plan.stripe_product_id || '');
+      let productExists = false;
+      if (productId) {
+        try {
+          const product = await checkoutStripe.products.retrieve(productId);
+          productExists = !!product?.id;
+        } catch {}
+      }
+      if (!productExists) {
+        const product = await checkoutStripe.products.create({ name: plan.name });
+        productId = product.id;
+        await executeQuery(
+          'UPDATE subscription_plans SET stripe_product_id = ? WHERE id = ?',
+          [productId, plan.id]
+        );
+      }
+
+      const price = await checkoutStripe.prices.create({
+        unit_amount: Math.round(planPriceNum * 100),
+        currency: 'usd',
+        recurring: { interval: billingCycle === 'yearly' ? 'year' : 'month' },
+        product: productId,
+      });
+      priceId = price.id;
+
+      await executeQuery(
+        billingCycle === 'yearly'
+          ? 'UPDATE subscription_plans SET stripe_yearly_price_id = ? WHERE id = ?'
+          : 'UPDATE subscription_plans SET stripe_monthly_price_id = ? WHERE id = ?',
+        [priceId, plan.id]
+      );
+    }
+
+    const payloadForStorage = {
+      source,
+      returnUrl,
+      actorUserId: req.user?.id ? Number(req.user.id) : adminId,
+      clientData: {
+        first_name: clientData.first_name || null,
+        last_name: clientData.last_name || null,
+        email: email || null,
+        phone: clientData.phone || null,
+        address: clientData.address || null,
+        city: clientData.city || null,
+        state: clientData.state || null,
+        zip_code: clientData.zip_code || null,
+        ssn_last_four: clientData.ssn_last_four || clientData.ssnLast4 || null,
+        date_of_birth: clientData.date_of_birth || null,
+        employment_status: clientData.employment_status || null,
+        annual_income: clientData.annual_income || null,
+        status: clientData.status || 'active',
+        notes: clientData.notes || null,
+        platform: platform || null,
+        platform_email: platformEmail || null,
+        platform_password: clientData.platform_password || clientData.password || null,
+      },
+      token: req.body?.token || null,
+      slug: req.body?.slug || null,
+      password: clientData.password || null,
+      ssnLast4: clientData.ssnLast4 || null,
+    };
+
+    const insertResult: any = await executeQuery(
+      `INSERT INTO client_enrollment_requests
+         (admin_id, plan_id, source, status, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four, date_of_birth, employment_status, annual_income, platform, platform_email, platform_password, intake_payload)
+       VALUES (?, ?, ?, 'pending_payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        adminId,
+        plan.id,
+        source,
+        clientData.first_name || null,
+        clientData.last_name || null,
+        email || null,
+        clientData.phone || null,
+        clientData.address || null,
+        clientData.city || null,
+        clientData.state || null,
+        clientData.zip_code || null,
+        clientData.ssn_last_four || clientData.ssnLast4 || null,
+        clientData.date_of_birth || null,
+        clientData.employment_status || null,
+        clientData.annual_income || null,
+        platform || null,
+        platformEmail || null,
+        clientData.platform_password || clientData.password || null,
+        JSON.stringify(payloadForStorage),
+      ]
+    );
+
+    const enrollmentRequestId = Number(insertResult?.insertId || 0);
+    const baseUrl = buildClientEnrollmentBaseUrl(req);
+    const successUrl = `${baseUrl}/client-enrollment/success?session_id={CHECKOUT_SESSION_ID}`;
+    const fallbackCancelUrl = returnUrl || `${baseUrl}/client-enrollment/success?cancelled=1`;
+
+    const customerName = [clientData.first_name, clientData.last_name].filter(Boolean).join(' ').trim() || undefined;
+    const session = await checkoutStripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: String(priceId), quantity: 1 }],
+      customer_email: email || platformEmail || undefined,
+      success_url: successUrl,
+      cancel_url: fallbackCancelUrl,
+      metadata: {
+        flow: 'client_enrollment',
+        source,
+        adminId: String(adminId),
+        planId: String(plan.id),
+        enrollmentRequestId: String(enrollmentRequestId),
+        stripeContext,
+      },
+      subscription_data: {
+        metadata: {
+          flow: 'client_enrollment',
+          source,
+          adminId: String(adminId),
+          planId: String(plan.id),
+          enrollmentRequestId: String(enrollmentRequestId),
+          clientEmail: email || platformEmail || '',
+          clientName: customerName || '',
+          stripeContext,
+        },
+      },
+    });
+
+    await executeQuery(
+      `UPDATE client_enrollment_requests
+          SET stripe_checkout_session_id = ?, updated_at = NOW()
+        WHERE id = ?`,
+      [session.id, enrollmentRequestId]
+    );
+
+    return res.json({
+      success: true,
+      url: session.url,
+      sessionId: session.id,
+      enrollmentRequestId,
+      enrollment: {
+        allowFreeEnrollment: false,
+        clientPlan: plan,
+        adminPlan: enrollmentSettings.adminPlan,
+      },
+    });
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to create client enrollment checkout session');
+    const status =
+      message === 'Invalid intake token scope' ? 403 :
+      message === 'Onboarding link not found' ? 404 :
+      message === 'Invalid or expired intake token' ? 401 :
+      message === 'Intake token required' ? 400 :
+      500;
+    return res.status(status).json({ error: message });
   }
 });
 
@@ -1913,9 +2656,11 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
     let planName = 'Subscription';
     let billingCycle: 'monthly' | 'yearly' = metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
     const planIdMeta = metadata?.planId ? parseInt(String(metadata.planId), 10) : undefined;
+    let selectedPlan: any = null;
     if (planIdMeta) {
-      const planRows = await executeQuery<any[]>('SELECT name FROM subscription_plans WHERE id = ?', [planIdMeta]);
+      const planRows = await executeQuery<any[]>('SELECT id, name, plan_category, auto_create_affiliate_account, client_registration_mode, default_client_plan_id FROM subscription_plans WHERE id = ?', [planIdMeta]);
       if (Array.isArray(planRows) && planRows.length > 0 && planRows[0].name) {
+        selectedPlan = planRows[0];
         planName = planRows[0].name;
       }
     }
@@ -1973,7 +2718,8 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
     if (userId) {
       syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
       const userRows = await executeQuery('SELECT email, first_name, last_name, company_name, role FROM users WHERE id = ?', [userId]) as any[];
-      if (userRows && userRows.length > 0 && userRows[0].role === 'admin') {
+      const shouldAutoCreateAffiliate = Number(selectedPlan?.auto_create_affiliate_account ?? 0) === 1 || selectedPlan?.auto_create_affiliate_account === true;
+      if (userRows && userRows.length > 0 && userRows[0].role === 'admin' && shouldAutoCreateAffiliate) {
         const adminAffiliateRows = await executeQuery('SELECT id FROM affiliates WHERE admin_id = ?', [userId]) as any[];
         if (adminAffiliateRows && adminAffiliateRows.length > 0) {
           await executeQuery('UPDATE affiliates SET plan_type = ?, status = ?, updated_at = NOW() WHERE admin_id = ?', ['paid_partner', 'active', userId]);
@@ -2071,6 +2817,26 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Failed to finalize checkout session', details: error?.message || 'Unknown error' });
+  }
+});
+
+router.post('/finalize-client-enrollment-session', optionalAuth, async (req, res) => {
+  try {
+    const { sessionId } = req.body as { sessionId?: string };
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+
+    const result = await finalizeClientEnrollmentCheckoutSession(String(sessionId));
+    return res.json({
+      success: true,
+      enrollment: result,
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      error: 'Failed to finalize client enrollment session',
+      details: error?.message || 'Unknown error',
+    });
   }
 });
 
@@ -2715,6 +3481,12 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         try {
+          if (session.metadata?.flow === 'client_enrollment') {
+            await finalizeClientEnrollmentCheckoutSession(String(session.id));
+            console.log('✅ Client enrollment finalized via webhook:', session.id);
+            break;
+          }
+
           if (session.mode === 'subscription' && session.subscription) {
             const stripeSubscriptionId = String(session.subscription);
             const customerId = String(session.customer);
@@ -2724,12 +3496,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             const billingCycle: 'monthly' | 'yearly' = metadata?.billingCycle === 'yearly' ? 'yearly' : 'monthly';
 
             let planName = 'Subscription';
+            let selectedPlan: any = null;
             if (planId) {
               const planRows = await executeQuery<any[]>(
-                'SELECT name FROM subscription_plans WHERE id = ?',
+                'SELECT id, name, auto_create_affiliate_account FROM subscription_plans WHERE id = ?',
                 [planId]
               );
               if (Array.isArray(planRows) && planRows.length > 0 && planRows[0].name) {
+                selectedPlan = planRows[0];
                 planName = planRows[0].name;
               }
             }
@@ -2950,7 +3724,8 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               'SELECT email, first_name, last_name, company_name, role FROM users WHERE id = ?',
               [userId]
             ) as any[];
-            if (userRows && userRows.length > 0 && userRows[0].role === 'admin') {
+            const shouldAutoCreateAffiliate = Number(selectedPlan?.auto_create_affiliate_account ?? 0) === 1 || selectedPlan?.auto_create_affiliate_account === true;
+            if (userRows && userRows.length > 0 && userRows[0].role === 'admin' && shouldAutoCreateAffiliate) {
               const adminAffiliateRows = await executeQuery(
                 'SELECT id, email, plan_type FROM affiliates WHERE admin_id = ?',
                 [userId]

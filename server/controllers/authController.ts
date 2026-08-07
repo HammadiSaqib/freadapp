@@ -1778,7 +1778,7 @@ export class AuthController {
       if (['admin', 'super_admin'].includes(user.role)) {
         try {
           const adminProfile = await getQuery(
-            'SELECT permissions FROM admin_profiles WHERE user_id = ? LIMIT 1',
+            'SELECT permissions, allow_free_client_enrollment FROM admin_profiles WHERE user_id = ? LIMIT 1',
             [user.id]
           );
 
@@ -1799,10 +1799,17 @@ export class AuthController {
             }
           }
 
-          (userData as any).permissions = parsedPermissions;
-          (userData as any).is_subscription_exempt = Array.isArray(parsedPermissions) && (
+          const allowFreeClientEnrollment =
+            Number((adminProfile as any)?.allow_free_client_enrollment ?? 0) === 1 ||
+            (adminProfile as any)?.allow_free_client_enrollment === true;
+
+          const hasPermissionExemption = Array.isArray(parsedPermissions) && (
             parsedPermissions.includes('subscription_exempt') || parsedPermissions.includes('no_subscription_required')
           );
+
+          (userData as any).permissions = parsedPermissions;
+          (userData as any).allow_free_client_enrollment = allowFreeClientEnrollment;
+          (userData as any).is_subscription_exempt = allowFreeClientEnrollment || hasPermissionExemption;
 
           const portalAccess = await getScoreMachinePortalAccessStatus(user.id);
           (userData as any).admin_portal_mode = portalAccess.portalMode;
@@ -1815,6 +1822,7 @@ export class AuthController {
         } catch (profileErr) {
           console.warn('Admin profile not found or permissions unavailable:', profileErr);
           (userData as any).permissions = [];
+          (userData as any).allow_free_client_enrollment = false;
           (userData as any).is_subscription_exempt = false;
           (userData as any).admin_portal_mode = 'standard';
           (userData as any).has_score_machine_basic_access = false;

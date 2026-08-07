@@ -61,7 +61,17 @@ router.get('/affiliate/status', authenticateToken, async (req, res) => {
       [userId]
     );
     if (!rows || rows.length === 0) {
-      return res.status(404).json({ error: 'No affiliate access found' });
+      return res.json({
+        success: true,
+        has_access: false,
+        status: null,
+        email_verified: false,
+        plan_type: null,
+        affiliate_id: null,
+        partner_monitoring_link: null,
+        referral_slug: null,
+        created_at: null
+      });
     }
     let selected = null as any;
     if (adminEmail) {
@@ -90,6 +100,7 @@ router.get('/affiliate/status', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
+      has_access: true,
       status: selected.status,
       email_verified: selected.email_verified,
       plan_type: selected.plan_type,

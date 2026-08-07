@@ -61,9 +61,10 @@ router.get('/plans', optionalAuth, async (req: Request, res: Response) => {
   try {
     const db = getDatabaseAdapter();
     const plans = await db.allQuery(
-      `SELECT id, name, description, price, billing_cycle, features, page_permissions, max_users, max_clients, max_disputes, sort_order
+      `SELECT id, name, description, price, billing_cycle, features, page_permissions, max_users, max_clients, max_disputes, sort_order, plan_category
        FROM subscription_plans 
-       WHERE is_active = TRUE 
+       WHERE is_active = TRUE
+         AND COALESCE(plan_category, 'admin') = 'admin'
        ORDER BY sort_order ASC, price ASC`
     );
 
@@ -237,9 +238,9 @@ router.get('/plans/:id', optionalAuth, async (req: Request, res: Response) => {
 
     const db = getDatabaseAdapter();
     const plan = await db.getQuery(
-      `SELECT id, name, description, price, billing_cycle, features, page_permissions, max_users, max_clients, max_disputes, sort_order
+      `SELECT id, name, description, price, billing_cycle, features, page_permissions, max_users, max_clients, max_disputes, sort_order, plan_category
        FROM subscription_plans 
-       WHERE id = ? AND is_active = TRUE`,
+       WHERE id = ? AND is_active = TRUE AND COALESCE(plan_category, 'admin') = 'admin'`,
       [planId]
     );
 

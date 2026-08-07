@@ -87,6 +87,7 @@ interface SubscriptionPlan {
   name: string;
   description: string;
   price: number;
+  plan_category?: 'admin' | 'client';
   billing_cycle: 'monthly' | 'yearly' | 'lifetime';
   features: string[];
   page_permissions?: string[]; // New field for page access control
@@ -95,6 +96,9 @@ interface SubscriptionPlan {
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
+  auto_create_affiliate_account?: boolean;
+  client_registration_mode?: 'paid' | 'free';
+  default_client_plan_id?: number | null;
   max_users?: number;
   max_clients?: number;
   is_active: boolean;
@@ -130,6 +134,7 @@ interface PlanFormData {
   name: string;
   description: string;
   price: number;
+  plan_category: 'admin' | 'client';
   billing_cycle: 'monthly' | 'yearly' | 'lifetime';
   features: string[];
   page_permissions: string[]; // New field for page access control
@@ -138,6 +143,9 @@ interface PlanFormData {
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
+  auto_create_affiliate_account: boolean;
+  client_registration_mode: 'paid' | 'free';
+  default_client_plan_id?: number | null;
   max_users?: number;
   max_clients?: number;
   is_active: boolean;
@@ -152,6 +160,7 @@ const initialFormData: PlanFormData = {
   name: '',
   description: '',
   price: 0,
+  plan_category: 'admin',
   billing_cycle: 'monthly',
   features: [],
   page_permissions: [], // Initialize empty page permissions
@@ -160,6 +169,9 @@ const initialFormData: PlanFormData = {
   stripe_monthly_price_id: '',
   stripe_yearly_price_id: '',
   stripe_product_id: '',
+  auto_create_affiliate_account: false,
+  client_registration_mode: 'paid',
+  default_client_plan_id: null,
   max_users: undefined,
   max_clients: undefined,
   is_active: true,
@@ -170,7 +182,19 @@ const initialFormData: PlanFormData = {
   allowed_affiliate_ids: []
 };
 
-export default function PlanManagement() {
+interface PlanManagementProps {
+  planCategoryFilter?: 'admin' | 'client' | 'all';
+  lockPlanCategory?: boolean;
+  title?: string;
+  description?: string;
+}
+
+export default function PlanManagement({
+  planCategoryFilter = 'all',
+  lockPlanCategory = false,
+  title = 'Plan Management',
+  description = 'Manage subscription plans and pricing',
+}: PlanManagementProps) {
   console.log('🚀 PlanManagement component mounted');
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -198,7 +222,11 @@ export default function PlanManagement() {
       const allPlans: any[] = [];
 
       while (page <= pages && page <= maxPages) {
-        const response = await superAdminApi.getPlans({ page, limit });
+        const response = await superAdminApi.getPlans({
+          page,
+          limit,
+          ...(planCategoryFilter !== 'all' ? { plan_category: planCategoryFilter } : {}),
+        });
         console.log('✅ Plans API response:', response);
         console.log('📊 Raw response.data:', response.data);
         const plansData = response.data?.data || response.data || [];
@@ -243,7 +271,7 @@ export default function PlanManagement() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [planCategoryFilter]);
 
   const loadCourses = useCallback(async () => {
     try {
@@ -279,6 +307,7 @@ export default function PlanManagement() {
     setEditingPlan(null);
     setFormData({
       ...initialFormData,
+      plan_category: planCategoryFilter !== 'all' ? planCategoryFilter : initialFormData.plan_category,
       assigned_courses: [],
       page_permissions: []
     });
@@ -317,6 +346,7 @@ export default function PlanManagement() {
       name: plan.name,
       description: plan.description,
       price: plan.price,
+      plan_category: plan.plan_category || 'admin',
       billing_cycle: plan.billing_cycle,
       features: [...plan.features],
       page_permissions: normalizePortalPagePermissions(plan.page_permissions || []),
@@ -325,6 +355,9 @@ export default function PlanManagement() {
       stripe_monthly_price_id: plan.stripe_monthly_price_id || '',
       stripe_yearly_price_id: plan.stripe_yearly_price_id || '',
       stripe_product_id: plan.stripe_product_id || '',
+      auto_create_affiliate_account: !!plan.auto_create_affiliate_account,
+      client_registration_mode: plan.client_registration_mode || 'paid',
+      default_client_plan_id: plan.default_client_plan_id ?? null,
       max_users: plan.max_users,
       max_clients: plan.max_clients,
       is_active: plan.is_active,
@@ -367,7 +400,10 @@ export default function PlanManagement() {
       }
       
       setIsDialogOpen(false);
-      setFormData(initialFormData);
+      setFormData({
+        ...initialFormData,
+        plan_category: planCategoryFilter !== 'all' ? planCategoryFilter : initialFormData.plan_category,
+      });
       setAllowedEmailsText('');
       setEditingPlan(null);
       await loadPlans();
@@ -410,6 +446,9 @@ export default function PlanManagement() {
   };
 
   const filteredPlans = (Array.isArray(plans) ? plans : []).filter(plan => {
+    if (planCategoryFilter !== 'all' && (plan.plan_category || 'admin') !== planCategoryFilter) {
+      return false;
+    }
     const normalizedSearchTerm = searchTerm.trim().toLowerCase();
     const normalizedPlanName = String(plan.name || '').toLowerCase();
     const normalizedPlanDescription = String(plan.description || '').toLowerCase();
@@ -464,8 +503,8 @@ export default function PlanManagement() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Plan Management</h2>
-          <p className="text-muted-foreground">Manage subscription plans and pricing</p>
+          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+          <p className="text-muted-foreground">{description}</p>
         </div>
         <Button onClick={handleCreatePlan}>
           <Plus className="mr-2 h-4 w-4" />
@@ -517,9 +556,9 @@ export default function PlanManagement() {
       {/* Plans Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Subscription Plans ({filteredPlans.length})</CardTitle>
+          <CardTitle>{title} ({filteredPlans.length})</CardTitle>
           <CardDescription>
-            Manage your subscription plans, pricing, and features
+            {description}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -676,6 +715,22 @@ export default function PlanManagement() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
+                    <Label htmlFor="plan_category">Plan Category</Label>
+                    <Select
+                      value={formData.plan_category}
+                      onValueChange={(value: 'admin' | 'client') => setFormData(prev => ({ ...prev, plan_category: value }))}
+                      disabled={lockPlanCategory}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin Plan</SelectItem>
+                        <SelectItem value="client">Client Plan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
                     <Label htmlFor="billing_cycle">Billing Cycle</Label>
                     <Select value={formData.billing_cycle} onValueChange={(value: 'monthly' | 'yearly' | 'lifetime') => {
                       setFormData(prev => ({ ...prev, billing_cycle: value }));
@@ -698,6 +753,35 @@ export default function PlanManagement() {
                       value={formData.sort_order}
                       onChange={(e) => setFormData(prev => ({ ...prev, sort_order: parseInt(e.target.value) || 0 }))}
                     />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-lg border p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <Label htmlFor="auto_create_affiliate_account">Auto-create affiliate after payment</Label>
+                        <p className="text-xs text-muted-foreground">Use this for admin plans that should generate an affiliate account once payment succeeds.</p>
+                      </div>
+                      <Switch
+                        id="auto_create_affiliate_account"
+                        checked={formData.auto_create_affiliate_account}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, auto_create_affiliate_account: checked }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border p-4 space-y-3">
+                    <Label htmlFor="client_registration_mode">Client Enrollment Mode</Label>
+                    <Select value={formData.client_registration_mode} onValueChange={(value: 'paid' | 'free') => setFormData(prev => ({ ...prev, client_registration_mode: value }))}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">Paid client enrollment</SelectItem>
+                        <SelectItem value="free">Free client enrollment</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">Super admin can still override this per admin account.</p>
                   </div>
                 </div>
 

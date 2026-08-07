@@ -40,6 +40,7 @@ import EliteClients from "@/components/EliteClients";
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { clientsApi, creditReportScraperApi, contractsApi } from "@/lib/api";
+import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
 import { buildAliasUrl } from "@/lib/hostRouting";
 import {
   closeReportPullLoading,
@@ -515,6 +516,7 @@ const getScoreChange = (current: number, previous: number) => {
     e.preventDefault();
     setIsAddingClient(true);
     let reportPullFeedbackOpen = false;
+    let pendingCheckoutClientData: Record<string, any> | null = null;
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -729,6 +731,7 @@ const getScoreChange = (current: number, previous: number) => {
         ...(addSsnLast4 ? { ssn_last_four: addSsnLast4 } : {}),
         notes: `Client created via credit report scraping from ${addPlatform}`,
       };
+      pendingCheckoutClientData = clientData;
 
       const createResponse = await clientsApi.createClient(clientData);
       const createResponseData = createResponse?.data ?? createResponse;
@@ -768,6 +771,25 @@ const getScoreChange = (current: number, previous: number) => {
       if (reportPullFeedbackOpen) {
         showReportPullError();
         reportPullFeedbackOpen = false;
+      }
+      if (isClientPlanPaymentRequired(error)) {
+        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
+          source: "clients_page_scrape",
+          returnUrl: window.location.href,
+          clientData: pendingCheckoutClientData || {
+            platform: addPlatform,
+            email: addEmail,
+            platform_email: addEmail,
+            platform_password: addPassword,
+            ...(addSsnLast4 ? { ssn_last_four: addSsnLast4 } : {}),
+          },
+        });
+        toast({
+          title: "Client payment link copied",
+          description: "Send this payment link to the client so they can complete enrollment.",
+        });
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        return;
       }
       if (error.response?.status === 403 && error.response?.data?.error === "Client quota exceeded") {
         const planLimits = error.response.data.planLimits;

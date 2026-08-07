@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { contractsApi } from "@/lib/api";
+import { getAdminPortalMode } from "@/lib/adminPortalAccess";
 
 type EliteStatusCacheEntry = {
   hasAccess: boolean;
@@ -86,6 +87,16 @@ const fetchEliteAgreementStatus = async (userId: string) => {
   const request = contractsApi.getLatestTsmEliteAgreement()
     .then((response) => {
       const agreement = response?.data?.data;
+      const hasAccess = response?.data?.has_access !== false && !!agreement;
+
+      if (!hasAccess) {
+        updateEliteStatusCache(userId, {
+          ...EMPTY_ELITE_STATUS_CACHE,
+          hasResolvedAgreement: true,
+        });
+        return;
+      }
+
       const isSigned = String(agreement?.status || "").trim().toLowerCase() === "signed";
       const canSign = Boolean(agreement?.can_sign);
 
@@ -143,6 +154,14 @@ export function useScoreMachineEliteStatus(): UseScoreMachineEliteStatusResult {
   const canResolveEliteStatus = Boolean(
     userId && ['admin', 'employee', 'user', 'funding_manager'].includes(String(userProfile?.role || ''))
   );
+  const portalMode = getAdminPortalMode(userProfile);
+  const hasProfileEliteAccess = Boolean(
+    userProfile?.role === "super_admin" ||
+    portalMode === "elite" ||
+    userProfile?.has_score_machine_elite_access ||
+    userProfile?.has_direct_score_machine_elite_permission ||
+    userProfile?.has_plan_score_machine_elite_access
+  );
 
   useEffect(() => {
     const syncStatus = () => {
@@ -156,6 +175,20 @@ export function useScoreMachineEliteStatus(): UseScoreMachineEliteStatusResult {
       eliteStatusListeners.delete(syncStatus);
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !canResolveEliteStatus || !hasProfileEliteAccess) {
+      return;
+    }
+
+    updateEliteStatusCache(userId, (current) => ({
+      ...current,
+      hasAccess: true,
+      hasResolvedAgreement: current.hasResolvedAgreement && current.hasAccess
+        ? current.hasResolvedAgreement
+        : false,
+    }));
+  }, [canResolveEliteStatus, hasProfileEliteAccess, userId]);
 
   useEffect(() => {
     if (!userId || !canResolveEliteStatus) {
@@ -174,7 +207,7 @@ export function useScoreMachineEliteStatus(): UseScoreMachineEliteStatusResult {
     userId,
   ]);
 
-  const hasScoreMachineEliteAccess = canResolveEliteStatus && cachedStatus.hasAccess;
+  const hasScoreMachineEliteAccess = canResolveEliteStatus && (cachedStatus.hasAccess || hasProfileEliteAccess);
 
   useEffect(() => {
     if (!userId || userProfile?.role !== "admin") {

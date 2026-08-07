@@ -40,21 +40,28 @@ export async function checkUserPlanLimits(userId: number): Promise<PlanLimits> {
     // Check if admin has a subscription exemption permission
     // This allows unlimited clients and bypasses subscription requirements
     const adminProfile = await getQuery(
-      'SELECT permissions FROM admin_profiles WHERE user_id = ?',
+      'SELECT permissions, allow_free_client_enrollment FROM admin_profiles WHERE user_id = ?',
       [effectiveUserId]
     );
+    const allowFreeClientEnrollment =
+      Number(adminProfile?.allow_free_client_enrollment ?? 0) === 1 ||
+      adminProfile?.allow_free_client_enrollment === true;
     try {
       const rawPermissions = adminProfile?.permissions;
       const permissions = rawPermissions
         ? (typeof rawPermissions === 'string' ? JSON.parse(rawPermissions) : rawPermissions)
         : [];
-      if (Array.isArray(permissions) && (permissions.includes('subscription_exempt') || permissions.includes('no_subscription_required'))) {
+      const hasPermissionExemption =
+        Array.isArray(permissions) &&
+        (permissions.includes('subscription_exempt') || permissions.includes('no_subscription_required'));
+
+      if (allowFreeClientEnrollment || hasPermissionExemption) {
         return {
           hasActivePlan: true,
           maxClients: Number.MAX_SAFE_INTEGER,
           currentClientCount,
           canAddClient: true,
-          planName: 'Admin Exempt',
+          planName: allowFreeClientEnrollment ? 'Free Enrollment Admin' : 'Admin Exempt',
           planStatus: 'exempt'
         };
       }

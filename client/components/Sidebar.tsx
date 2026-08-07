@@ -982,7 +982,22 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
         <div className="flex items-center justify-between">
           {!collapsed && (
             <Link to="/" className="flex items-center space-x-2">
-              <img src={isEliteActive ? "/capsol-logo-white.png" : "/capsol-logo.png"} alt="CapSol" className={isBasicAdminPortalUser ? 'w-28 h-10 object-contain' : 'w-32 h-12 object-contain'} />
+              {isEliteActive ? (
+                <>
+                  <img
+                    src="/capsol-logo.png"
+                    alt="CapSol"
+                    className={`block dark:hidden ${isBasicAdminPortalUser ? 'w-28 h-10 object-contain' : 'w-32 h-12 object-contain'}`}
+                  />
+                  <img
+                    src="/capsol-logo-white.png"
+                    alt="CapSol"
+                    className={`hidden dark:block ${isBasicAdminPortalUser ? 'w-28 h-10 object-contain' : 'w-32 h-12 object-contain'}`}
+                  />
+                </>
+              ) : (
+                <img src="/capsol-logo.png" alt="CapSol" className={isBasicAdminPortalUser ? 'w-28 h-10 object-contain' : 'w-32 h-12 object-contain'} />
+              )}
             </Link>
           )}
           {collapsed && (

@@ -79,14 +79,16 @@ export default function ScoreMachineElitePrompt({
       setError(null);
       const response = await contractsApi.getLatestTsmEliteAgreement();
       const data = response?.data?.data as ScoreMachineEliteAgreement | undefined;
+      const hasAccess = response?.data?.has_access !== false;
 
-      if (data) {
-        setAgreement(data);
-        setSignatureDataUrl(data.signature_image_url || null);
-      } else {
+      if (!hasAccess || !data) {
         setAgreement(null);
-        setError("No Score Machine Elite agreement is available right now.");
+        setError("Score Machine Elite is not enabled for this admin account.");
+        return;
       }
+
+      setAgreement(data);
+      setSignatureDataUrl(data.signature_image_url || null);
     } catch (err: any) {
       if (err?.response?.status === 404) {
         setAgreement(null);

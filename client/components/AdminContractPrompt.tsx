@@ -61,14 +61,8 @@ export default function AdminContractPrompt() {
         setOpen(false);
       }
     } catch (err: any) {
-      // 404 is fine (no contract found for admin)
-      if (err?.response?.status === 404) {
-        setContract(null);
-        setOpen(false);
-      } else {
-        console.error("AdminContractPrompt: failed to fetch latest contract", err);
-        setError("Failed to check admin contract status.");
-      }
+      console.error("AdminContractPrompt: failed to fetch latest contract", err);
+      setError("Failed to check admin contract status.");
     } finally {
       setLoading(false);
     }
@@ -94,6 +88,7 @@ export default function AdminContractPrompt() {
           setOpen(false);
         }
       } catch (err: any) {
+        console.error("AdminContractPrompt: failed to fetch latest contract on demand", err);
         setError("Failed to check admin contract status.");
       } finally {
         setLoading(false);

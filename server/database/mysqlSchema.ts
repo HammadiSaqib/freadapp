@@ -508,6 +508,12 @@ export async function initializeMySQLDatabase(): Promise<void> {
     await createMySQLTables();
 
     try {
+      await repairTableIdAutoIncrement('users');
+    } catch (error: any) {
+      console.log('⚠️  Error repairing users.id AUTO_INCREMENT:', error.message);
+    }
+
+    try {
       await repairClientsIdAutoIncrement();
     } catch (error: any) {
       console.log('⚠️  Error repairing clients.id AUTO_INCREMENT:', error.message);
@@ -535,6 +541,30 @@ export async function initializeMySQLDatabase(): Promise<void> {
       await repairTableIdAutoIncrement('disputes');
     } catch (error: any) {
       console.log('Error repairing disputes.id AUTO_INCREMENT:', error.message);
+    }
+
+    try {
+      await repairTableIdAutoIncrement('admin_profiles');
+    } catch (error: any) {
+      console.log('Error repairing admin_profiles.id AUTO_INCREMENT:', error.message);
+    }
+
+    try {
+      await repairTableIdAutoIncrement('subscription_plans');
+    } catch (error: any) {
+      console.log('Error repairing subscription_plans.id AUTO_INCREMENT:', error.message);
+    }
+
+    try {
+      await repairTableIdAutoIncrement('contract_signatures');
+    } catch (error: any) {
+      console.log('Error repairing contract_signatures.id AUTO_INCREMENT:', error.message);
+    }
+
+    try {
+      await repairTableIdAutoIncrement('billing_transactions');
+    } catch (error: any) {
+      console.log('Error repairing billing_transactions.id AUTO_INCREMENT:', error.message);
     }
 
     try {

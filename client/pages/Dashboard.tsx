@@ -48,6 +48,7 @@ import {
   openReportPullLoading,
   showReportPullError,
 } from "@/lib/reportPullFeedback";
+import { copyClientEnrollmentCheckoutLink, isClientPlanPaymentRequired } from "@/lib/clientEnrollment";
 import {
   Users,
   FileText,
@@ -458,7 +459,24 @@ export default function Dashboard() {
     if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin') {
       try {
         const affiliateResponse = await api.get('/api/auth/affiliate/status');
-        const { status, affiliate_id, referral_slug, partner_monitoring_link } = affiliateResponse.data || {};
+        const { has_access, status, affiliate_id, referral_slug, partner_monitoring_link } = affiliateResponse.data || {};
+        const hasAccess = has_access !== false && !!affiliate_id;
+
+        if (!hasAccess) {
+          setHasAffiliateAccess(false);
+          setAffiliateVerificationStatus(null);
+          setAffiliateId(null);
+          setAffiliateLink("");
+
+          updateDashboardOverviewCache({
+            hasAffiliateAccess: false,
+            affiliateVerificationStatus: null,
+            affiliateId: null,
+            affiliateLink: "",
+          });
+          return;
+        }
+
         const nextVerificationStatus = status || null;
         const nextAffiliateId = affiliate_id ? String(affiliate_id) : null;
         const refPart = referral_slug && typeof referral_slug === 'string' && referral_slug.length > 0
@@ -1195,6 +1213,7 @@ export default function Dashboard() {
     }
     setIsSubmitting(true);
     let reportPullFeedbackOpen = false;
+    let pendingCheckoutClientData: Record<string, any> | null = null;
 
     try {
       // Check if user is authenticated
@@ -1434,6 +1453,7 @@ export default function Dashboard() {
         ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
         notes: `Client created via credit report scraping from ${newClient.platform}`,
       };
+      pendingCheckoutClientData = clientData;
 
       console.log("Creating client with extracted data:", clientData);
       const response = await clientsApi.createClient(clientData);
@@ -1486,6 +1506,26 @@ export default function Dashboard() {
       if (reportPullFeedbackOpen) {
         showReportPullError();
         reportPullFeedbackOpen = false;
+      }
+
+      if (isClientPlanPaymentRequired(error)) {
+        const checkoutUrl = await copyClientEnrollmentCheckoutLink({
+          source: "dashboard_scrape",
+          returnUrl: window.location.href,
+          clientData: pendingCheckoutClientData || {
+            platform: newClient.platform,
+            email: newClient.email,
+            platform_email: newClient.email,
+            platform_password: newClient.password,
+            ...(newClient.ssnLast4 ? { ssn_last_four: newClient.ssnLast4 } : {}),
+          },
+        });
+        toast({
+          title: "Client payment link copied",
+          description: "Send this payment link to the client so they can complete enrollment.",
+        });
+        window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+        return;
       }
       
       // Handle quota exceeded error specifically

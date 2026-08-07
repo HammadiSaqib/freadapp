@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { buildOnboardingIntakeUrl } from "@/lib/hostRouting";
 import { clientsApi } from "@/lib/api";
+import { isClientPlanPaymentRequired, startClientEnrollmentCheckout } from "@/lib/clientEnrollment";
 import {
   closeReportPullLoading,
   openReportPullLoading,
@@ -204,6 +205,32 @@ const ClientIntake = () => {
         }, 1200);
       }
     } catch (error: any) {
+      if (isClientPlanPaymentRequired(error)) {
+        if (reportPullFeedbackOpen) {
+          closeReportPullLoading();
+          reportPullFeedbackOpen = false;
+        }
+        toast({
+          title: "Payment required",
+          description: "Redirecting you to secure checkout to complete enrollment.",
+        });
+        await startClientEnrollmentCheckout({
+          token,
+          slug: intakeSlug || undefined,
+          source: "public_intake",
+          returnUrl: window.location.href,
+          clientData: {
+            platform: formData.platform,
+            email: formData.email,
+            password: formData.password,
+            ssnLast4: requiresSsn ? formData.ssnLast4 : undefined,
+            platform_email: formData.email,
+            platform_password: formData.password,
+          },
+        });
+        return;
+      }
+
       const message = error?.response?.data?.message || error?.response?.data?.error || error?.message || "Failed to submit intake form.";
       if (reportPullFeedbackOpen) {
         showReportPullError({

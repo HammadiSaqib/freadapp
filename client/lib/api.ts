@@ -560,6 +560,17 @@ export const billingApi = {
 
   finalizeCheckoutSession: (sessionId: string) =>
     api.post('/api/billing/finalize-checkout-session', { sessionId }),
+
+  createClientEnrollmentCheckout: (data: {
+    token?: string;
+    slug?: string;
+    source?: string;
+    returnUrl?: string;
+    clientData: Record<string, any>;
+  }) => api.post('/api/billing/create-client-enrollment-checkout', data),
+
+  finalizeClientEnrollmentSession: (sessionId: string) =>
+    api.post('/api/billing/finalize-client-enrollment-session', { sessionId }),
   
   cancelSubscription: (data?: {
     reasonCode?: string;
@@ -807,7 +818,7 @@ export const superAdminApi = {
   updateDefaultContractTemplate: (payload: { name?: string; description?: string; content?: string }) => api.put('/api/super-admin/contract-templates/default', payload),
   updateUser: (id: string, data: any) => api.put(`/api/super-admin/users/${id}`, data),
   deleteUser: (id: string) => api.delete(`/api/super-admin/users/${id}`),
-  getPlans: (params?: { page?: number; limit?: number | string; search?: string; is_active?: boolean | string }) =>
+  getPlans: (params?: { page?: number; limit?: number | string; search?: string; is_active?: boolean | string; plan_category?: 'admin' | 'client' }) =>
     api.get('/api/super-admin/plans', { params }),
   createPlan: (data: any) => api.post('/api/super-admin/plans', data),
   updatePlan: (id: string | number, data: any) => api.put(`/api/super-admin/plans/${id}`, data),

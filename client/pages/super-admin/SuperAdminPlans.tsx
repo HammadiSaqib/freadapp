@@ -4,10 +4,15 @@ import PlanManagement from "@/components/super-admin/PlanManagement";
 export default function SuperAdminPlans() {
   return (
     <SuperAdminLayout 
-      title="Subscription Plans" 
-      description="Manage subscription plans, pricing, and features"
+      title="Admin Plans" 
+      description="Manage CRM subscription plans, pricing, and features for admins"
     >
-      <PlanManagement />
+      <PlanManagement
+        planCategoryFilter="admin"
+        lockPlanCategory
+        title="Admin Plans"
+        description="These plans are used for admin CRM subscriptions only."
+      />
     </SuperAdminLayout>
   );
 }

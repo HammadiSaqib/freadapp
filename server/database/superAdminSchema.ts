@@ -8,6 +8,7 @@ export interface SubscriptionPlan {
   name: string;
   description: string;
   price: number;
+  plan_category?: 'admin' | 'client';
   billing_cycle: 'monthly' | 'yearly' | 'lifetime';
   features: string; // JSON string of features array
   page_permissions?: string; // JSON string of page permissions array
@@ -15,6 +16,9 @@ export interface SubscriptionPlan {
   stripe_monthly_price_id?: string;
   stripe_yearly_price_id?: string;
   stripe_product_id?: string;
+  auto_create_affiliate_account?: boolean;
+  client_registration_mode?: 'paid' | 'free';
+  default_client_plan_id?: number | null;
   max_users?: number;
   max_clients?: number;
   max_disputes?: number;
@@ -36,6 +40,7 @@ export interface AdminProfile {
   phone?: string;
   emergency_contact?: string;
   notes?: string;
+  allow_free_client_enrollment?: boolean;
   is_active: boolean;
   last_activity_at?: string;
   created_at: string;
@@ -121,6 +126,7 @@ export async function createSuperAdminTables(): Promise<void> {
       name VARCHAR(255) NOT NULL,
       description TEXT,
       price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+      plan_category ENUM('admin', 'client') NOT NULL DEFAULT 'admin',
       billing_cycle ENUM('monthly', 'yearly', 'lifetime') NOT NULL DEFAULT 'monthly',
       features JSON NOT NULL,
       page_permissions JSON DEFAULT NULL,
@@ -128,6 +134,9 @@ export async function createSuperAdminTables(): Promise<void> {
       stripe_monthly_price_id VARCHAR(255) DEFAULT NULL,
       stripe_yearly_price_id VARCHAR(255) DEFAULT NULL,
       stripe_product_id VARCHAR(255) DEFAULT NULL,
+      auto_create_affiliate_account BOOLEAN NOT NULL DEFAULT FALSE,
+      client_registration_mode ENUM('paid', 'free') NOT NULL DEFAULT 'paid',
+      default_client_plan_id INT DEFAULT NULL,
       max_users INT DEFAULT NULL,
       max_clients INT DEFAULT NULL,
       max_disputes INT DEFAULT NULL,
@@ -138,9 +147,11 @@ export async function createSuperAdminTables(): Promise<void> {
       created_by INT NOT NULL,
       updated_by INT NOT NULL,
       INDEX idx_name (name),
+      INDEX idx_plan_category (plan_category),
       INDEX idx_billing_cycle (billing_cycle),
       INDEX idx_is_active (is_active),
       INDEX idx_sort_order (sort_order),
+      FOREIGN KEY (default_client_plan_id) REFERENCES subscription_plans(id) ON DELETE SET NULL,
       FOREIGN KEY (created_by) REFERENCES users(id),
       FOREIGN KEY (updated_by) REFERENCES users(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -156,6 +167,7 @@ export async function createSuperAdminTables(): Promise<void> {
       phone VARCHAR(20),
       emergency_contact VARCHAR(255),
       notes TEXT,
+      allow_free_client_enrollment BOOLEAN NOT NULL DEFAULT FALSE,
       is_active BOOLEAN NOT NULL DEFAULT TRUE,
       last_activity_at DATETIME,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -165,6 +177,7 @@ export async function createSuperAdminTables(): Promise<void> {
       INDEX idx_user_id (user_id),
       INDEX idx_access_level (access_level),
       INDEX idx_department (department),
+      INDEX idx_allow_free_client_enrollment (allow_free_client_enrollment),
       INDEX idx_is_active (is_active),
       INDEX idx_last_activity_at (last_activity_at),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -204,6 +217,43 @@ export async function createSuperAdminTables(): Promise<void> {
       FOREIGN KEY (plan_id) REFERENCES subscription_plans(id),
       FOREIGN KEY (created_by) REFERENCES users(id),
       FOREIGN KEY (updated_by) REFERENCES users(id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+    `CREATE TABLE IF NOT EXISTS client_enrollment_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      admin_id INT NOT NULL,
+      plan_id INT NOT NULL,
+      source ENUM('admin_dashboard', 'public_onboarding') NOT NULL DEFAULT 'public_onboarding',
+      status ENUM('pending_payment', 'paid', 'completed', 'cancelled', 'expired') NOT NULL DEFAULT 'pending_payment',
+      first_name VARCHAR(255) DEFAULT NULL,
+      last_name VARCHAR(255) DEFAULT NULL,
+      email VARCHAR(255) DEFAULT NULL,
+      phone VARCHAR(50) DEFAULT NULL,
+      address TEXT DEFAULT NULL,
+      city VARCHAR(255) DEFAULT NULL,
+      state VARCHAR(255) DEFAULT NULL,
+      zip_code VARCHAR(50) DEFAULT NULL,
+      ssn_last_four VARCHAR(10) DEFAULT NULL,
+      date_of_birth DATE DEFAULT NULL,
+      employment_status VARCHAR(255) DEFAULT NULL,
+      annual_income DECIMAL(12,2) DEFAULT NULL,
+      platform VARCHAR(100) DEFAULT NULL,
+      platform_email VARCHAR(255) DEFAULT NULL,
+      platform_password TEXT DEFAULT NULL,
+      intake_payload JSON DEFAULT NULL,
+      stripe_checkout_session_id VARCHAR(255) DEFAULT NULL,
+      stripe_subscription_id VARCHAR(255) DEFAULT NULL,
+      stripe_customer_id VARCHAR(255) DEFAULT NULL,
+      created_client_id INT DEFAULT NULL,
+      paid_at DATETIME DEFAULT NULL,
+      completed_at DATETIME DEFAULT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_client_enrollment_admin (admin_id),
+      INDEX idx_client_enrollment_plan (plan_id),
+      INDEX idx_client_enrollment_status (status),
+      INDEX idx_client_enrollment_email (email),
+      UNIQUE KEY uniq_client_enrollment_checkout (stripe_checkout_session_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     
     // Plan Course Associations table
@@ -413,6 +463,55 @@ export async function createSuperAdminTables(): Promise<void> {
     } catch (e) {
       console.warn('⚠️ Shop products column migration skipped or failed:', e);
     }
+    try {
+      const [planControlCols] = await connection.execute<any[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'subscription_plans'
+           AND COLUMN_NAME IN ('plan_category','auto_create_affiliate_account','client_registration_mode','default_client_plan_id')`
+      );
+      const existing = new Set((planControlCols as any[]).map((c: any) => c.COLUMN_NAME));
+      const alters: string[] = [];
+      if (!existing.has('plan_category')) {
+        alters.push("ADD COLUMN plan_category ENUM('admin', 'client') NOT NULL DEFAULT 'admin' AFTER price");
+      }
+      if (!existing.has('auto_create_affiliate_account')) {
+        alters.push('ADD COLUMN auto_create_affiliate_account BOOLEAN NOT NULL DEFAULT FALSE AFTER stripe_product_id');
+      }
+      if (!existing.has('client_registration_mode')) {
+        alters.push("ADD COLUMN client_registration_mode ENUM('paid', 'free') NOT NULL DEFAULT 'paid' AFTER auto_create_affiliate_account");
+      }
+      if (!existing.has('default_client_plan_id')) {
+        alters.push('ADD COLUMN default_client_plan_id INT DEFAULT NULL AFTER client_registration_mode');
+      }
+      if (alters.length) {
+        await connection.execute(`ALTER TABLE subscription_plans ${alters.join(', ')}`);
+      }
+      if (!existing.has('default_client_plan_id')) {
+        try {
+          await connection.execute('ALTER TABLE subscription_plans ADD CONSTRAINT fk_subscription_plans_default_client_plan FOREIGN KEY (default_client_plan_id) REFERENCES subscription_plans(id) ON DELETE SET NULL');
+        } catch (constraintError) {
+          console.warn('⚠️ Unable to add default client plan foreign key:', constraintError);
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Subscription plan control migration skipped or failed:', e);
+    }
+
+    try {
+      const [profileCols] = await connection.execute<any[]>(
+        `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'admin_profiles'
+           AND COLUMN_NAME IN ('allow_free_client_enrollment')`
+      );
+      const existing = new Set((profileCols as any[]).map((c: any) => c.COLUMN_NAME));
+      if (!existing.has('allow_free_client_enrollment')) {
+        await connection.execute('ALTER TABLE admin_profiles ADD COLUMN allow_free_client_enrollment BOOLEAN NOT NULL DEFAULT FALSE AFTER notes');
+      }
+    } catch (e) {
+      console.warn('⚠️ Admin profile enrollment migration skipped or failed:', e);
+    }
   });
   
   console.log('✅ Super Admin tables created successfully');
@@ -430,6 +529,7 @@ export async function seedSuperAdminData(): Promise<void> {
           name: 'Starter',
           description: 'Perfect for small credit repair businesses',
           price: 29.99,
+          plan_category: 'admin',
           billing_cycle: 'monthly',
           features: JSON.stringify([
             'Up to 50 clients',
@@ -440,12 +540,15 @@ export async function seedSuperAdminData(): Promise<void> {
           max_users: 2,
           max_clients: 50,
           max_disputes: 500,
+          auto_create_affiliate_account: false,
+          client_registration_mode: 'paid',
           sort_order: 1
         },
         {
           name: 'Professional',
           description: 'For growing credit repair businesses',
           price: 79.99,
+          plan_category: 'admin',
           billing_cycle: 'monthly',
           features: JSON.stringify([
             'Up to 200 clients',
@@ -458,12 +561,15 @@ export async function seedSuperAdminData(): Promise<void> {
           max_users: 5,
           max_clients: 200,
           max_disputes: 2000,
+          auto_create_affiliate_account: true,
+          client_registration_mode: 'paid',
           sort_order: 2
         },
         {
           name: 'Enterprise',
           description: 'For large credit repair organizations',
           price: 199.99,
+          plan_category: 'admin',
           billing_cycle: 'monthly',
           features: JSON.stringify([
             'Unlimited clients',
@@ -477,15 +583,36 @@ export async function seedSuperAdminData(): Promise<void> {
           max_users: null,
           max_clients: null,
           max_disputes: null,
+          auto_create_affiliate_account: true,
+          client_registration_mode: 'free',
           sort_order: 3
+        },
+        {
+          name: 'Client Access',
+          description: 'Client membership billed when a member joins an admin CRM.',
+          price: 49.99,
+          plan_category: 'client',
+          billing_cycle: 'monthly',
+          features: JSON.stringify([
+            'Member portal access',
+            'Credit profile tracking',
+            'Admin CRM membership',
+            'Funding readiness workflow'
+          ]),
+          max_users: null,
+          max_clients: null,
+          max_disputes: null,
+          auto_create_affiliate_account: false,
+          client_registration_mode: 'paid',
+          sort_order: 50
         }
       ];
       
       for (const plan of plans) {
         await connection.execute(
-          `INSERT IGNORE INTO subscription_plans (name, description, price, billing_cycle, features, max_users, max_clients, max_disputes, sort_order, created_by, updated_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
-          [plan.name, plan.description, plan.price, plan.billing_cycle, plan.features, plan.max_users, plan.max_clients, plan.max_disputes, plan.sort_order]
+          `INSERT IGNORE INTO subscription_plans (name, description, price, plan_category, billing_cycle, features, auto_create_affiliate_account, client_registration_mode, max_users, max_clients, max_disputes, sort_order, created_by, updated_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1)`,
+          [plan.name, plan.description, plan.price, (plan as any).plan_category || 'admin', plan.billing_cycle, plan.features, (plan as any).auto_create_affiliate_account ? 1 : 0, (plan as any).client_registration_mode || 'paid', plan.max_users, plan.max_clients, plan.max_disputes, plan.sort_order]
         );
       }
       
