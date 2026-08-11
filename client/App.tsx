@@ -171,6 +171,7 @@ const FundingManagerCreditReport = React.lazy(() => import("./pages/funding-mana
 const Invoices = React.lazy(() => import("./pages/Invoices"));
 const ClientLogin = React.lazy(() => import("./pages/client/ClientLogin"));
 const ClientDashboard = React.lazy(() => import("./pages/client/ClientDashboard"));
+const ClientOverview = React.lazy(() => import("./pages/client/Overview"));
 const ClientAccounts = React.lazy(() => import("./pages/client/Accounts"));
 const ClientPayments = React.lazy(() => import("./pages/client/Payments"));
 const ClientCollections = React.lazy(() => import("./pages/client/Collections"));
@@ -959,13 +960,21 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
       ];
     case "member":
       return [
-        { path: "/", element: <Navigate to="/dashboard" replace /> },
+        { path: "/", element: <Navigate to="/overview" replace /> },
         { path: "/login", element: <ClientLogin /> },
         {
           path: "/dashboard",
           element: (
             <ClientProtectedRoute>
               <ClientDashboard />
+            </ClientProtectedRoute>
+          ),
+        },
+        {
+          path: "/overview",
+          element: (
+            <ClientProtectedRoute>
+              <ClientOverview />
             </ClientProtectedRoute>
           ),
         },
@@ -2098,12 +2107,20 @@ const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname 
           
           {/* Member Routes */}
           <Route path="/member/login" element={<ClientLogin />} />
-          <Route path="/member" element={<Navigate to="/member/login" replace />} />
+          <Route path="/member" element={<Navigate to="/member/overview" replace />} />
           <Route
             path="/member/dashboard"
             element={
               <ClientProtectedRoute>
                 <ClientDashboard />
+              </ClientProtectedRoute>
+            }
+          />
+          <Route
+            path="/member/overview"
+            element={
+              <ClientProtectedRoute>
+                <ClientOverview />
               </ClientProtectedRoute>
             }
           />

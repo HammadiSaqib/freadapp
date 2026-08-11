@@ -71,7 +71,7 @@ const ClientLogin = () => {
           try {
             sessionStorage.setItem('client_just_logged_in', '1');
           } catch (e) {}
-          const dashboardTarget = getPortalNavigationTarget('member', '/dashboard');
+          const dashboardTarget = getPortalNavigationTarget('member', '/overview');
           if (dashboardTarget.external) {
             window.location.href = dashboardTarget.target;
             return;

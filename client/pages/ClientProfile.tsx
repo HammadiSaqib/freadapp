@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import DashboardLayout from "@/components/DashboardLayout";
+import ClientLayout from "@/components/ClientLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -253,8 +254,25 @@ interface ClientData {
   latestJsonData?: any;
 }
 
-export default function ClientProfile() {
+type ClientProfilePortalMode = "admin" | "client";
+
+interface ClientProfileProps {
+  portalMode?: ClientProfilePortalMode;
+}
+
+const getStoredClientPortalUserId = () => {
+  if (typeof window === "undefined") return "";
+
+  const storedId = window.localStorage.getItem("userId") || window.localStorage.getItem("clientId") || "";
+  return storedId && storedId !== "null" && storedId !== "undefined" ? storedId : "";
+};
+
+export default function ClientProfile({
+  portalMode = "admin",
+}: ClientProfileProps = {}) {
   const { userProfile, isLoading: authLoading } = useAuthContext();
+  const isClientPortalMode = portalMode === "client";
+  const ProfileLayout = isClientPortalMode ? ClientLayout : DashboardLayout;
   const isSuperAdminUser = userProfile?.role === "super_admin";
   const { isEliteActive, isEliteStatusLoading } = useScoreMachineEliteStatus();
   const shouldResolveEliteVariant = ['admin', 'employee', 'user', 'funding_manager'].includes(String(userProfile?.role || ''));
@@ -264,18 +282,22 @@ export default function ClientProfile() {
 
   if (isClientProfileVariantLoading) {
     return (
-      <DashboardLayout>
+      <ProfileLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </DashboardLayout>
+      </ProfileLayout>
     );
   }
 
   const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
 
-  if (isBasicAdminPortalUser && !isEliteActive) {
+  if (!isClientPortalMode && isBasicAdminPortalUser && !isEliteActive) {
     return <BasicClientProfile />;
+  }
+
+  if (isClientPortalMode) {
+    return <EnhancedClientProfile portalMode="client" />;
   }
 
   const showEnhancedClientProfile = isSuperAdminUser || isEliteActive || hasAdminBasicPortalAccess(userProfile);
@@ -386,13 +408,19 @@ function OtherDocUploadButton({ onUpload }: { onUpload: (files: File[]) => Promi
   );
 }
 
-function EnhancedClientProfile() {
-  const { clientId } = useParams<{ clientId: string }>();
+function EnhancedClientProfile({
+  portalMode = "admin",
+}: ClientProfileProps = {}) {
+  const { clientId: routeClientId } = useParams<{ clientId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { userProfile } = useAuthContext();
+  const isClientPortalMode = portalMode === "client";
+  const ProfileLayout = isClientPortalMode ? ClientLayout : DashboardLayout;
+  const isReadOnlyClientPortal = isClientPortalMode;
+  const clientId = isClientPortalMode ? String(userProfile?.id || getStoredClientPortalUserId()).trim() : routeClientId;
   const isBasicAdminPortalUser = userProfile?.role === "admin" && hasAdminBasicPortalAccess(userProfile);
   const [client, setClient] = useState<ClientData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -401,10 +429,14 @@ function EnhancedClientProfile() {
   const [scoreHistory, setScoreHistory] = useState<any[]>([]);
   const [scoreHistoryLoading, setScoreHistoryLoading] = useState(false);
   const allowedClientProfileTabs = ["overview", "info", "history", "scores", "power-of-attorney", "letters", "equifax", "other-creditors-freeze", "json"] as const;
+  const hiddenClientPortalTabs = ["power-of-attorney", "equifax", "other-creditors-freeze"] as const;
+  const visibleClientProfileTabs = allowedClientProfileTabs.filter(
+    (tab) => !isClientPortalMode || !(hiddenClientPortalTabs as readonly string[]).includes(tab),
+  );
   const getClientProfileTab = () => {
     const tab = String(searchParams.get("tab") || "").trim();
     if (isBasicAdminPortalUser && tab === "overview") return "info";
-    return allowedClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : (isBasicAdminPortalUser ? "info" : "overview");
+    return visibleClientProfileTabs.includes(tab as typeof allowedClientProfileTabs[number]) ? tab : (isBasicAdminPortalUser ? "info" : "overview");
   };
   const activeTab = getClientProfileTab();
   const [scrapingLoading, setScrapingLoading] = useState(false);
@@ -442,14 +474,16 @@ function EnhancedClientProfile() {
   const [equifaxSavedScreenshot, setEquifaxSavedScreenshot] = useState<any>(null);
   const [securityFreezePinSaveState, setSecurityFreezePinSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-  const profileBackHref = isBasicAdminPortalUser ? "/dashboard" : "/clients";
-  const profileBackLabel = isBasicAdminPortalUser ? "Back to Dashboard" : "Back to Clients";
-  const profileNotFoundTitle = isBasicAdminPortalUser ? "Profile Not Found" : "Client not found";
-  const profileNotFoundDescription = isBasicAdminPortalUser
+  const isOwnProfileView = isBasicAdminPortalUser || isClientPortalMode;
+  const profileBackHref = isOwnProfileView ? (isClientPortalMode ? "/member/dashboard" : "/dashboard") : "/clients";
+  const profileBackLabel = isOwnProfileView ? "Back to Dashboard" : "Back to Clients";
+  const profileNotFoundTitle = isOwnProfileView ? "Profile Not Found" : "Client not found";
+  const profileNotFoundDescription = isOwnProfileView
     ? "The requested profile could not be found."
     : "The requested client could not be found.";
   const shouldForceReportPullPrompt = normalizeBasicAdminBooleanParam(searchParams.get("reportPullPrompt"));
-  const shouldShowBasicAdminReportPullPrompt = isBasicAdminPortalUser
+  const shouldShowBasicAdminReportPullPrompt = !isReadOnlyClientPortal
+    && isBasicAdminPortalUser
     && Boolean(client)
     && (!hasStoredClientReport(client) || shouldForceReportPullPrompt);
 
@@ -460,7 +494,7 @@ function EnhancedClientProfile() {
   }, [clientId, isBasicAdminPortalUser]);
 
   const handleClientProfileTabChange = (nextTab: string) => {
-    if (!allowedClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number]) || (isBasicAdminPortalUser && nextTab === "overview")) {
+    if (!visibleClientProfileTabs.includes(nextTab as typeof allowedClientProfileTabs[number]) || (isBasicAdminPortalUser && nextTab === "overview")) {
       return;
     }
 
@@ -509,11 +543,12 @@ function EnhancedClientProfile() {
   );
 
   useEffect(() => {
+    if (isReadOnlyClientPortal) return;
     const state = location.state as { openEdit?: boolean } | null;
     if (state?.openEdit) {
       setShowEditForm(true);
     }
-  }, [location.state]);
+  }, [location.state, isReadOnlyClientPortal]);
 
   const isManuallyAddedClient = useMemo(() => {
     if (!client) return false;
@@ -589,7 +624,7 @@ function EnhancedClientProfile() {
   }, [currentMatchIndex, matchCount]);
 
   const handleScrapeNewReport = async () => {
-    if (!client) return;
+    if (isReadOnlyClientPortal || !client) return;
 
     // Check if client has stored credentials
     if (!client.platform || !client.platform_email || !client.platform_password) {
@@ -676,17 +711,18 @@ function EnhancedClientProfile() {
   };
 
   const handleApplyFunding = () => {
-    if (!client) return;
+    if (isReadOnlyClientPortal || !client) return;
     setFundingDialogOpen(true);
   };
   const handleFundingContinue = () => {
-    if (!clientId || !selectedFundingType || !selectedFundingMethod) return;
+    if (isReadOnlyClientPortal || !clientId || !selectedFundingType || !selectedFundingMethod) return;
     const typeToUse = selectedFundingType === "both" ? startWithType : selectedFundingType;
     const base = selectedFundingMethod === "diy" ? "/funding/diy" : "/funding/apply";
     setFundingDialogOpen(false);
     navigate(`${base}/${typeToUse}?clientId=${clientId}`);
   };
   const handleEditClient = () => {
+    if (isReadOnlyClientPortal) return;
     setShowEditForm(true);
   };
 
@@ -738,6 +774,10 @@ function EnhancedClientProfile() {
     row: any,
     sender: PrintRequestSenderFormValues,
   ) => {
+    if (isReadOnlyClientPortal) {
+      throw new Error('Client portal overview is read-only');
+    }
+
     if (!clientId) {
       toast({ title: profileNotFoundTitle, variant: 'destructive' });
       throw new Error(profileNotFoundTitle);
@@ -1172,7 +1212,7 @@ function EnhancedClientProfile() {
   };
 
   const handleSaveAll = async () => {
-    if (!clientId) return;
+    if (isReadOnlyClientPortal || !clientId) return;
     setSaving(true);
     setSaveSuccess(false);
     try {
@@ -1579,7 +1619,7 @@ function EnhancedClientProfile() {
   }, [activeTab, clientId]);
 
   const handleDocumentUpload = async (type: string, file: File) => {
-    if (!clientId) return;
+    if (isReadOnlyClientPortal || !clientId) return;
     setUploadingDoc(type);
     try {
       const token = localStorage.getItem("token");
@@ -1606,7 +1646,7 @@ function EnhancedClientProfile() {
   };
 
   const handleDocumentDelete = async (type: string) => {
-    if (!clientId) return;
+    if (isReadOnlyClientPortal || !clientId) return;
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/client-documents/${clientId}/document/${type}`, {
@@ -1636,7 +1676,7 @@ function EnhancedClientProfile() {
   };
 
   const handleAdditionalUpload = async (files: File[]) => {
-    if (!clientId) return;
+    if (isReadOnlyClientPortal || !clientId) return;
     try {
       if (files.length === 1) {
         await clientDocumentsApi.uploadAdditionalDocument(clientId, 'other', files[0]);
@@ -1652,7 +1692,7 @@ function EnhancedClientProfile() {
   };
 
   const handleAdditionalDelete = async (docId: number) => {
-    if (!clientId) return;
+    if (isReadOnlyClientPortal || !clientId) return;
     try {
       await clientDocumentsApi.deleteAdditionalDocument(clientId, docId);
       setOtherDocs(prev => prev.filter(d => d.id !== docId));
@@ -1689,17 +1729,17 @@ function EnhancedClientProfile() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <ProfileLayout>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
-      </DashboardLayout>
+      </ProfileLayout>
     );
   }
 
   if (!client) {
     return (
-      <DashboardLayout>
+      <ProfileLayout>
         <div className="text-center py-12">
           <h2 className="text-2xl font-bold text-gray-900">{profileNotFoundTitle}</h2>
           <p className="text-gray-600 mt-2">{profileNotFoundDescription}</p>
@@ -1708,7 +1748,7 @@ function EnhancedClientProfile() {
             {profileBackLabel}
           </Button>
         </div>
-      </DashboardLayout>
+      </ProfileLayout>
     );
   }
 
@@ -1793,7 +1833,7 @@ function EnhancedClientProfile() {
   }>;
   const cityStateZip = [formData.city, formData.state, formData.zip_code].filter(Boolean).join(", ");
 return (
-    <DashboardLayout>
+    <ProfileLayout>
       <div className="relative min-h-screen">
         <div className={shouldShowBasicAdminReportPullPrompt ? "pointer-events-none select-none blur-sm opacity-80" : ""}>
       <div className="space-y-6">
@@ -1831,6 +1871,8 @@ return (
           <Badge variant="outline" className={getStatusColor(client.status)}>
             {client.status}
           </Badge>
+          {!isReadOnlyClientPortal && (
+          <>
           <Button variant="outline" size="sm" onClick={handleEditClient}>
             <Edit className="h-4 w-4 mr-2" />
             {isBasicAdminPortalUser ? 'Edit My Profile' : 'Edit Client'}
@@ -1857,6 +1899,8 @@ return (
             )}
             {scrapingLoading ? "Fetching..." : "Fetch New Report"}
           </Button>
+          </>
+          )}
         </div>
         </div>
 
@@ -1941,7 +1985,7 @@ return (
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-4 sm:grid-cols-9 gap-2 min-w-[1120px] sm:min-w-0">
+            <TabsList className={`grid w-full grid-cols-3 gap-2 ${isClientPortalMode ? "sm:grid-cols-6 min-w-[760px]" : "sm:grid-cols-9 min-w-[1120px]"} sm:min-w-0`}>
               {!isBasicAdminPortalUser && (
                 <TabsTrigger value="overview" className="flex items-center space-x-2">
                   <LayoutGrid className="h-4 w-4" />
@@ -1960,22 +2004,28 @@ return (
                 <TrendingUp className="h-4 w-4" />
                 <span>{isBasicAdminPortalUser ? 'My Score History' : 'Score History'}</span>
               </TabsTrigger>
-              <TabsTrigger value="power-of-attorney" className="flex items-center space-x-2">
-                <FileText className="h-4 w-4" />
-                <span>POA (Power of Attorney)</span>
-              </TabsTrigger>
+              {!isClientPortalMode && (
+                <TabsTrigger value="power-of-attorney" className="flex items-center space-x-2">
+                  <FileText className="h-4 w-4" />
+                  <span>POA (Power of Attorney)</span>
+                </TabsTrigger>
+              )}
               <TabsTrigger value="letters" className="flex items-center space-x-2">
                 <ScrollText className="h-4 w-4" />
                 <span>Generated Letters</span>
               </TabsTrigger>
-              <TabsTrigger value="equifax" className="flex items-center space-x-2">
-                <Shield className="h-4 w-4" />
-                <span>Equifax Settlement</span>
-              </TabsTrigger>
-              <TabsTrigger value="other-creditors-freeze" className="flex items-center space-x-2">
-                <ShieldCheck className="h-4 w-4" />
-                <span>other creditors freeze</span>
-              </TabsTrigger>
+              {!isClientPortalMode && (
+                <>
+                  <TabsTrigger value="equifax" className="flex items-center space-x-2">
+                    <Shield className="h-4 w-4" />
+                    <span>Equifax Settlement</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="other-creditors-freeze" className="flex items-center space-x-2">
+                    <ShieldCheck className="h-4 w-4" />
+                    <span>other creditors freeze</span>
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="json" className="flex items-center space-x-2">
                 <Code className="h-4 w-4" />
                 <span>Raw Data</span>
@@ -2224,6 +2274,7 @@ return (
                   </div>
                 </div>
 
+                <fieldset disabled={isReadOnlyClientPortal} className="contents">
                 {/* Personal Information */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-3 flex items-center gap-2.5">
@@ -2441,6 +2492,7 @@ return (
                     </div>
                   </div>
                 </div>
+                </fieldset>
 
                 {/* Documents */}
                 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
@@ -2459,6 +2511,7 @@ return (
                         clientId={parseInt(client.id)}
                         onUpload={(f) => handleDocumentUpload('dl_or_id_card', f)}
                         onDelete={() => handleDocumentDelete('dl_or_id_card')}
+                        readOnly={isReadOnlyClientPortal}
                       />
                       <DocumentUploadBox
                         title="Social Security Number"
@@ -2468,6 +2521,7 @@ return (
                         clientId={parseInt(client.id)}
                         onUpload={(f) => handleDocumentUpload('ssc', f)}
                         onDelete={() => handleDocumentDelete('ssc')}
+                        readOnly={isReadOnlyClientPortal}
                       />
                       <DocumentUploadBox
                         title="Proof of Address"
@@ -2477,6 +2531,7 @@ return (
                         clientId={parseInt(client.id)}
                         onUpload={(f) => handleDocumentUpload('poa', f)}
                         onDelete={() => handleDocumentDelete('poa')}
+                        readOnly={isReadOnlyClientPortal}
                       />
                     </div>
 
@@ -2508,6 +2563,7 @@ return (
                                 <Button variant="ghost" size="sm" onClick={() => setOtherDocPreview(doc)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
+                                {!isReadOnlyClientPortal && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -2516,12 +2572,15 @@ return (
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
+                                )}
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
+                      {!isReadOnlyClientPortal && (
                       <OtherDocUploadButton onUpload={handleAdditionalUpload} />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2558,6 +2617,7 @@ return (
                 </Dialog>
 
                 {/* Save Button */}
+                {!isReadOnlyClientPortal && (
                 <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleSaveAll}
@@ -2586,6 +2646,7 @@ return (
                     )}
                   </Button>
                 </div>
+                )}
           </TabsContent>
 
           {/* Credit Report History Tab */}
@@ -2593,6 +2654,7 @@ return (
             <Card className="gradient-light border-0">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-lg">{isBasicAdminPortalUser ? 'My Report History' : 'Credit Report History'}</CardTitle>
+                {!isReadOnlyClientPortal && (
                 <Button
                   onClick={() => {
                     console.log('Fetch New Report button clicked!');
@@ -2611,6 +2673,7 @@ return (
                     "🔄 FETCH NEW REPORT"
                   )}
                 </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -2886,9 +2949,11 @@ return (
           </TabsContent>
 
           {/* Generated Letter History Tab */}
-          <TabsContent value="power-of-attorney" className="mt-0">
-            <PowerOfAttorneyTab clientId={clientId || client.id} />
-          </TabsContent>
+          {!isClientPortalMode && (
+            <TabsContent value="power-of-attorney" className="mt-0">
+              <PowerOfAttorneyTab clientId={clientId || client.id} />
+            </TabsContent>
+          )}
 
           <TabsContent value="letters" className="mt-0">
                 <h3 className="text-3xl font-bold text-slate-800 mb-8">
@@ -3024,6 +3089,7 @@ return (
                                       )}
                                       Download ZIP
                                     </Button>
+                                    {!isReadOnlyClientPortal && (
                                     <Button
                                       type="button"
                                       size="sm"
@@ -3038,6 +3104,7 @@ return (
                                       )}
                                       Send For Printing
                                     </Button>
+                                    )}
                                   </div>
                                 </div>
                               </td>
@@ -3057,6 +3124,7 @@ return (
           </TabsContent>
 
           {/* Equifax Data Breach Settlement Tab */}
+          {!isClientPortalMode && (
           <TabsContent value="equifax" className="mt-0 space-y-6">
                 <div className="flex flex-wrap items-start justify-end gap-3">
                   <div className="w-full sm:w-[240px]">
@@ -3145,7 +3213,9 @@ return (
                   <div className="text-sm text-red-600 text-center">{equifaxLiveError}</div>
                 )}
           </TabsContent>
+          )}
 
+          {!isClientPortalMode && (
           <TabsContent value="other-creditors-freeze" className="mt-0 space-y-6">
             <Card className="border border-slate-200 shadow-sm">
               <CardHeader>
@@ -3185,12 +3255,13 @@ return (
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
         </Tabs>
       </div>
 
       {/* Edit Client Modal */}
-      {showEditForm && client && (
+      {!isReadOnlyClientPortal && showEditForm && client && (
         <EditClientForm
           client={{
             ...client,
@@ -3229,6 +3300,7 @@ return (
           onPullStarted={handleBasicAdminReportPullStarted}
         />
 
+      {!isReadOnlyClientPortal && (
       <PrintRequestDialog
         open={Boolean(historyPrintDialogRow)}
         onOpenChange={(open) => {
@@ -3248,7 +3320,9 @@ return (
         title="Send Print Request"
         description="Confirm the sender details that should be included in this generated dispute letter history request."
       />
+      )}
       
+      {!isReadOnlyClientPortal && (
       <Dialog open={fundingDialogOpen} onOpenChange={setFundingDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -3325,6 +3399,7 @@ return (
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </DashboardLayout>
+      )}
+    </ProfileLayout>
   );
 }

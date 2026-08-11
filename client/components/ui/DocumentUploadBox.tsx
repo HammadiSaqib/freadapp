@@ -41,6 +41,7 @@ interface DocumentUploadBoxProps {
   onUpload: (file: File) => Promise<void>;
   onDelete: () => Promise<void>;
   className?: string;
+  readOnly?: boolean;
 }
 
 const documentToneStyles = {
@@ -105,7 +106,8 @@ export function DocumentUploadBox({
   clientId,
   onUpload,
   onDelete,
-  className
+  className,
+  readOnly = false
 }: DocumentUploadBoxProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -116,11 +118,13 @@ export function DocumentUploadBox({
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     if (e.currentTarget.contains(e.relatedTarget as Node)) {
       return;
     }
@@ -130,6 +134,7 @@ export function DocumentUploadBox({
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (readOnly) return;
     setIsDragging(false);
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
@@ -139,6 +144,7 @@ export function DocumentUploadBox({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (readOnly) return;
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       await processFile(file);
@@ -146,6 +152,7 @@ export function DocumentUploadBox({
   };
 
   const processFile = async (file: File) => {
+    if (readOnly) return;
     if (!isSupportedPrimaryDocument(file)) {
       toast({
         title: 'Invalid file type',
@@ -175,6 +182,7 @@ export function DocumentUploadBox({
   };
 
   const handleDelete = async () => {
+    if (readOnly) return;
     if (confirm('Are you sure you want to delete this document?')) {
       setIsLoading(true);
       try {
@@ -196,6 +204,7 @@ export function DocumentUploadBox({
   };
 
   const triggerFileInput = () => {
+    if (readOnly) return;
     fileInputRef.current?.click();
   };
 
@@ -212,7 +221,7 @@ export function DocumentUploadBox({
           className={cn(
             'relative w-full h-48 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all overflow-hidden',
             isDragging ? tone.activeZone : tone.idleZone,
-            currentFileUrl ? cn('border-solid p-0', tone.previewZone) : 'cursor-pointer'
+            currentFileUrl ? cn('border-solid p-0', tone.previewZone) : readOnly ? 'cursor-default' : 'cursor-pointer'
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -240,6 +249,14 @@ export function DocumentUploadBox({
                   className='w-full h-full object-contain p-2'
                 />
               )}
+            </div>
+          ) : readOnly ? (
+            <div className='flex flex-col items-center text-center p-6'>
+              <div className={cn('h-16 w-16 rounded-full flex items-center justify-center mb-4 shadow-sm', tone.iconWrap)}>
+                <FileText className={cn('h-8 w-8', tone.icon)} />
+              </div>
+              <p className={cn('text-base font-semibold', tone.fileName)}>No document on file</p>
+              <p className={cn('text-sm mt-2', tone.helperText)}>This document has not been uploaded yet.</p>
             </div>
           ) : (
             <div className='flex flex-col items-center text-center p-6'>
@@ -300,6 +317,7 @@ export function DocumentUploadBox({
               </DialogContent>
             </Dialog>
             
+            {!readOnly && (
             <div className='flex gap-3 w-full'>
               <Button 
                 variant='outline' 
@@ -318,6 +336,7 @@ export function DocumentUploadBox({
                 Delete File
               </Button>
             </div>
+            )}
           </div>
         )}
       </CardContent>

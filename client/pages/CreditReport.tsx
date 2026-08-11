@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import DashboardLayout from "@/components/DashboardLayout";
+import ClientLayout from "@/components/ClientLayout";
 import BureauScoresChart from "@/components/BureauScoresChart";
 import ScoreChartsCard from "@/components/ScoreChartsCard";
 import NegativeAccountsCard from "@/components/NegativeAccountsCard";
@@ -2430,11 +2431,37 @@ const defaultNegativeItemBureauFilters = ['experian', 'equifax', 'transunion'];
 const defaultNegativeItemCategoryFilters = ['personal-information', 'public-record', 'hard-inquiry', 'soft-inquiry', 'charge-off', 'collection', 'late-payment', 'student-loan'];
 const negativeItemBureauOrder = ['Experian', 'Equifax', 'TransUnion'];
 
-export default function CreditReport() {
+type CreditReportPortalMode = "admin" | "client";
+type CreditReportDefaultTab =
+  | "overview"
+  | "personal"
+  | "inquiries"
+  | "public"
+  | "accounts"
+  | "analysis"
+  | "progress"
+  | "underwriting"
+  | "creditWarMap"
+  | "creditRepair"
+  | "debtConsolidation"
+  | "funding"
+  | "fundingApplications";
+
+interface CreditReportProps {
+  portalMode?: CreditReportPortalMode;
+  defaultTab?: CreditReportDefaultTab;
+}
+
+export default function CreditReport({
+  portalMode = "admin",
+  defaultTab = "overview",
+}: CreditReportProps = {}) {
   const { userProfile, isLoading: authLoading, refreshProfile } = useAuthContext();
   const { isEliteActive, isEliteStatusLoading } = useScoreMachineEliteStatus();
   const isBasicAdminPortalUser = userProfile?.role === 'admin' && hasAdminBasicPortalAccess(userProfile);
   const basicPortalUpgradeUrl = "https://thescoremachine.com/pricing";
+  const isClientPortalMode = portalMode === "client";
+  const ReportLayout = isClientPortalMode ? ClientLayout : DashboardLayout;
   const creditReportPageTitle = isBasicAdminPortalUser ? 'My Report' : 'Credit Report';
   const creditReportAnalysisTitle = isBasicAdminPortalUser ? 'My Report Analysis' : 'Credit Report Analysis';
   const creditReportGroupTitle = isBasicAdminPortalUser ? 'My Report' : 'Credit Report';
@@ -2499,7 +2526,7 @@ export default function CreditReport() {
   ] as const;
   const getRequestedCreditReportTab = () => {
     const tab = String(searchParams.get('tab') || '').trim();
-    return allowedCreditReportTabs.includes(tab as typeof allowedCreditReportTabs[number]) ? tab : 'overview';
+    return allowedCreditReportTabs.includes(tab as typeof allowedCreditReportTabs[number]) ? tab : defaultTab;
   };
   const getRequestedLawEngineAuto = () => {
     const normalized = String(searchParams.get('lawEngineAuto') || '').trim().toLowerCase();
@@ -8348,7 +8375,7 @@ export default function CreditReport() {
 
   if (loading) {
     return (
-      <DashboardLayout
+      <ReportLayout
         title={`${creditReportPageTitle} - ${clientName}`}
         description="Loading credit report..."
       >
@@ -8358,13 +8385,13 @@ export default function CreditReport() {
             <p className="text-muted-foreground">Loading credit report...</p>
           </div>
         </div>
-      </DashboardLayout>
+      </ReportLayout>
     );
   }
 
   if (error) {
     return (
-      <DashboardLayout
+      <ReportLayout
         title={`${creditReportPageTitle} - ${clientName}`}
         description="Error loading credit report"
       >
@@ -8378,12 +8405,12 @@ export default function CreditReport() {
             </Button>
           </div>
         </div>
-      </DashboardLayout>
+      </ReportLayout>
     );
   }
 
   return (
-    <DashboardLayout
+    <ReportLayout
       title={`${creditReportPageTitle} - ${clientName}`}
       description="Detailed credit report analysis and information"
     >
@@ -8475,11 +8502,11 @@ export default function CreditReport() {
       <div className="mb-6">
         <Button
           variant="outline"
-          onClick={() => navigate("/reports")}
+          onClick={() => navigate(isClientPortalMode ? "/member/dashboard" : "/reports")}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Reports
+          {isClientPortalMode ? "Back to Dashboard" : "Back to Reports"}
         </Button>
 
         <div className="flex justify-between items-center">
@@ -8621,7 +8648,7 @@ export default function CreditReport() {
           </div>
         </div>
         {/* Step-wise Navigation (grouped) */}
-        {!isBasicAdminPortalUser && (
+        {!isClientPortalMode && !isBasicAdminPortalUser && (
         <div className="w-full mb-8 space-y-6">
           {/* Work Area group */}
           <div>
@@ -26752,7 +26779,7 @@ export default function CreditReport() {
       </div>
 
 
-    </DashboardLayout>
+    </ReportLayout>
   );
 }
 

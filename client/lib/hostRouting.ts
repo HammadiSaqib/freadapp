@@ -49,7 +49,7 @@ const PORTAL_DEFAULT_PATHS: Record<PortalAlias, string> = {
   support: "/dashboard",
   affiliate: "/dashboard",
   "funding-manager": "/dashboard",
-  member: "/dashboard",
+  member: "/overview",
   "printing-team": "/dispute-letter",
 };
 

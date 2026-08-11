@@ -185,7 +185,7 @@ const Support = () => {
                 <Clock className="h-6 w-6 text-green-600" />
                 <div>
                   <h4 className="font-semibold">Support Hours</h4>
-                  <p className="text-sm text-gray-600">Monday To Saturday From 11:00AM to 7:00PM EST</p>
+                  <p className="text-sm text-gray-600">Monday To Saturday From 9:00 AM - 6:00 PM EST</p>
                 </div>
               </div>
               <Badge className="bg-green-100 text-green-800">

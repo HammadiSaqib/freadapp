@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Target,
   PieChart,
+  LayoutGrid,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -48,6 +49,7 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
     {
       title: "Credit Report Section",
       items: [
+        { name: "Overview", href: "/member/overview", icon: LayoutGrid },
         { name: "Dashboard", href: "/member/dashboard", icon: LayoutDashboard },
         { name: "Personal", href: "/member/personal", icon: User },
         { name: "Inquiries", href: "/member/inquiries", icon: Search },
@@ -62,7 +64,6 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
         { name: "Progress Report", href: "/member/progress-report", icon: TrendingUp },
         { name: "Underwriting", href: "/member/underwriting", icon: FileText },
         { name: "Funding Audit", href: "/member/funding", icon: DollarSign },
-        { name: "Subscription", href: "/member/subscription", icon: CreditCard },
       ],
     },
   ];
@@ -261,15 +262,6 @@ export default function ClientSidebar({ className = "", mobileOpen = false, onCl
               >
                 <PieChart className="h-4 w-4 mr-2" />
                 Credit Analysis
-              </Button>
-              <Button
-                onClick={() => navigate("/member/subscription")}
-                variant="outline"
-                size="sm"
-                className="w-full justify-start border-green-500/20 text-green-600 hover:bg-green-500 dark:hover:bg-green-900/20"
-              >
-                <CreditCard className="h-4 w-4 mr-2" />
-                Subscription
               </Button>
               <Button
                 onClick={() => navigate("/member/monitoring")}
