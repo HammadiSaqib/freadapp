@@ -179,6 +179,13 @@ export default function Sidebar({ className, onAddClient }: SidebarProps) {
       pageKey: "dashboard",
     },
     {
+      name: "Book a Meeting With Us",
+      href: "/consultations",
+      icon: Calendar,
+      badge: null,
+      pageKey: "consultations",
+    },
+    {
       name: isEliteActive ? "CRM" : "Clients",
       href: "/clients",
       icon: Users,

@@ -102,6 +102,9 @@ const SuperAdminCreditReportUpload = React.lazy(() => import("./pages/super-admi
 const ShopManagement = React.lazy(() => import("./pages/super-admin/ShopManagement"));
 const SuperAdminAffiliateTrialPlans = React.lazy(() => import("./pages/super-admin/SuperAdminAffiliateTrialPlans"));
 const SuperAdminLetterTemplates = React.lazy(() => import("./pages/super-admin/SuperAdminLetterTemplates"));
+const SuperAdminAppointments = React.lazy(() => import("./pages/super-admin/SuperAdminAppointments"));
+const AdminConsultations = React.lazy(() => import("./pages/AdminConsultations"));
+const ManageConsultation = React.lazy(() => import("./pages/ManageConsultation"));
 const Login = React.lazy(() => import("./pages/Login"));
 const Register = React.lazy(() => import("./pages/Register"));
 const SuperAdminLogin = React.lazy(() => import("./pages/SuperAdminLogin"));
@@ -593,6 +596,14 @@ function getPortalAliasRoutes(alias: NonAdminPortalAlias): PortalAliasRoute[] {
           element: (
             <SuperAdminProtectedRoute>
               <SuperAdminAffiliateTrialPlans />
+            </SuperAdminProtectedRoute>
+          ),
+        },
+        {
+          path: "/appointments",
+          element: (
+            <SuperAdminProtectedRoute>
+              <SuperAdminAppointments />
             </SuperAdminProtectedRoute>
           ),
         },
@@ -1290,6 +1301,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname 
             }
           />
           <Route
+            path="/consultations"
+            element={
+              <ProtectedRoute allowUnpaidAccess={true}>
+                <AdminConsultations />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/clients"
             element={
               <ProtectedRoute allowUnpaidAccess={true} pageId="clients">
@@ -1732,6 +1751,14 @@ const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname 
             }
           />
           <Route
+            path="/super-admin/appointments"
+            element={
+              <SuperAdminProtectedRoute>
+                <SuperAdminAppointments />
+              </SuperAdminProtectedRoute>
+            }
+          />
+          <Route
             path="/super-admin/reports/:clientId"
             element={
               <SuperAdminProtectedRoute>
@@ -2100,6 +2127,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname 
           <Route path="/join-affiliate/embed" element={<JoinAffiliate embed />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/book-appointment" element={<BookAppointment />} />
+          <Route path="/manage-consultation" element={<ManageConsultation />} />
           <Route path="/contact/embed" element={<Contact embed />} />
           <Route path="/ref/:affiliateId" element={<ReferralLandingPage />} />
           <Route path="/:publicId" element={<DynamicPublicHostRoute hostname={requestHostname} />} />

@@ -70,12 +70,11 @@ import shopRoutes from "./routes/shop.js";
 import testimonialsRoutes, { publicTestimonialsRoutes } from "./routes/testimonials.js";
 import testimonialsExternalRoutes from "./routes/testimonialsExternal.js";
 import integrationsRoutes from "./routes/integrations.js";
+import appointmentsRoutes from "./routes/appointments.js";
 import { emailService } from "./services/emailService.js";
 
 import { reminderService } from "./services/reminderService.js";
 import { ghlAdminLifecycleScheduler } from "./services/ghlAdminLifecycleService.js";
-import { adminInactivityEmailScheduler } from "./services/adminInactivityEmailService.js";
-import { reportPullReminderEmailScheduler } from "./services/reportPullEmailService.js";
 
 // Course routes
 import {
@@ -737,6 +736,7 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // =============================================================================
   app.use("/api/support/settings", supportSettingsRoutes);
   app.use("/api/integrations", integrationsRoutes);
+  app.use("/api/appointments", appointmentsRoutes);
 
   // =============================================================================
   // KNOWLEDGE BASE ROUTES
@@ -1098,19 +1098,13 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   console.log('🔄 Initializing Stripe...');
   await initializeStripe();
 
-  // Initialize Reminder Service
-  console.log('📅 Initializing Reminder Service...');
-  reminderService.start();
+  // Keep the post-payment thank-you follow-up. Automatic reminder delivery
+  // (payment, report-pull, and inactivity reminders) is intentionally disabled.
+  reminderService.startThankYouEmails();
 
   // Keep ScoreMachine-owned GHL admin tags repaired even if an event was missed during downtime.
   ghlAdminLifecycleScheduler.start();
 
-  // Notify active admins once when they cross two days without a login.
-  adminInactivityEmailScheduler.start();
-
-  // Remind admins when a client's most recent successful report pull is 30 days old.
-  reportPullReminderEmailScheduler.start();
-  
   // Initialize WebSocket service
   const websocketService = initializeWebSocketService(httpServer);
   

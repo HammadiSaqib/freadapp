@@ -36,7 +36,7 @@ export default function SiteHeader() {
             width="240"
             height="140"
             decoding="async"
-            fetchPriority="high"
+            fetchpriority="high"
           />
         </Link>
 

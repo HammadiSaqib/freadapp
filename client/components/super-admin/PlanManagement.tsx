@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, DollarSign, Users, Calendar, Check, X, Shield, BookOpen } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Users, Calendar, Check, X, Shield, BookOpen, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { superAdminApi, coursesApi } from "@/lib/api";
 // WebSocket removed to eliminate connection errors
@@ -209,6 +209,7 @@ export default function PlanManagement({
   const [filterPlanTier, setFilterPlanTier] = useState<'all' | 'pro' | 'basic' | 'elite'>('all');
   const [allowedEmailsText, setAllowedEmailsText] = useState('');
   const [affiliateSearchTerm, setAffiliateSearchTerm] = useState('');
+  const [visibilityUpdatingPlanId, setVisibilityUpdatingPlanId] = useState<number | null>(null);
   // WebSocket functionality removed to eliminate connection errors
 
   const loadPlans = useCallback(async () => {
@@ -262,7 +263,10 @@ export default function PlanManagement({
         console.warn('PLANS DEBUG:', { count: uniquePlans.length, ids: planIds, hasDuplicates: planIds.length !== uniqueIds.length });
       }
       
-      setPlans(uniquePlans);
+      setPlans(uniquePlans.map((plan: any) => ({
+        ...plan,
+        is_active: plan.is_active === true || Number(plan.is_active) === 1,
+      })));
       console.log('✅ Plans state updated, count:', uniquePlans.length);
     } catch (error) {
       console.error('❌ Error loading plans:', error);
@@ -428,6 +432,33 @@ export default function PlanManagement({
     }
   };
 
+  const handleClientPlanVisibilityChange = async (plan: SubscriptionPlan) => {
+    if ((plan.plan_category || 'admin') !== 'client') {
+      return;
+    }
+
+    const nextIsVisible = !plan.is_active;
+    try {
+      setVisibilityUpdatingPlanId(plan.id);
+      await superAdminApi.updatePlan(plan.id, { is_active: nextIsVisible });
+      setPlans((currentPlans) => currentPlans.map((currentPlan) => (
+        currentPlan.id === plan.id
+          ? { ...currentPlan, is_active: nextIsVisible }
+          : currentPlan
+      )));
+      toast.success(
+        nextIsVisible
+          ? `${plan.name} is visible for new client enrollments again`
+          : `${plan.name} is hidden from new client enrollments; existing clients are unaffected`
+      );
+    } catch (error) {
+      console.error('Error updating client plan visibility:', error);
+      toast.error(`Failed to ${nextIsVisible ? 'show' : 'hide'} client plan`);
+    } finally {
+      setVisibilityUpdatingPlanId(null);
+    }
+  };
+
   const addFeature = () => {
     if (newFeature.trim() && !formData.features.includes(newFeature.trim())) {
       setFormData(prev => ({
@@ -534,8 +565,8 @@ export default function PlanManagement({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Plans</SelectItem>
-                <SelectItem value="true">Active Only</SelectItem>
-                <SelectItem value="false">Inactive Only</SelectItem>
+                <SelectItem value="true">{planCategoryFilter === 'client' ? 'Visible Only' : 'Active Only'}</SelectItem>
+                <SelectItem value="false">{planCategoryFilter === 'client' ? 'Hidden Only' : 'Inactive Only'}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterPlanTier} onValueChange={(value: 'all' | 'pro' | 'basic' | 'elite') => setFilterPlanTier(value)}>
@@ -558,7 +589,9 @@ export default function PlanManagement({
         <CardHeader>
           <CardTitle>{title} ({filteredPlans.length})</CardTitle>
           <CardDescription>
-            {description}
+            {planCategoryFilter === 'client'
+              ? 'Hide a plan to remove it from new enrollments. Clients who already purchased it keep their plan and access.'
+              : description}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -631,14 +664,29 @@ export default function PlanManagement({
                     <TableCell>
                       <Badge variant={plan.is_active ? "default" : "secondary"}>
                         {plan.is_active ? (
-                          <><Check className="h-3 w-3 mr-1" />Active</>
+                          <><Check className="h-3 w-3 mr-1" />{planCategoryFilter === 'client' ? 'Visible' : 'Active'}</>
                         ) : (
-                          <><X className="h-3 w-3 mr-1" />Inactive</>
+                          <><X className="h-3 w-3 mr-1" />{planCategoryFilter === 'client' ? 'Hidden' : 'Inactive'}</>
                         )}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        {planCategoryFilter === 'client' && (plan.plan_category || 'admin') === 'client' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={visibilityUpdatingPlanId === plan.id}
+                            onClick={() => handleClientPlanVisibilityChange(plan)}
+                            title={plan.is_active ? 'Hide from new client enrollments' : 'Show for new client enrollments'}
+                          >
+                            {plan.is_active ? (
+                              <><EyeOff className="mr-2 h-4 w-4" />Hide</>
+                            ) : (
+                              <><Eye className="mr-2 h-4 w-4" />Show</>
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -1133,7 +1181,16 @@ export default function PlanManagement({
                     checked={formData.is_active}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_active: checked }))}
                   />
-                  <Label htmlFor="is_active">Active Plan</Label>
+                  <div>
+                    <Label htmlFor="is_active">
+                      {formData.plan_category === 'client' ? 'Visible for new client enrollments' : 'Active Plan'}
+                    </Label>
+                    {formData.plan_category === 'client' && (
+                      <p className="text-xs text-muted-foreground">
+                        Turning this off only hides the plan from new purchases. Existing clients keep it.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 

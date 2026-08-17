@@ -173,6 +173,12 @@ export default function SuperAdminSidebar({ className }: SuperAdminSidebarProps)
       badge: null,
     },
     {
+      name: "Appointments",
+      href: "/super-admin/appointments",
+      icon: CalendarClock,
+      badge: null,
+    },
+    {
       name: "Admin Import",
       href: "/super-admin/admin-import",
       icon: Receipt,

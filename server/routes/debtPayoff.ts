@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { runQuery, getQuery, allQuery } from '../database/databaseAdapter.js';
 import { authenticateToken } from '../middleware/authMiddleware.js';
-import { reminderService } from '../services/reminderService.js';
 
 const router = Router();
 
@@ -69,11 +68,6 @@ router.post('/', authenticateToken, async (req, res) => {
         ]
       );
 
-      // Trigger reminder check if enabled
-      if (validatedData.reminder_enabled) {
-        reminderService.checkAndSendReminders().catch(err => console.error('Error triggering reminders:', err));
-      }
-
       res.json({ message: 'Payoff plan updated successfully', id: existingPlan.id });
     } else {
       // Create new plan
@@ -92,11 +86,6 @@ router.post('/', authenticateToken, async (req, res) => {
           validatedData.track_enabled ? 1 : 0
         ]
       );
-
-      // Trigger reminder check if enabled
-      if (validatedData.reminder_enabled) {
-        reminderService.checkAndSendReminders().catch(err => console.error('Error triggering reminders:', err));
-      }
 
       res.json({ message: 'Payoff plan created successfully', id: result.insertId });
     }
