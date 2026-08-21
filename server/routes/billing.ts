@@ -11,9 +11,7 @@ import { emailService } from '../services/emailService.js';
 import crypto from 'crypto';
 import { createAffiliate } from '../controllers/authController.js';
 import type { Request } from 'express';
-import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 import { validateClientQuota } from '../utils/planValidation.js';
-import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
 
 const router = express.Router();
 
@@ -855,10 +853,6 @@ async function finalizeClientEnrollmentCheckoutSession(sessionId: string) {
       adminId,
     };
   });
-
-  if (result?.createdClientId) {
-    syncAdminClientToGhlInBackground(Number(result.adminId), Number(result.createdClientId), 'client_created');
-  }
 
   const adminRows = await executeQuery<any[]>(
     `SELECT onboarding_slug, intake_redirect_url, intake_company_name, company_name
@@ -2337,7 +2331,6 @@ router.post('/confirm-payment', authenticateToken, async (req, res) => {
           plan_type = VALUES(plan_type),
           cancel_at_period_end = FALSE
         `, [userId, transaction.plan_name, now, endDate, transaction.plan_type]);
-        syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
         console.log('✅ Subscription created/updated for user:', userId);
 
         // Create admin onboarding contract if not already pending/signed
@@ -2878,7 +2871,6 @@ router.post('/finalize-checkout-session', authenticateToken, async (req, res) =>
       }
     }
     if (userId) {
-      syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
       const userRows = await executeQuery('SELECT email, first_name, last_name, company_name, role FROM users WHERE id = ?', [userId]) as any[];
       const shouldAutoCreateAffiliate = Number(selectedPlan?.auto_create_affiliate_account ?? 0) === 1 || selectedPlan?.auto_create_affiliate_account === true;
       if (userRows && userRows.length > 0 && userRows[0].role === 'admin' && shouldAutoCreateAffiliate) {
@@ -3083,7 +3075,6 @@ router.post('/cancel-subscription', authenticateToken, async (req, res) => {
       console.log('🔁 Affiliate plan_type set to free and commission_rate set to 10% for user', userId);
     } catch {}
     console.log(`✅ Subscription set to cancel at period end for user ${userId}`);
-    syncGhlAdminLifecycleTagsInBackground(Number(userId));
     return res.json({
       success: true,
       message: 'Subscription cancellation scheduled',
@@ -3325,7 +3316,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             userId
           ]
         );
-        syncGhlAdminLifecycleTagsInBackground(Number(userId), lifecycleOptions);
       }
 
       return { userId, customerId, normalizedStatus };
@@ -3348,7 +3338,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           ) as any[];
           
           if (txnRows && txnRows.length > 0) {
-            syncGhlAdminLifecycleTagsInBackground(Number(txnRows[0].user_id), { paymentFailed: false });
             const commissionService = new CommissionService();
             // Parse affiliateId from transaction metadata if present
             let affiliateIdFromMetadata: number | undefined = undefined;
@@ -3633,9 +3622,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             const userLookup = await findUserByStripeCustomerId(webhookContext, String(failedPayment.customer));
             failedUserId = userLookup.userId ? Number(userLookup.userId) : null;
           }
-          if (failedUserId) {
-            syncGhlAdminLifecycleTagsInBackground(failedUserId, { paymentFailed: true });
-          }
         } catch {}
         break;
       
@@ -3878,10 +3864,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       }
           console.log('✅ Subscription created/updated via checkout session:', { userId, stripeSubscriptionId, planName, billingCycle });
           if (userId) {
-            syncGhlAdminLifecycleTagsInBackground(Number(userId), { paymentFailed: false });
-          }
-
-          if (userId) {
             const userRows = await executeQuery(
               'SELECT email, first_name, last_name, company_name, role FROM users WHERE id = ?',
               [userId]
@@ -4051,7 +4033,6 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
               'UPDATE subscriptions SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?',
               ['canceled', userId]
             );
-            syncGhlAdminLifecycleTagsInBackground(Number(userId));
             console.log('🛑 Subscription canceled via webhook:', { userId });
           }
         } catch (delErr) {

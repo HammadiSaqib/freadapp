@@ -44,7 +44,6 @@ import {
   getReportPullReminderEmailEnabled,
   setReportPullReminderEmailEnabled,
 } from '../services/reportPullEmailService.js';
-import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -6509,9 +6508,6 @@ router.post('/clients/import-csv', authenticateToken, requireSuperAdmin, upload.
           ]
         );
         const clientId = ins.insertId || ins?.lastID || 0;
-        if (clientId) {
-          syncAdminClientToGhlInBackground(adminId, Number(clientId), 'client_imported');
-        }
         results.push({ email, status: 'imported', client_id: clientId });
       } catch (e: any) {
         if (isKycDatabaseRejection(e)) {

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import axios from 'axios';
-import { authenticateToken, AuthRequest, requireRole } from '../middleware/authMiddleware.js';
+import { authenticateToken, AuthRequest, requireRole, requireExactRole } from '../middleware/authMiddleware.js';
 import { rateLimit } from '../middleware/securityMiddleware.js';
 import { getDatabaseAdapter } from '../database/databaseAdapter.js';
 import { getScoreMachineEliteAccessStatus, hasSignedScoreMachineEliteAgreement } from '../utils/scoreMachineEliteAccess.js';
@@ -1642,7 +1642,7 @@ router.post(
 router.post(
   '/funding-diy-strategy',
   authenticateToken,
-  requireRole('admin', 'super_admin', 'funding_manager', 'employee', 'user'),
+  requireExactRole('super_admin', 'funding_manager'),
   rateLimit({ windowMs: 60_000, maxRequests: 12, message: 'Too many AI funding strategy requests, try again shortly' }),
   async (req: Request, res: Response) => {
     try {
@@ -2269,7 +2269,7 @@ Paste the client's credit report JSON here.
 router.get(
   '/funding-diy-strategy/quota',
   authenticateToken,
-  requireRole('admin', 'super_admin', 'funding_manager', 'employee', 'user'),
+  requireExactRole('super_admin', 'funding_manager'),
   async (req: Request, res: Response) => {
     try {
       const owner = await resolveAiQuotaOwnerId(req as AuthRequest);

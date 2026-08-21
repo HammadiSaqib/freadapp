@@ -6,8 +6,6 @@ import { OAuth2Client } from 'google-auth-library';
 import { getQuery, runQuery } from '../database/databaseAdapter.js';
 import { ENV_CONFIG } from '../config/environment.js';
 import { emailService } from '../services/emailService.js';
-import { syncGhlAdminSignup } from '../services/ghlService.js';
-import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 import { extractLoginInfo } from '../utils/loginUtils.js';
 import { getScoreMachinePortalAccessStatus } from '../utils/scoreMachineEliteAccess.js';
 import { ensureKycSchema } from '../utils/kyc.js';
@@ -79,36 +77,6 @@ export interface AuthRequest extends Request {
     email: string;
     role: string;
   }
-}
-
-function syncAdminSignupToGhlInBackground(params: {
-  userId?: number | string | null;
-  email?: string | null;
-  phone?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  companyName?: string | null;
-  role?: string | null;
-  registrationData?: Record<string, any> | null;
-}) {
-  const role = String(params.role || 'admin').toLowerCase();
-  if (role !== 'admin') {
-    return;
-  }
-
-  void syncGhlAdminSignup(params)
-    .then((result) => {
-      if (!result?.skipped) {
-        console.log('GHL admin signup synced:', {
-          userId: params.userId || null,
-          email: params.email || null,
-          contactId: result?.contactId || null
-        });
-      }
-    })
-    .catch((error: any) => {
-      console.error('GHL admin signup sync failed:', error?.response?.data || error?.message || error);
-    });
 }
 
 // Helper functions
@@ -210,23 +178,11 @@ export async function createUser(userData: {
   console.log(`✅ User created successfully. Subscription and affiliate setup will be handled in dashboard.`);
   
   const newUser = await getUserById(insertedId);
-  syncAdminSignupToGhlInBackground({
-    userId: insertedId,
-    email: userData.email,
-    phone: userData.phone || null,
-    firstName: userData.first_name,
-    lastName: userData.last_name,
-    companyName: userData.company_name || null,
-    role: userData.role || 'admin',
-    registrationData: userData
-  });
-
   return newUser;
 }
 
 export async function updateUserLastLogin(userId: number): Promise<void> {
   await runQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
-  syncGhlAdminLifecycleTagsInBackground(userId);
 }
 
 // Client helper functions
@@ -973,21 +929,6 @@ export class AuthController {
           }
 
           console.log('New admin account created from Google sign-in, ID:', newUserId);
-          syncAdminSignupToGhlInBackground({
-            userId: newUserId,
-            email,
-            phone: null,
-            firstName: googleFirstName,
-            lastName: googleLastName,
-            companyName: null,
-            role: 'admin',
-            registrationData: {
-              auth_provider: 'google',
-              avatar: googleAvatar,
-              referral_affiliate_id: parseResult.data.referral_affiliate_id || null
-            }
-          });
-
           // Handle affiliate referral if provided
           try {
             const providedAffiliateIdRaw = (parseResult.data.referral_affiliate_id || '').toString().trim();
@@ -1319,22 +1260,6 @@ export class AuthController {
       
       const userId = userResult.insertId;
       console.log('User created successfully with ID:', userId);
-      syncAdminSignupToGhlInBackground({
-        userId,
-        email: userData.email,
-        phone: req.body?.phone || req.body?.phone_number || null,
-        firstName: userData.first_name,
-        lastName: userData.last_name,
-        companyName: userData.company_name || req.body?.company_name || null,
-        role: userData.role || 'admin',
-        registrationData: {
-          ...req.body,
-          user_id: userId,
-          account_type: 'admin',
-          referral_source: (req.body?.affiliate_id || userData.referral_affiliate_id) ? 'product_link' : null
-        }
-      });
-
       // If a referral affiliate ID was provided, create a pending referral record
       try {
         const providedAffiliateIdRaw = (req.body?.affiliate_id || userData.referral_affiliate_id || '').toString().trim();
@@ -1574,25 +1499,6 @@ export class AuthController {
       // Get the created user
       const insertedId = result.insertId;
       const newUser = await getUserById(insertedId);
-      syncAdminSignupToGhlInBackground({
-        userId: newUser.id,
-        email: newUser.email,
-        phone: pendingData.phone || null,
-        firstName: newUser.first_name,
-        lastName: newUser.last_name,
-        companyName: newUser.company_name || null,
-        role: newUser.role || 'admin',
-        registrationData: {
-          pending_registration_id: pendingData.id || null,
-          email: pendingData.email,
-          first_name: pendingData.first_name,
-          last_name: pendingData.last_name,
-          company_name: pendingData.company_name || null,
-          role: pendingData.role || 'admin',
-          verified_at: new Date().toISOString()
-        }
-      });
-
       console.log('✅ User created successfully:', { id: newUser.id, email: newUser.email });
       console.log('💡 User will set up subscription and affiliate profile in dashboard after payment');
 

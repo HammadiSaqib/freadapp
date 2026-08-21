@@ -10,6 +10,7 @@ import { clientsApi, creditReportScraperApi } from "@/lib/api";
 import { runWithReportPullFeedback, showReportPullError } from "@/lib/reportPullFeedback";
 import { useToast } from "@/hooks/use-toast";
 import EditClientForm from "@/components/EditClientForm";
+import FundingAgreementCard from "@/components/FundingAgreementCard";
 import {
   Dialog,
   DialogContent,
@@ -696,11 +697,6 @@ export default function ClientProfileStandard() {
               <Edit className="h-4 w-4 mr-2" />
               Edit Client
             </Button>
-            {!client.latestJsonData && (
-              <Button variant="default" size="sm" onClick={handleApplyFunding}>
-                Apply for Funding
-              </Button>
-            )}
             <Button variant="default" size="sm" onClick={handleScrapeNewReport} disabled={scrapingLoading}>
               {scrapingLoading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -771,6 +767,8 @@ export default function ClientProfileStandard() {
             </CardContent>
           </Card>
         </div>
+
+        <FundingAgreementCard clientId={client.id} isFundable={client.fundingEligibility === 'fundable'} source="admin_dashboard" />
 
         <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">

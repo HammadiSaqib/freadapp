@@ -15,6 +15,7 @@ import { useScoreMachineEliteStatus } from "@/hooks/useScoreMachineEliteStatus";
 import EditClientForm from "@/components/EditClientForm";
 import ClientProfileStandard from "@/pages/ClientProfileStandard";
 import BasicAdminReportPullPrompt from "@/components/BasicAdminReportPullPrompt";
+import FundingAgreementCard from "@/components/FundingAgreementCard";
 import PowerOfAttorneyTab from "@/components/PowerOfAttorneyTab";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
 import { PrintRequestDialog, type PrintRequestSenderFormValues } from "@/components/PrintRequestDialog";
@@ -1699,15 +1700,6 @@ export default function BasicClientProfile() {
             <Edit className="h-4 w-4 mr-2" />
             {isBasicAdminPortalUser ? 'Edit My Profile' : 'Edit Client'}
           </Button>
-          {!client.latestJsonData && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={handleApplyFunding}
-            >
-              Apply for Funding
-            </Button>
-          )}
           <Button 
             variant="default" 
             size="sm" 
@@ -1801,6 +1793,8 @@ export default function BasicClientProfile() {
             </CardContent>
           </Card>
         </div>
+
+        <FundingAgreementCard clientId={client.id} isFundable={client.fundingEligibility === 'fundable'} source="admin_dashboard" />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">

@@ -11,8 +11,6 @@ let pool = null;
 
 // Import environment configuration
 import { ENV_CONFIG } from '../config/environment.js';
-import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
-import { syncGhlAdminLifecycleTagsInBackground } from '../services/ghlAdminLifecycleService.js';
 
 // Default database configuration using ENV_CONFIG
 const DEFAULT_CONFIG = {
@@ -254,29 +252,6 @@ async function saveCreditReport(data) {
   try {
     const result = await insertCreditReportHistory(sql, params);
     await persistClientSsnLastFour(data.client_id, data.ssn_last_four);
-    try {
-      const clientId = data.client_id;
-      let clientRow = null;
-      if (clientId) {
-        const rows = await executeQuery(
-          'SELECT id, user_id, first_name, last_name, email, phone, integration_id FROM clients WHERE id = ? LIMIT 1',
-          [clientId]
-        );
-        if (Array.isArray(rows) && rows.length > 0) {
-          clientRow = rows[0];
-        }
-      }
-      if (clientRow?.user_id) {
-        syncGhlAdminLifecycleTagsInBackground(Number(clientRow.user_id));
-        syncAdminClientToGhlInBackground(
-          Number(clientRow.user_id),
-          Number(clientRow.id),
-          'report_pulled'
-        );
-      }
-    } catch (ghlError) {
-      console.error('GHL sync failed:', ghlError);
-    }
     const numericClientId = Number(data.client_id);
     if ((data.status || 'completed') === 'completed' && Number.isFinite(numericClientId) && numericClientId > 0) {
       import('../services/reportPullEmailService.js')

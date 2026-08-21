@@ -14,7 +14,6 @@ import { ENV_CONFIG } from '../config/environment.js';
 import { fetchCreditReport } from '../services/scrapers/index.js';
 import { saveCreditReport } from '../database/dbConnection.js';
 import crypto from 'crypto';
-import { syncAdminClientToGhlInBackground } from '../services/ghlService.js';
 import { normalizeYearOnlyDob } from '../../shared/partialDob.js';
 import {
   captureEquifaxSettlementScreenshot,
@@ -71,29 +70,6 @@ const clientIntakeSchema = z.object({
   password: z.string().min(1),
   ssnLast4: z.string().optional()
 });
-
-const ghlIntakeSchema = z.object({
-  locationId: z.string().optional(),
-  contact: z.object({
-    id: z.string().optional(),
-    email: z.string().email().optional(),
-    phone: z.string().optional(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional()
-  }).optional(),
-  contactId: z.string().optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  platform: z.string().optional(),
-  platform_email: z.string().email().optional(),
-  platform_password: z.string().optional(),
-  platformPassword: z.string().optional(),
-  password: z.string().optional(),
-  tags: z.array(z.string()).optional(),
-  notes: z.string().optional()
-}).passthrough();
 
 function normalizeDateInput(input?: string | null): string | null {
   try {
@@ -732,61 +708,6 @@ function extractMyScoreIqScores(rawData: any): { experianScore: number; equifaxS
   return scores;
 }
 
-async function pruneGhlWebhookEvents() {
-  const adapter = getDatabaseAdapter();
-  const isSqlite = adapter.getType() === 'sqlite';
-  const cleanupSql = isSqlite
-    ? `DELETE FROM integration_webhook_events WHERE created_at < datetime('now', '-2 days')`
-    : `DELETE FROM integration_webhook_events WHERE created_at < DATE_SUB(NOW(), INTERVAL 2 DAY)`;
-  try {
-    await runQuery(cleanupSql);
-  } catch {}
-}
-
-function buildIdempotencyKey(options: {
-  integrationId: number;
-  email?: string | null;
-  phone?: string | null;
-  platform?: string | null;
-  headerValue?: string | null;
-}) {
-  const headerValue = String(options.headerValue || '').trim();
-  if (headerValue) return headerValue;
-  const source = `${options.integrationId}|${options.email || options.phone || ''}|${options.platform || ''}`;
-  return crypto.createHash('sha256').update(source).digest('hex');
-}
-
-function isDuplicateKeyError(error: any) {
-  const code = error?.code || '';
-  return code === 'ER_DUP_ENTRY' || code === 'SQLITE_CONSTRAINT' || code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'SQLITE_CONSTRAINT_PRIMARYKEY';
-}
-
-async function logIntegrationActivity(params: {
-  integrationId: number;
-  adminId: number;
-  direction: 'inbound' | 'outbound';
-  eventType: string;
-  status: 'success' | 'failed';
-  message?: string | null;
-  clientId?: number | null;
-}) {
-  try {
-    await runQuery(
-      `INSERT INTO integration_activity_logs (integration_id, admin_id, direction, event_type, status, message, client_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-      [
-        params.integrationId,
-        params.adminId,
-        params.direction,
-        params.eventType,
-        params.status,
-        params.message || null,
-        params.clientId || null
-      ]
-    );
-  } catch {}
-}
-
 function extractClientFromReport(rawReport: any, email: string, allowEmailFallback = true) {
   const reportData = rawReport?.reportData || rawReport;
   const rawCreditData = rawReport?.rawCreditData || rawReport?.raw_credit_data || null;
@@ -1164,7 +1085,6 @@ export async function createClient(req: AuthRequest, res: Response) {
           userAgent: req.get('User-Agent') || null
         });
 
-        syncAdminClientToGhlInBackground(baseUserId, Number(existingClient.id), 'client_imported');
         return res.status(200).json({
           ...refreshedClient,
           reusedExisting: true,
@@ -1218,7 +1138,6 @@ export async function createClient(req: AuthRequest, res: Response) {
         userAgent: req.get('User-Agent') || null
       });
 
-      syncAdminClientToGhlInBackground(baseUserId, Number(emailMatchedClient.id), 'client_imported');
       return res.status(200).json({
         ...refreshedClient,
         reusedExisting: true,
@@ -1336,7 +1255,6 @@ export async function createClient(req: AuthRequest, res: Response) {
       userAgent: req.get('User-Agent') || null
     });
 
-    syncAdminClientToGhlInBackground(baseUserId, Number(insertedId), 'client_created');
     
     res.status(201).json({
       ...newClient,
@@ -1880,324 +1798,6 @@ export async function submitClientIntake(req: Request, res: Response) {
   }
 }
 
-export async function submitGhlWebhook(req: Request, res: Response) {
-  try {
-    const integrationHash = String(req.params.integration_hash || '').trim();
-    if (!integrationHash) {
-      return res.status(400).json({ error: 'Integration hash is required' });
-    }
-
-    const integration = await getQuery(
-      `SELECT id, admin_id, location_id FROM admin_integrations WHERE integration_hash = ? AND provider = 'ghl' AND is_active = 1 LIMIT 1`,
-      [integrationHash]
-    );
-    if (!integration?.id || !integration?.admin_id) {
-      return res.status(404).json({ error: 'Integration not found' });
-    }
-
-    const payload = ghlIntakeSchema.parse(req.body || {});
-    const contact = payload.contact || {};
-    const email = contact.email || payload.email || null;
-    const phone = contact.phone || payload.phone || null;
-    const firstName = contact.firstName || payload.firstName || '';
-    const lastName = contact.lastName || payload.lastName || '';
-    const locationId = payload.locationId || String((req.body as any)?.locationId || '');
-    const contactId = contact.id || payload.contactId || '';
-    const platform = String((payload as any).platform || '').trim() || 'other';
-    const platformEmail = String(
-      (payload as any).platform_email ||
-      (payload as any).platformEmail ||
-      (req.body as any)?.platform_email ||
-      (req.body as any)?.platformEmail ||
-      email ||
-      ''
-    ).trim();
-    const platformPasswordRaw =
-      (payload as any).platform_password ||
-      (payload as any).platformPassword ||
-      (payload as any).password ||
-      (req.body as any)?.platform_password ||
-      (req.body as any)?.platformPassword ||
-      (req.body as any)?.password;
-    const platformPassword =
-      typeof platformPasswordRaw === 'string' && platformPasswordRaw.trim()
-        ? platformPasswordRaw.trim()
-        : null;
-
-    if (!email && !phone) {
-      await logIntegrationActivity({
-        integrationId: Number(integration.id),
-        adminId: Number(integration.admin_id),
-        direction: 'inbound',
-        eventType: 'client_created',
-        status: 'failed',
-        message: 'Email or phone is required'
-      });
-      return res.status(400).json({ error: 'Email or phone is required' });
-    }
-
-    if (integration.location_id && locationId && integration.location_id !== locationId) {
-      return res.status(403).json({ error: 'Invalid location' });
-    }
-
-    const adminId = Number(integration.admin_id);
-    if (!adminId) {
-      return res.status(400).json({ error: 'Invalid admin integration' });
-    }
-
-  if (!platformEmail || !platformPassword) {
-    await logIntegrationActivity({
-      integrationId: Number(integration.id),
-      adminId,
-      direction: 'inbound',
-      eventType: 'client_created',
-      status: 'failed',
-      message: 'Platform email and password are required for portal access'
-    });
-    return res.status(400).json({ error: 'Platform email and password are required' });
-  }
-
-    const quotaValidation = await validateClientQuota(adminId);
-    if (!quotaValidation.canAdd) {
-      await logIntegrationActivity({
-        integrationId: Number(integration.id),
-        adminId,
-        direction: 'inbound',
-        eventType: 'client_created',
-        status: 'failed',
-        message: 'Client quota exceeded'
-      });
-      return res.status(403).json({
-        success: false,
-        error: 'Client quota exceeded',
-        message: quotaValidation.error,
-        planLimits: quotaValidation.planLimits
-      });
-    }
-
-    await pruneGhlWebhookEvents();
-    const idempotencyKey = buildIdempotencyKey({
-      integrationId: Number(integration.id),
-      email,
-      phone,
-      platform: payload.platform || null,
-      headerValue: req.get('X-GHL-Event-ID') || null
-    });
-
-    try {
-      await runQuery(
-        `INSERT INTO integration_webhook_events (integration_id, idempotency_key, created_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
-        [integration.id, idempotencyKey]
-      );
-    } catch (error) {
-      if (isDuplicateKeyError(error)) {
-        await logIntegrationActivity({
-          integrationId: Number(integration.id),
-          adminId,
-          direction: 'inbound',
-          eventType: 'client_created',
-          status: 'success',
-          message: 'Duplicate webhook ignored'
-        });
-        return res.status(200).json({ success: true, created: false, duplicate: true });
-      }
-      throw error;
-    }
-
-    const existingClient = email
-      ? await getQuery('SELECT * FROM clients WHERE email = ? AND user_id = ? LIMIT 1', [email, adminId])
-      : await getQuery('SELECT * FROM clients WHERE phone = ? AND user_id = ? LIMIT 1', [phone, adminId]);
-
-    const tags = Array.isArray(payload.tags) ? payload.tags.filter(Boolean) : [];
-    const noteParts = [payload.notes, contactId ? `GHL Contact: ${contactId}` : '', tags.length ? `GHL Tags: ${tags.join(', ')}` : '']
-      .map((value) => String(value || '').trim())
-      .filter((value) => value.length > 0);
-    const newNotes = noteParts.length ? noteParts.join(' | ') : null;
-
-    if (existingClient) {
-      const updates: Record<string, any> = {};
-      if (firstName && !existingClient.first_name) updates.first_name = firstName;
-      if (lastName && !existingClient.last_name) updates.last_name = lastName;
-      if (email && !existingClient.email) updates.email = email;
-      if (phone && !existingClient.phone) updates.phone = phone;
-      if (platform && !existingClient.platform) updates.platform = platform;
-      if (platformEmail && !existingClient.platform_email) updates.platform_email = platformEmail;
-      if (platformPassword && !existingClient.platform_password) updates.platform_password = platformPassword;
-      if (newNotes) {
-        const mergedNotes = [existingClient.notes, newNotes].filter(Boolean).join(' | ');
-        updates.notes = mergedNotes;
-      }
-      if (Object.keys(updates).length > 0) {
-        const fields = Object.keys(updates);
-        const setClause = fields.map((field) => `${field} = ?`).join(', ');
-        const values = fields.map((field) => updates[field]);
-        await runQuery(
-          `UPDATE clients SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?`,
-          [...values, existingClient.id, adminId]
-        );
-      }
-      const refreshedClient = await getQuery('SELECT * FROM clients WHERE id = ?', [existingClient.id]);
-      await logIntegrationActivity({
-        integrationId: Number(integration.id),
-        adminId,
-        direction: 'inbound',
-        eventType: 'client_created',
-        status: 'success',
-        message: 'Client already exists',
-        clientId: existingClient.id
-      });
-      return res.json({ success: true, data: refreshedClient, created: false });
-    }
-
-    const kycGate = await checkClientCreationKyc({
-      userId: adminId,
-      source: 'ghl_webhook',
-      ipAddress: req.ip,
-      userAgent: req.get('User-Agent') || null,
-    });
-    if (!kycGate.allowed) {
-      await logIntegrationActivity({
-        integrationId: Number(integration.id),
-        adminId,
-        direction: 'inbound',
-        eventType: 'client_created',
-        status: 'failed',
-        message: 'Identity verification required',
-      });
-      return res.status(403).json({
-        ...KYC_REQUIRED_RESPONSE,
-        kyc_status: kycGate.status,
-        existing_client_count: kycGate.clientCount,
-      });
-    }
-
-    const result = await executeTransaction(async (connection) => {
-      const insertResult = await executeClientInsert(connection, `
-        INSERT INTO clients (
-          user_id, first_name, last_name, email, phone, address, city, state, zip_code, ssn_last_four,
-          date_of_birth, employment_status, annual_income, status, credit_score,
-          experian_score, equifax_score, transunion_score, previous_credit_score, notes, 
-          platform, platform_email, platform_password, created_via, integration_id, created_by, updated_by
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        adminId,
-        firstName || null,
-        lastName || null,
-        email || null,
-        phone || null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        'active',
-        null,
-        null,
-        null,
-        null,
-        null,
-        newNotes,
-        platform,
-        platformEmail || email || null,
-        platformPassword,
-        'ghl',
-        integration.id,
-        adminId,
-        adminId
-      ]);
-      return insertResult;
-    });
-
-    const insertedId = (result as any)?.insertId;
-    const newClient = await getQuery('SELECT * FROM clients WHERE id = ?', [insertedId]);
-
-    await runQuery(
-      `INSERT INTO activities (user_id, client_id, type, description) VALUES (?, ?, ?, ?)`,
-      [
-        adminId,
-        insertedId,
-        'client_added',
-        `New client added: ${firstName} ${lastName}`.trim()
-      ]
-    );
-
-    await runQuery(
-      `INSERT INTO user_activities (user_id, activity_type, resource_type, resource_id, description, ip_address, user_agent, session_id)
-       VALUES (?, 'create', 'client', ?, ?, ?, ?, ?)`,
-      [
-        adminId,
-        insertedId,
-        `New client added: ${firstName} ${lastName}`.trim(),
-        (req as any).ip || null,
-        req.get('User-Agent') || null,
-        null
-      ]
-    );
-
-    await logIntegrationActivity({
-      integrationId: Number(integration.id),
-      adminId,
-      direction: 'inbound',
-      eventType: 'client_created',
-      status: 'success',
-      message: 'Created via GHL',
-      clientId: insertedId
-    });
-
-    return res.status(201).json({ success: true, data: newClient, created: true });
-  } catch (error) {
-    if (isKycDatabaseRejection(error)) {
-      return res.status(403).json(KYC_REQUIRED_RESPONSE);
-    }
-    if (error instanceof z.ZodError) {
-      try {
-        const integrationHash = String(req.params.integration_hash || '').trim();
-        if (integrationHash) {
-          const integration = await getQuery(
-            `SELECT id, admin_id FROM admin_integrations WHERE integration_hash = ? AND provider = 'ghl' LIMIT 1`,
-            [integrationHash]
-          );
-          if (integration?.id && integration?.admin_id) {
-            await logIntegrationActivity({
-              integrationId: Number(integration.id),
-              adminId: Number(integration.admin_id),
-              direction: 'inbound',
-              eventType: 'client_created',
-              status: 'failed',
-              message: 'Validation error'
-            });
-          }
-        }
-      } catch {}
-      return res.status(400).json({ error: 'Validation error', details: error.errors });
-    }
-    console.error('Error submitting GHL webhook:', error);
-    try {
-      const integrationHash = String(req.params.integration_hash || '').trim();
-      if (integrationHash) {
-        const integration = await getQuery(
-          `SELECT id, admin_id FROM admin_integrations WHERE integration_hash = ? AND provider = 'ghl' LIMIT 1`,
-          [integrationHash]
-        );
-        if (integration?.id && integration?.admin_id) {
-          await logIntegrationActivity({
-            integrationId: Number(integration.id),
-            adminId: Number(integration.admin_id),
-            direction: 'inbound',
-            eventType: 'client_created',
-            status: 'failed',
-            message: 'Internal server error'
-          });
-        }
-      }
-    } catch {}
-    return res.status(500).json({ error: 'Internal server error' });
-  }
-}
-
 // Update a client
 export async function updateClient(req: AuthRequest, res: Response) {
   try {
@@ -2290,7 +1890,6 @@ export async function updateClient(req: AuthRequest, res: Response) {
       [id]
     );
 
-    syncAdminClientToGhlInBackground(baseUserId, Number(id), 'client_updated');
     
     res.json(updatedClient);
   } catch (error) {

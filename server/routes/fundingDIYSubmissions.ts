@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { body, validationResult } from 'express-validator';
-import { AuthRequest, authenticateToken, requireRole } from '../middleware/authMiddleware.js';
+import { AuthRequest, authenticateToken, requireExactRole } from '../middleware/authMiddleware.js';
 import { executeQuery } from '../database/mysqlConfig.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
@@ -41,7 +41,7 @@ async function getVisibleClientClauses(req: AuthRequest) {
   };
 }
 
-router.get('/stats', authenticateToken, requireRole('funding_manager'), async (req: AuthRequest, res: Response) => {
+router.get('/stats', authenticateToken, requireExactRole('funding_manager', 'super_admin'), async (req: AuthRequest, res: Response) => {
   try {
     const visibility = await getVisibleClientClauses(req);
     const where = [...visibility.clauses, "s.status = 'approved'"];
@@ -69,7 +69,7 @@ router.get('/stats', authenticateToken, requireRole('funding_manager'), async (r
 
 // Create or update DIY submission for a given card
 // Fetch existing DIY submissions with optional filters
-router.get('/', authenticateToken, requireRole('funding_manager'), async (req: AuthRequest, res: Response) => {
+router.get('/', authenticateToken, requireExactRole('funding_manager', 'super_admin'), async (req: AuthRequest, res: Response) => {
   try {
     const { client_id, card_id } = req.query as { client_id?: string; card_id?: string };
     const visibility = await getVisibleClientClauses(req);
@@ -111,7 +111,7 @@ router.get('/', authenticateToken, requireRole('funding_manager'), async (req: A
 });
 
 // Create or update DIY submission for a given card
-router.post('/', authenticateToken, requireRole('funding_manager'), diySubmissionValidation, async (req: Request, res: Response) => {
+router.post('/', authenticateToken, requireExactRole('funding_manager', 'super_admin'), diySubmissionValidation, async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

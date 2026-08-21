@@ -76,6 +76,16 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+// Use this for sensitive internal-team features where the legacy Admin bypass
+// in requireRole must not apply.
+export function requireExactRole(...roles: string[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+    if (roles.includes(req.user.role)) return next();
+    return res.status(403).json({ error: 'Internal Funding Team access required' });
+  };
+}
+
 export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];

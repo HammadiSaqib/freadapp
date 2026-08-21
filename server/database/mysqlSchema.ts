@@ -124,8 +124,6 @@ export interface Client {
   platform?: string;
   platform_email?: string;
   platform_password?: string;
-  created_via?: string;
-  integration_id?: number;
   created_at: string;
   updated_at: string;
   created_by: number;
@@ -585,8 +583,6 @@ export async function initializeMySQLDatabase(): Promise<void> {
       if (!existing.has('platform')) alters.push('ADD COLUMN platform VARCHAR(50) NULL');
       if (!existing.has('platform_email')) alters.push('ADD COLUMN platform_email VARCHAR(255) NULL');
       if (!existing.has('platform_password')) alters.push('ADD COLUMN platform_password VARCHAR(255) NULL');
-      if (!existing.has('created_via')) alters.push('ADD COLUMN created_via VARCHAR(20) NULL');
-      if (!existing.has('integration_id')) alters.push('ADD COLUMN integration_id INT NULL');
       if (!existing.has('payment_status')) alters.push("ADD COLUMN payment_status ENUM('paid','unpaid') NOT NULL DEFAULT 'paid'");
       if (!existing.has('credit_score')) alters.push('ADD COLUMN credit_score INT NULL');
       if (!existing.has('previous_credit_score')) alters.push('ADD COLUMN previous_credit_score INT NULL');
@@ -614,37 +610,6 @@ export async function initializeMySQLDatabase(): Promise<void> {
         console.log('ℹ️  clients.platform column already updated or conversion not needed');
       }
     } catch (e) {
-    }
-
-    try {
-      const integrationColumns = await executeQuery(
-        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'admin_integrations'`
-      );
-      const existingIntegrationColumns = new Set((integrationColumns as any[]).map((row: any) => row.COLUMN_NAME));
-      const integrationAlters: string[] = [];
-      if (!existingIntegrationColumns.has('verified_at')) integrationAlters.push('ADD COLUMN verified_at DATETIME NULL');
-      if (!existingIntegrationColumns.has('last_validation_code')) integrationAlters.push('ADD COLUMN last_validation_code INT NULL');
-      if (!existingIntegrationColumns.has('last_validation_error')) integrationAlters.push('ADD COLUMN last_validation_error TEXT NULL');
-      if (integrationAlters.length) {
-        await executeQuery(`ALTER TABLE admin_integrations ${integrationAlters.join(', ')}`);
-      }
-
-      const logColumns = await executeQuery(
-        `SELECT COLUMN_NAME FROM information_schema.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'integration_activity_logs'`
-      );
-      const existingLogColumns = new Set((logColumns as any[]).map((row: any) => row.COLUMN_NAME));
-      const logAlters: string[] = [];
-      if (!existingLogColumns.has('response_code')) logAlters.push('ADD COLUMN response_code INT NULL');
-      if (!existingLogColumns.has('error_message')) logAlters.push('ADD COLUMN error_message TEXT NULL');
-      if (!existingLogColumns.has('data_fields')) logAlters.push('ADD COLUMN data_fields JSON NULL');
-      if (!existingLogColumns.has('retry_status')) logAlters.push('ADD COLUMN retry_status VARCHAR(100) NULL');
-      if (logAlters.length) {
-        await executeQuery(`ALTER TABLE integration_activity_logs ${logAlters.join(', ')}`);
-      }
-    } catch (e) {
-      console.error('Failed to update GoHighLevel integration schema:', e);
     }
 
     try {
@@ -854,8 +819,7 @@ async function createMySQLTables(): Promise<void> {
       WHERE c.TABLE_SCHEMA = DATABASE()
         AND c.COLUMN_NAME = 'id'
         AND c.TABLE_NAME IN (
-          'users', 'clients', 'admin_integrations', 'community_posts',
-          'integration_activity_logs',
+          'users', 'clients', 'community_posts',
           'calendar_events', 'affiliates', 'affiliate_referrals',
           'blog_categories', 'blog_posts', 'blog_tags', 'cards',
           'contract_templates', 'courses', 'disputes'
@@ -958,74 +922,6 @@ async function createMySQLTables(): Promise<void> {
       INDEX idx_user_id (user_id),
       FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
-    `CREATE TABLE IF NOT EXISTS admin_integrations (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      admin_id INT NOT NULL,
-      provider ENUM('ghl') NOT NULL DEFAULT 'ghl',
-      name VARCHAR(255) NULL,
-      access_token VARCHAR(500) NOT NULL,
-      location_id VARCHAR(255) NULL,
-      integration_hash VARCHAR(255) NOT NULL,
-      outbound_url VARCHAR(500) NULL,
-      business_record_id VARCHAR(255) NULL,
-      custom_field_credit_score VARCHAR(255) NULL,
-      custom_field_experian_score VARCHAR(255) NULL,
-      custom_field_equifax_score VARCHAR(255) NULL,
-      custom_field_transunion_score VARCHAR(255) NULL,
-      custom_field_report_date VARCHAR(255) NULL,
-      field_mappings JSON NULL,
-      is_active BOOLEAN NOT NULL DEFAULT TRUE,
-      verified_at DATETIME NULL,
-      last_validation_code INT NULL,
-      last_validation_error TEXT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      created_by INT NULL,
-      updated_by INT NULL,
-      UNIQUE KEY uniq_integration_hash (integration_hash),
-      INDEX idx_admin_id (admin_id),
-      INDEX idx_provider (provider),
-      INDEX idx_is_active (is_active),
-      FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-      FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
-    `CREATE TABLE IF NOT EXISTS integration_activity_logs (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      integration_id INT NOT NULL,
-      admin_id INT NOT NULL,
-      direction ENUM('inbound','outbound') NOT NULL,
-      event_type VARCHAR(100) NOT NULL,
-      status ENUM('success','failed') NOT NULL,
-      message TEXT NULL,
-      client_id INT NULL,
-      response_code INT NULL,
-      error_message TEXT NULL,
-      data_fields JSON NULL,
-      retry_status VARCHAR(100) NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_integration_id (integration_id),
-      INDEX idx_admin_id (admin_id),
-      INDEX idx_direction (direction),
-      INDEX idx_status (status),
-      INDEX idx_created_at (created_at),
-      FOREIGN KEY (integration_id) REFERENCES admin_integrations(id) ON DELETE CASCADE,
-      FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-
-    `CREATE TABLE IF NOT EXISTS integration_webhook_events (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      integration_id INT NOT NULL,
-      idempotency_key VARCHAR(255) NOT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_integration_event (integration_id, idempotency_key),
-      INDEX idx_integration_id (integration_id),
-      INDEX idx_created_at (created_at),
-      FOREIGN KEY (integration_id) REFERENCES admin_integrations(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
     // Support team members table
@@ -1159,8 +1055,6 @@ async function createMySQLTables(): Promise<void> {
       platform ENUM('myfreescorenow','identityiq','smartcredit','myscoreiq','transunion','experian','equifax','creditkarma','other'),
       platform_email VARCHAR(255),
       platform_password VARCHAR(255),
-      created_via VARCHAR(20) NULL,
-      integration_id INT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       created_by INT NOT NULL,
@@ -1171,7 +1065,6 @@ async function createMySQLTables(): Promise<void> {
       INDEX idx_payment_status (payment_status),
       INDEX idx_created_at (created_at),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (integration_id) REFERENCES admin_integrations(id) ON DELETE SET NULL,
       FOREIGN KEY (created_by) REFERENCES users(id),
       FOREIGN KEY (updated_by) REFERENCES users(id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -2525,13 +2418,10 @@ async function createMySQLTables(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
   ];
 
-  // Some integration tables reference clients, so these parent tables must be
-  // created first when initializing an empty database. Keep the remaining schema
-  // in its declared order.
+  // Create parent tables before their dependent tables.
   const parentTablePriority = new Map([
     ['users', 0],
-    ['admin_integrations', 1],
-    ['clients', 2]
+    ['clients', 1]
   ]);
   tables.sort((left, right) => {
     const leftName = left.match(/CREATE TABLE IF NOT EXISTS\s+([a-zA-Z0-9_]+)/)?.[1] || '';
@@ -2546,64 +2436,6 @@ async function createMySQLTables(): Promise<void> {
     }
   });
 
-  // Imported dumps can contain the integration activity table without the
-  // indexes/constraints normally declared by CREATE TABLE. Restore them after
-  // all parent tables are guaranteed to exist.
-  await repairTableIdAutoIncrement('integration_activity_logs');
-  const integrationLogForeignKeys = await executeQuery(
-    `SELECT COLUMN_NAME
-       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'integration_activity_logs'
-        AND REFERENCED_TABLE_NAME IS NOT NULL`
-  );
-  const constrainedIntegrationLogColumns = new Set(
-    (integrationLogForeignKeys as Array<{ COLUMN_NAME: string }>).map((row) => row.COLUMN_NAME)
-  );
-  const integrationLogConstraintAlters: string[] = [];
-  if (!constrainedIntegrationLogColumns.has('integration_id')) {
-    integrationLogConstraintAlters.push(
-      'ADD CONSTRAINT fk_integration_activity_logs_integration FOREIGN KEY (integration_id) REFERENCES admin_integrations(id) ON DELETE CASCADE'
-    );
-  }
-  if (!constrainedIntegrationLogColumns.has('admin_id')) {
-    integrationLogConstraintAlters.push(
-      'ADD CONSTRAINT fk_integration_activity_logs_admin FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE'
-    );
-  }
-  if (!constrainedIntegrationLogColumns.has('client_id')) {
-    integrationLogConstraintAlters.push(
-      'ADD CONSTRAINT fk_integration_activity_logs_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL'
-    );
-  }
-  if (integrationLogConstraintAlters.length > 0) {
-    try {
-      await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
-    } catch (error: any) {
-      if (isRecoverableForeignKeyError(error)) {
-        console.warn('⚠️  Encountered legacy foreign-key issue while applying integration activity constraints; attempting cleanup before retrying.');
-        try {
-          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'admin_id', 'users', false));
-        } catch (cleanupError: any) {
-          console.warn('⚠️  Failed to clean integration_activity_logs.admin_id references:', cleanupError.message);
-        }
-        try {
-          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'client_id', 'clients', true));
-        } catch (cleanupError: any) {
-          console.warn('⚠️  Failed to clean integration_activity_logs.client_id references:', cleanupError.message);
-        }
-        try {
-          await executeQuery(getForeignKeyCleanupSql('integration_activity_logs', 'integration_id', 'admin_integrations', false));
-        } catch (cleanupError: any) {
-          console.warn('⚠️  Failed to clean integration_activity_logs.integration_id references:', cleanupError.message);
-        }
-        await executeQuery(`ALTER TABLE integration_activity_logs ${integrationLogConstraintAlters.join(', ')}`);
-      } else {
-        throw error;
-      }
-    }
-  }
-  
   console.log('✅ MySQL tables created successfully');
 
   // Add file_path column to dispute_letter_zips if it doesn't exist

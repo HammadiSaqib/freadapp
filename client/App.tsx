@@ -15,6 +15,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { useAuthContext } from "./contexts/AuthContext";
 import { BlogSsrProvider, BlogSsrData } from "./contexts/BlogSsrContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SuperAdminProtectedRoute from "./components/SuperAdminProtectedRoute";
@@ -1172,13 +1173,26 @@ function DynamicPublicHostRoute({ hostname }: { hostname?: string }) {
 }
 
 function FundingDIYRoute() {
+  const { userProfile } = useAuthContext();
   const { hasScoreMachineEliteAccess, isEliteStatusLoading, isEliteActive } = useScoreMachineEliteStatus();
+
+  if (!['super_admin', 'funding_manager'].includes(String(userProfile?.role || ''))) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (hasScoreMachineEliteAccess && isEliteStatusLoading) {
     return <LoadingScreen message="Loading funding experience..." />;
   }
 
   return isEliteActive ? <EliteFundingDIY /> : <StandardFundingDIY />;
+}
+
+function InternalFundingRoute({ children }: { children: React.ReactNode }) {
+  const { userProfile, isLoading } = useAuthContext();
+  if (isLoading) return <LoadingScreen message="Checking funding permissions..." />;
+  return ['super_admin', 'funding_manager'].includes(String(userProfile?.role || ''))
+    ? <>{children}</>
+    : <Navigate to="/dashboard" replace />;
 }
 
 const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname }: AppProps) => {
@@ -1384,7 +1398,7 @@ const App = ({ router, routerProps, helmetContext, blogSsrData, requestHostname 
             path="/funding/apply/:type"
             element={
               <ProtectedRoute pageId="credit-report">
-                <FundingApplication />
+                <InternalFundingRoute><FundingApplication /></InternalFundingRoute>
               </ProtectedRoute>
             }
           />

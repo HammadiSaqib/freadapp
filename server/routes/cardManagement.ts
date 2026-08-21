@@ -1,11 +1,12 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { body, validationResult, query } from 'express-validator';
-import { authenticateToken } from '../middleware/authMiddleware.js';
+import { authenticateToken, requireExactRole } from '../middleware/authMiddleware.js';
 import { executeQuery } from '../database/mysqlConfig.js';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 const router = express.Router();
+router.use(authenticateToken, requireExactRole('funding_manager', 'super_admin'));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Valid US state codes (2-letter)

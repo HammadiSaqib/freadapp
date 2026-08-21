@@ -126,6 +126,7 @@ import PersonalCardsDisplay from '../../components/PersonalCardsDisplay';
 import BusinessCardsDisplay from '../../components/BusinessCardsDisplay';
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 import { useAuthContext } from "@/contexts/AuthContext";
+import FundingAgreementCard from "@/components/FundingAgreementCard";
 
 interface DebtConsolidationViewProps {
   accounts: any[];
@@ -4196,6 +4197,13 @@ export default function CreditReport() {
       title={`Credit Report - ${clientName}`}
       description="Detailed credit report analysis and information"
     >
+      <div className="mb-6">
+        <FundingAgreementCard
+          clientId={Number(clientId || 0)}
+          isFundable={String(clientRecord?.fundable_status || '') === 'fundable'}
+          source="member_dashboard"
+        />
+      </div>
       <Dialog
         open={lawEngineNoticeOpen}
         onOpenChange={(open) => {

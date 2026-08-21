@@ -317,15 +317,6 @@ export const authApi = {
   logout: () => api.post('/api/auth/logout'),
 };
 
-export const integrationsApi = {
-  getGhlIntegration: () => api.get('/api/integrations/ghl'),
-  saveGhlIntegration: (data: { access_token: string; location_id?: string | null }) =>
-    api.post('/api/integrations/ghl', data),
-  disableGhlIntegration: () => api.post('/api/integrations/ghl/disable'),
-  regenerateGhlWebhook: () => api.post('/api/integrations/ghl/regenerate-webhook'),
-  getGhlActivity: (limit?: number) => api.get('/api/integrations/ghl/activity', { params: { limit } }),
-};
-
 // Clients API
 export const clientsApi = {
   getClients: (params?: { page?: number; limit?: number; search?: string; status?: string }) =>
@@ -379,6 +370,16 @@ export const clientsApi = {
 
   closeEquifaxSettlementLiveBrowser: (id: string) =>
     api.delete(`/api/clients/${id}/equifax-breach-settlement/live`),
+};
+
+export const fundingAgreementsApi = {
+  getClientAgreement: (clientId: string | number) =>
+    api.get(`/api/funding-agreements/client/${clientId}`),
+  signClientAgreement: (clientId: string | number, data: { signature: string; source: 'admin_dashboard' | 'member_dashboard' }) =>
+    api.post(`/api/funding-agreements/client/${clientId}/sign`, data),
+  getTemplate: () => api.get('/api/funding-agreements/template'),
+  publishTemplate: (data: { title: string; content_html: string; success_fee_percentage: number }) =>
+    api.put('/api/funding-agreements/template', data),
 };
 
 // Disputes API

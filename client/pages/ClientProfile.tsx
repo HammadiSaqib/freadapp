@@ -17,6 +17,7 @@ import EditClientForm from "@/components/EditClientForm";
 import ClientProfileStandard from "@/pages/ClientProfileStandard";
 import BasicClientProfile from "@/components/BasicClientProfile";
 import BasicAdminReportPullPrompt from "@/components/BasicAdminReportPullPrompt";
+import FundingAgreementCard from "@/components/FundingAgreementCard";
 import PowerOfAttorneyTab from "@/components/PowerOfAttorneyTab";
 import { DocumentUploadBox } from "@/components/ui/DocumentUploadBox";
 import { PrintRequestDialog, type PrintRequestSenderFormValues } from "@/components/PrintRequestDialog";
@@ -1877,15 +1878,6 @@ return (
             <Edit className="h-4 w-4 mr-2" />
             {isBasicAdminPortalUser ? 'Edit My Profile' : 'Edit Client'}
           </Button>
-          {!client.latestJsonData && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={handleApplyFunding}
-            >
-              Apply for Funding
-            </Button>
-          )}
           <Button 
             variant="default" 
             size="sm" 
@@ -1983,6 +1975,12 @@ return (
         </div>
 
         {/* Tabs */}
+        <FundingAgreementCard
+          clientId={client.id}
+          isFundable={client.fundingEligibility === 'fundable'}
+          source={isClientPortalMode ? 'member_dashboard' : 'admin_dashboard'}
+        />
+
         <Tabs value={activeTab} onValueChange={handleClientProfileTabChange} className="space-y-6">
           <div className="overflow-x-auto">
             <TabsList className={`grid w-full grid-cols-3 gap-2 ${isClientPortalMode ? "sm:grid-cols-6 min-w-[760px]" : "sm:grid-cols-9 min-w-[1120px]"} sm:min-w-0`}>

@@ -28,7 +28,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '../ui/tabs';
-import { authApi, superAdminApi } from '../../lib/api';
+import { authApi, superAdminApi, fundingAgreementsApi } from '../../lib/api';
 import { User, Settings, Key, Eye, EyeOff, Save, RefreshCw, AlertTriangle, CheckCircle, Camera, Trash2 } from 'lucide-react';
 import { useToast } from '../../hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -88,7 +88,9 @@ const SuperAdminSettingsManagement: React.FC = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<StripeConfig | null>(null);
   const [newValue, setNewValue] = useState('');
-  const [activeTab, setActiveTab] = useState<'profile' | 'system'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'system' | 'funding-agreement'>('profile');
+  const [fundingAgreement, setFundingAgreement] = useState({ title: '', content_html: '', success_fee_percentage: '8', version: 1 });
+  const [fundingAgreementSaving, setFundingAgreementSaving] = useState(false);
   const openAiConfigurationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   
   // Profile form state
@@ -106,7 +108,41 @@ const SuperAdminSettingsManagement: React.FC = () => {
     fetchStripeConfig();
     fetchAffiliateCommissionSettings();
     fetchOpenAiConfiguration();
+    fetchFundingAgreement();
   }, []);
+
+  const fetchFundingAgreement = async () => {
+    try {
+      const response = await fundingAgreementsApi.getTemplate();
+      const template = response.data?.data;
+      if (template) setFundingAgreement({
+        title: String(template.title || ''),
+        content_html: String(template.content_html || ''),
+        success_fee_percentage: String(template.success_fee_percentage ?? 8),
+        version: Number(template.version || 1),
+      });
+    } catch (error) {
+      console.error('Failed to load funding agreement template:', error);
+    }
+  };
+
+  const publishFundingAgreement = async () => {
+    const fee = Number(fundingAgreement.success_fee_percentage);
+    if (!fundingAgreement.title.trim() || !fundingAgreement.content_html.trim() || !Number.isFinite(fee)) {
+      toast({ title: 'Missing information', description: 'Title, agreement content, and a valid success fee are required.', variant: 'destructive' });
+      return;
+    }
+    try {
+      setFundingAgreementSaving(true);
+      await fundingAgreementsApi.publishTemplate({ title: fundingAgreement.title.trim(), content_html: fundingAgreement.content_html, success_fee_percentage: fee });
+      await fetchFundingAgreement();
+      toast({ title: 'Funding Agreement published', description: 'A new version is now active for future client agreements. Existing signed copies were not changed.' });
+    } catch (error: any) {
+      toast({ title: 'Unable to publish', description: error?.response?.data?.error || 'Please try again.', variant: 'destructive' });
+    } finally {
+      setFundingAgreementSaving(false);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -541,8 +577,8 @@ const SuperAdminSettingsManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'profile' | 'system')}>
-        <TabsList className="grid w-full grid-cols-2">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'profile' | 'system' | 'funding-agreement')}>
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User className="h-4 w-4" />
             Profile Settings
@@ -550,6 +586,10 @@ const SuperAdminSettingsManagement: React.FC = () => {
           <TabsTrigger value="system" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             System Configuration
+          </TabsTrigger>
+          <TabsTrigger value="funding-agreement" className="flex items-center gap-2">
+            <Save className="h-4 w-4" />
+            Funding Agreement
           </TabsTrigger>
         </TabsList>
 
@@ -921,6 +961,36 @@ const SuperAdminSettingsManagement: React.FC = () => {
                       Save Configuration
                     </>
                   )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="funding-agreement" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Client Funding Agreement Template</CardTitle>
+              <p className="text-sm text-muted-foreground">Current version: {fundingAgreement.version}. Publishing creates a new version; signed agreements keep their original snapshot and fee.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="funding-agreement-title">Agreement title</Label>
+                <Input id="funding-agreement-title" value={fundingAgreement.title} onChange={(event) => setFundingAgreement((current) => ({ ...current, title: event.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="funding-success-fee">Exact success fee percentage</Label>
+                <Input id="funding-success-fee" type="number" min="0" max="100" step="0.01" value={fundingAgreement.success_fee_percentage} onChange={(event) => setFundingAgreement((current) => ({ ...current, success_fee_percentage: event.target.value }))} />
+                <p className="text-xs text-muted-foreground">Expected range is currently 8%–10%. The exact accepted fee is stored on each client agreement.</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="funding-agreement-content">Agreement content (HTML)</Label>
+                <Textarea id="funding-agreement-content" className="min-h-[360px] font-mono text-sm" value={fundingAgreement.content_html} onChange={(event) => setFundingAgreement((current) => ({ ...current, content_html: event.target.value }))} />
+              </div>
+              <div className="flex justify-end">
+                <Button onClick={publishFundingAgreement} disabled={fundingAgreementSaving}>
+                  {fundingAgreementSaving ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Publish New Version
                 </Button>
               </div>
             </CardContent>

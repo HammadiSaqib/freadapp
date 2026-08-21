@@ -16,7 +16,7 @@ import { createServer as createHttpServer } from "http";
 import { handleDemo } from "./routes/demo.js";
 import { initializeDatabaseAdapter } from "./database/databaseAdapter.js";
 import { loadEnvironmentConfig } from "./config/environment.js";
-import { authenticateToken, requireRole } from "./middleware/authMiddleware.js";
+import { authenticateToken, requireRole, requireExactRole } from "./middleware/authMiddleware.js";
 import { requireSignedAdminContract } from "./middleware/contractGuard.js";
 import { requireSignedScoreMachineEliteAgreement } from "./middleware/scoreMachineEliteGuard.js";
 import { jsonErrorHandler, generalErrorHandler } from "./middleware/errorHandlingMiddleware.js";
@@ -64,17 +64,16 @@ import warMachineRoutes from "./routes/warMachine.js";
 import contractsRoutes from "./routes/contracts.js";
 import contractsAdminRoutes from "./routes/contractsAdmin.js";
 import contractAgreementsRoutes from "./routes/contractAgreements.js";
+import fundingAgreementsRoutes from "./routes/fundingAgreements.js";
 import employeesRoutes from "./routes/employees.js";
 import debtPayoffRoutes from "./routes/debtPayoff.js";
 import shopRoutes from "./routes/shop.js";
 import testimonialsRoutes, { publicTestimonialsRoutes } from "./routes/testimonials.js";
 import testimonialsExternalRoutes from "./routes/testimonialsExternal.js";
-import integrationsRoutes from "./routes/integrations.js";
 import appointmentsRoutes from "./routes/appointments.js";
 import { emailService } from "./services/emailService.js";
 
 import { reminderService } from "./services/reminderService.js";
-import { ghlAdminLifecycleScheduler } from "./services/ghlAdminLifecycleService.js";
 
 // Course routes
 import {
@@ -111,7 +110,6 @@ import {
   createClientIntakeToken,
   getClientIntakeConfig,
   submitClientIntake,
-  submitGhlWebhook,
   updateClient,
   deleteClient,
   getClientStats,
@@ -735,7 +733,6 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // SUPPORT SETTINGS ROUTES
   // =============================================================================
   app.use("/api/support/settings", supportSettingsRoutes);
-  app.use("/api/integrations", integrationsRoutes);
   app.use("/api/appointments", appointmentsRoutes);
 
   // =============================================================================
@@ -772,10 +769,10 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   app.use("/api/contracts", contractsRoutes);
   app.use("/api/contracts-admin", contractsAdminRoutes);
   app.use("/api/contract-agreements", contractAgreementsRoutes);
+  app.use("/api/funding-agreements", fundingAgreementsRoutes);
 
   app.post("/api/clients/intake", submitClientIntake);
   app.get("/api/clients/intake-config", getClientIntakeConfig);
-  app.post("/api/webhooks/ghl/:integration_hash", submitGhlWebhook);
   app.post("/api/clients/intake-token", authenticateToken, requireSignedAdminContract, createClientIntakeToken);
 
   // Enforce contract signing for admin-specific REST endpoints
@@ -849,22 +846,22 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   app.use('/api/funding/diy-submissions', fundingDIYSubmissionsRoutes);
 
   // Funding Requests
-  app.get("/api/funding-requests", authenticateToken, requireRole('funding_manager'), getFundingRequests);
-  app.get("/api/funding-requests/stats", authenticateToken, requireRole('funding_manager'), getFundingRequestStats);
-  app.get("/api/funding-requests/:id", authenticateToken, requireRole('funding_manager'), getFundingRequest);
-  app.post("/api/funding-requests", authenticateToken, requireRole('funding_manager'), createFundingRequest);
-  app.put("/api/funding-requests/:id", authenticateToken, requireRole('funding_manager'), updateFundingRequest);
-  app.delete("/api/funding-requests/:id", authenticateToken, requireRole('funding_manager'), deleteFundingRequest);
-  app.get("/api/funding-requests/:id/pdf", authenticateToken, requireRole('funding_manager'), generateFundingRequestPDF);
-  app.post("/api/funding-requests/upload-documents", authenticateToken, fundingDocumentsUpload.fields([
+  app.get("/api/funding-requests", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getFundingRequests);
+  app.get("/api/funding-requests/stats", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getFundingRequestStats);
+  app.get("/api/funding-requests/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getFundingRequest);
+  app.post("/api/funding-requests", authenticateToken, requireExactRole('funding_manager', 'super_admin'), createFundingRequest);
+  app.put("/api/funding-requests/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), updateFundingRequest);
+  app.delete("/api/funding-requests/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), deleteFundingRequest);
+  app.get("/api/funding-requests/:id/pdf", authenticateToken, requireExactRole('funding_manager', 'super_admin'), generateFundingRequestPDF);
+  app.post("/api/funding-requests/upload-documents", authenticateToken, requireExactRole('funding_manager', 'super_admin'), fundingDocumentsUpload.fields([
     { name: 'driverLicenseFile', maxCount: 1 },
     { name: 'einConfirmationFile', maxCount: 1 },
     { name: 'articlesFromStateFile', maxCount: 1 }
   ]), uploadFundingDocuments);
-  app.get("/api/funding-requests/documents/:filename", authenticateToken, serveDocument);
+  app.get("/api/funding-requests/documents/:filename", authenticateToken, requireExactRole('funding_manager', 'super_admin'), serveDocument);
 
   // Funding Manager Dashboard
-  app.get("/api/funding-manager/dashboard/stats", authenticateToken, requireRole('funding_manager'), getFundingManagerDashboardStats);
+  app.get("/api/funding-manager/dashboard/stats", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getFundingManagerDashboardStats);
 
   // Dispute Management
   app.get("/api/disputes", authenticateToken, getDisputes);
@@ -933,15 +930,15 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   app.get("/api/analytics/dashboard-elite", authenticateToken, getEliteDashboardData);
 
   // Bank Management
-  app.get("/api/banks", authenticateToken, requireRole('admin', 'funding_manager'), getBanks);
-  app.get("/api/banks/stats", authenticateToken, requireRole('admin', 'funding_manager'), getBankStats);
-  app.get("/api/banks/export", authenticateToken, requireRole('admin', 'funding_manager'), exportBanksCSV);
+  app.get("/api/banks", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getBanks);
+  app.get("/api/banks/stats", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getBankStats);
+  app.get("/api/banks/export", authenticateToken, requireExactRole('funding_manager', 'super_admin'), exportBanksCSV);
   const bankUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
-  app.post("/api/banks/import", authenticateToken, requireRole('admin', 'funding_manager'), bankUpload.single('file'), importBanksCSV);
-  app.get("/api/banks/:id", authenticateToken, requireRole('admin', 'funding_manager'), getBank);
-  app.post("/api/banks", authenticateToken, requireRole('admin', 'funding_manager'), createBank);
-  app.put("/api/banks/:id", authenticateToken, requireRole('admin', 'funding_manager'), updateBank);
-  app.delete("/api/banks/:id", authenticateToken, requireRole('admin', 'funding_manager'), deleteBank);
+  app.post("/api/banks/import", authenticateToken, requireExactRole('funding_manager', 'super_admin'), bankUpload.single('file'), importBanksCSV);
+  app.get("/api/banks/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), getBank);
+  app.post("/api/banks", authenticateToken, requireExactRole('funding_manager', 'super_admin'), createBank);
+  app.put("/api/banks/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), updateBank);
+  app.delete("/api/banks/:id", authenticateToken, requireExactRole('funding_manager', 'super_admin'), deleteBank);
 
   // Card Management
   app.use("/api/cards", cardManagementRoutes);
@@ -1101,9 +1098,6 @@ app.use("/api/commission-payments", commissionPaymentsRoutes);
   // Keep the post-payment thank-you follow-up. Automatic reminder delivery
   // (payment, report-pull, and inactivity reminders) is intentionally disabled.
   reminderService.startThankYouEmails();
-
-  // Keep ScoreMachine-owned GHL admin tags repaired even if an event was missed during downtime.
-  ghlAdminLifecycleScheduler.start();
 
   // Initialize WebSocket service
   const websocketService = initializeWebSocketService(httpServer);
