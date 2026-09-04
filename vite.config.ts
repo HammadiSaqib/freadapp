@@ -26,6 +26,18 @@ const portalLocalhostOrigins = portalAliases.flatMap((alias) => [
   `http://${alias}.localhost:3000`,
 ]);
 
+const publicAliases = [
+  'ref',
+  'refadmin',
+  'onboarding',
+  'mastermind',
+];
+
+const publicLocalhostOrigins = publicAliases.flatMap((alias) => [
+  `http://${alias}.localhost:3001`,
+  `http://${alias}.localhost:3000`,
+]);
+
 //1 https://vitejs.dev/config/
 export default defineConfig(() => ({
   server: {
@@ -122,6 +134,7 @@ function expressPlugin(): Plugin {
                 'http://localhost:3000',
                 'http://localhost:5173',
                 ...portalLocalhostOrigins,
+                ...publicLocalhostOrigins,
               ];
               if (process.env.CORS_ORIGIN) {
                 // Support comma-separated list

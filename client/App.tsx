@@ -198,6 +198,7 @@ const EliteFundingDIY = React.lazy(() => import("./pages/EliteFundingDIY"));
 const FundingApplication = React.lazy(() => import("./pages/FundingApplication"));
 const InvoiceView = React.lazy(() => import("./pages/InvoiceView"));
 const PayslipPublic = React.lazy(() => import("./pages/PayslipPublic"));
+const MastermindLanding = React.lazy(() => import("./pages/MastermindLanding"));
 
 const queryClient = new QueryClient();
 
@@ -1153,7 +1154,15 @@ function PublicHostRootRoute({ hostname }: { hostname?: string }) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return publicAlias === "onboarding" ? <ClientIntake /> : <Index />;
+  if (publicAlias === "onboarding") {
+    return <ClientIntake />;
+  }
+
+  if (publicAlias === "mastermind") {
+    return <MastermindLanding />;
+  }
+
+  return <Index />;
 }
 
 function DynamicPublicHostRoute({ hostname }: { hostname?: string }) {
@@ -1167,6 +1176,10 @@ function DynamicPublicHostRoute({ hostname }: { hostname?: string }) {
 
   if (publicAlias === "onboarding") {
     return <ClientIntake />;
+  }
+
+  if (publicAlias === "mastermind") {
+    return <NotFound />;
   }
 
   return <NotFound />;

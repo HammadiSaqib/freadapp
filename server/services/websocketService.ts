@@ -25,6 +25,8 @@ const publicLocalhostOrigins = [
   'http://refadmin.localhost:3000',
   'http://onboarding.localhost:3001',
   'http://onboarding.localhost:3000',
+  'http://mastermind.localhost:3001',
+  'http://mastermind.localhost:3000',
 ];
 
 const trustedProductionBaseDomains = [

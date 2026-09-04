@@ -8,7 +8,7 @@ export const PORTAL_ALIASES = [
   "printing-team",
 ] as const;
 
-export const PUBLIC_HOST_ALIASES = ["ref", "refadmin", "onboarding"] as const;
+export const PUBLIC_HOST_ALIASES = ["ref", "refadmin", "onboarding", "mastermind"] as const;
 
 export type PortalAlias = (typeof PORTAL_ALIASES)[number];
 export type PublicHostAlias = (typeof PUBLIC_HOST_ALIASES)[number];
@@ -462,6 +462,12 @@ export function getCanonicalPortalRedirect(input: RedirectInput): PortalRedirect
       type: "host",
       targetUrl: buildAliasUrl("admin", pathname, input),
     };
+  }
+
+  if (currentPublicAlias === "mastermind") {
+    if (pathname === "/") {
+      return null;
+    }
   }
 
   const prefixedPortalTarget = getLegacyPortalTarget(pathname, {
