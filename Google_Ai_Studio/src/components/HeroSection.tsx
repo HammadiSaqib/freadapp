@@ -25,7 +25,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onStartStep1 }) => {
 
         {/* Headline */}
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
-          Start Your Credit &amp; Funding Journey with{' '}
+          Start Your Credit &amp; Business Funding Journey with{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400">
             The CapSol
           </span>

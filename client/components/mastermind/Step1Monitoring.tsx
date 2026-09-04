@@ -70,36 +70,45 @@ export const Step1Monitoring: React.FC<Step1MonitoringProps> = ({ onContinue }) 
             </div>
           </div>
 
-          {/* Card 2: IdentityIQ (Coming Soon) */}
-          <div className="flex flex-col justify-between bg-slate-950/60 rounded-2xl border border-slate-800 p-6 shadow-md relative">
+          {/* Card 2: IdentityIQ */}
+          <div className="flex flex-col justify-between bg-slate-950 rounded-2xl border-2 border-slate-800 p-6 shadow-xl relative hover:border-slate-700 transition-all">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-slate-800 text-slate-300 rounded-full text-[11px] font-black uppercase tracking-wider border border-slate-700">
+              Option 2
+            </div>
+
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs font-bold text-slate-500 uppercase">Option 2</span>
-                <span className="text-xs font-bold px-2.5 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded-lg">
-                  Link Coming Soon
+              <div className="flex items-center justify-between mb-4 mt-2">
+                <span className="text-xs font-bold text-slate-400 uppercase">Provider 2</span>
+                <span className="text-xs font-bold px-2.5 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-lg flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5" /> Approved
                 </span>
               </div>
 
-              <h3 className="text-2xl font-bold text-slate-200 mb-1">
+              <h3 className="text-2xl font-bold text-white mb-1">
                 IdentityIQ
               </h3>
               <p className="text-xs text-slate-400 mb-5">
                 Identity theft protection &amp; credit bureau monitoring.
               </p>
 
-              {/* QR and Action Component - Placeholder State */}
+              {/* QR and Action Component */}
               <QRCodeCard
+                url="https://partner.idiq.com/inviteapartner?zid=168266"
                 buttonText="Register with IdentityIQ"
-                isAvailable={false}
-                placeholderText="Link Coming Soon"
+                isAvailable={true}
+                badge="Active"
+                accentColor="cyan"
               />
             </div>
 
             {/* Small Note */}
-            <div className="mt-6 pt-4 border-t border-slate-800 text-left">
-              <p className="text-xs text-slate-400">
-                Link is coming soon. For now, please choose <strong>MyScoreIQ</strong> or <strong>MyFreeScoreNow</strong>.
-              </p>
+            <div className="mt-6 pt-4 border-t border-slate-800/80 bg-amber-950/40 p-3.5 rounded-xl border border-amber-500/30 text-left">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-200 leading-normal">
+                  <strong className="text-amber-100">Remember the email address you use here.</strong> You must use the same email during The CapSol enrollment and payment.
+                </p>
+              </div>
             </div>
           </div>
 
